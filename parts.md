@@ -6,19 +6,11 @@ Farbsensoren: https://www.amazon.de/Youmile-TCS-34725-TCS34725-Lichtfarbmodul-Fa
 
 Pixy Kamera: Schule
 
-Motor: altes Auto
+Chassis: https://www.roboter-bausatz.de/p/2wd-rc-smart-car-chassis
 
 Motor driver: https://www.roboter-bausatz.de/p/l298n-motortreiber-mit-doppelter-h-bruecke
 
-Servo Motor: Emil
-
-Lenkung
-
-Bodenplatte
-
 USB-C Port für externe Stromversorgung: https://www.roboter-bausatz.de/p/usb-c-3.1-buchse-auf-pins-adapterplatine-5-stueck
-
-Farbsensor: https://www.amazon.de/AZDelivery-Farbsensor-TCS230-TCS3200-Arduino/dp/B07TWFD5TR/ref=sr_1_1_sspa?crid=30YQHVLUTXYOW&keywords=farbsensor%2Barduino&qid=1693848652&sprefix=%2Caps%2C105&sr=8-1-spons&sp_csd=d2lkZ2V0TmFtZT1zcF9hdGY&th=1
 
 
 
