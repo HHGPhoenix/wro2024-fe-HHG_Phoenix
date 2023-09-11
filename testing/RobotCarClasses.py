@@ -9,6 +9,7 @@ class Motor:
         self.fpin = fpin
         self.rpin = rpin
         self.spin = spin
+        self.speed = 0
         
         #GPIO setup
         GPIO.setup(fpin, GPIO.OUT)
@@ -18,6 +19,7 @@ class Motor:
         self.pwm = GPIO.PWM(spin, frequency)
 
     def drive(self, direction, speed):
+        self.speed = speed
         if direction == 'f':
             GPIO.output(self.fpin, 1)
             GPIO.output(self.rpin, 0)
@@ -33,7 +35,7 @@ class Motor:
             print(f"no valid speed value specified: {speed}")
             
     def start(self):
-        self.pwm.start(0)    
+        self.pwm.start(self.speed)    
             
     def stop(self):
         GPIO.output(self.fpin, 0) 
@@ -95,6 +97,7 @@ class Servo:
         GPIO.setup(self.SignalPin, GPIO.OUT)
         
         self.pwm = GPIO.PWM(SignalPin, frequency)
+        self.pwm.start(6.6)
         
     def steer(self, percentage):
         if percentage > 100:

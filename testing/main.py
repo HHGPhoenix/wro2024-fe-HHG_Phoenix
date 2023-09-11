@@ -1,7 +1,7 @@
 import keyboard
 import RPi.GPIO as GPIO
 import time
-from RobotCar import *
+from RobotCarClasses import *
 
 
 DISTANCE = 30
@@ -19,6 +19,15 @@ Ultraschallsensor.start_measurement()
 
 time.sleep(0.1)
 print(Ultraschallsensor.distance)
+
+
+
+
+
+
+
+
+
 
 """
 while True:
