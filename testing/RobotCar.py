@@ -45,6 +45,7 @@ class SuperSonicSensor:
     def __init__(self, TrigPin, EchoPin):
         self.EchoPin = EchoPin
         self.TrigPin = TrigPin
+        self.distance = 0
         
         #GPIO setup
         GPIO.setup(TrigPin, GPIO.OUT)

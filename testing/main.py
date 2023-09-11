@@ -1,13 +1,7 @@
 import keyboard
 import RPi.GPIO as GPIO
 import time
-
-F = 16
-R = 18
-Signal = 12
-TrigPin = 38
-EchoPin = 40
-Speed = 37
+from RobotCar import *
 
 
 DISTANCE = 30
@@ -16,7 +10,17 @@ P = 2.5
 
 GPIO.setmode(GPIO.BOARD)
 
+Motor1 = Motor(1000, 13, 15, 11)
 
+Servo1 = Servo(7, 50)
+
+Ultraschallsensor = SuperSonicSensor(16, 12)
+Ultraschallsensor.start_measurement()
+
+time.sleep(0.1)
+print(Ultraschallsensor.distance)
+
+"""
 GPIO.setup(F, GPIO.OUT)
 GPIO.setup(R, GPIO.OUT)
 GPIO.setup(Speed, GPIO.OUT)
@@ -82,7 +86,7 @@ while True:
 
     steering(-Correction)
 
-
+"""
 """
 while True:
     try:
