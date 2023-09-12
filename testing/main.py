@@ -19,28 +19,3 @@ Ultraschallsensor.start_measurement()
 
 time.sleep(0.1)
 print(Ultraschallsensor.distance)
-
-
-
-
-
-
-
-
-
-
-"""
-while True:
-    time.sleep(0.02)
-    distance = Ultraschall()
-    Error = distance - DISTANCE
-    Correction = P * Error
-    if Correction > 90:
-        Correction = 90
-    elif Correction < -90:
-        Correction = -90
-    print(Error)
-
-    steering(-Correction)
-
-"""

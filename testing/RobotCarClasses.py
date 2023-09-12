@@ -1,7 +1,9 @@
 import RPi.GPIO as GPIO
 import time
 import threading
-
+from ctypes import *
+from pixy import *
+import pixy
 
 class Motor:
     def __init__(self, frequency, fpin, rpin, spin):
@@ -107,3 +109,51 @@ class Servo:
         else:
             DutyCycle = 3e-5 * percentage**2 + 0.018 * percentage + 6.57
             self.pwm.ChangeDutyCycle(DutyCycle)
+            
+            
+class PixyCam:
+    def __init__(self):
+        self.x = 0
+        self.y = 0
+        self.width = 0
+        self.height = 0
+        self.threadStop = 0
+        self.count = 0
+        self.age = 0
+        self.index = 0
+        self.angle = 0
+        
+        pixy.init()
+        pixy.change_prog ("color_connected_components");        
+        
+    def start_reading(self):
+        self.threadStop = 0
+        self.thread = threading.Thread(target=self.read, daemon=True)
+        self.thread.start()
+        
+    def read(self):
+        class Blocks (Structure):
+            _fields_ = [ ("m_signature", c_uint),
+                ("m_x", c_uint),
+                ("m_y", c_uint),
+                ("m_width", c_uint),
+                ("m_height", c_uint),
+                ("m_angle", c_uint),
+                ("m_index", c_uint),
+                ("m_age", c_uint) ]
+            
+        self.output = BlockArray(100)
+            
+        while self.threadStop == 0:
+            self.count = pixy.ccc_get_blocks(100, self.output)
+            
+    def stop_reading(self):
+        self.threadStop = 1
+        
+    def LED(self, state):
+        if state == 1:
+            set_lamp(1, 1)
+        elif state == 0:
+            set_lamp(0, 0)
+        else:
+            print("no valid state specified " + state)
