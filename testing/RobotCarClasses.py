@@ -101,7 +101,8 @@ class Servo:
         self.pwm = GPIO.PWM(SignalPin, frequency)
         self.pwm.start(6.6)
         
-    def steer(self, percentage):
+    def steer(self, percentage, Motor, speed):
+        self.Motor = Motor
         if percentage > 100:
             print("specified percentage too big: -100 to 100")
         elif percentage < -100:
@@ -109,6 +110,13 @@ class Servo:
         else:
             DutyCycle = 3e-5 * percentage**2 + 0.018 * percentage + 6.57
             self.pwm.ChangeDutyCycle(DutyCycle)
+            if percentage > 50 or percentage < - 50:
+                MotorSpeed = abs(speed * abs(percentage) * 0.015)
+                if MotorSpeed > 100:
+                    MotorSpeed = 100
+                self.Motor.drive("r", MotorSpeed)
+            else:
+                self.Motor.drive("r", speed)
             
             
 class PixyCam:
@@ -161,6 +169,12 @@ class PixyCam:
             
 class Button:
     def __init__(self, SignalPin):
+        self.SignalPin = SignalPin
         #GPIO
-        GPIO.setup(TrigPin, GPIO.OUT)
-        GPIO.setup(EchoPin, GPIO.IN)
+        GPIO.setup(SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        
+    def state(self):
+        if GPIO.input(self.SignalPin) == 0:
+            return 1
+        elif GPIO.input(self.SignalPin) == 1:
+            return 0
