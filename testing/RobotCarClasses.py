@@ -84,7 +84,7 @@ class SuperSonicSensor:
             # Update self.dist
             self.distance = distance
 
-            time.sleep(0.025)
+            time.sleep(0.08)
 
     def stop_measurement(self):
         self.threadStop = 1
@@ -157,3 +157,10 @@ class PixyCam:
             set_lamp(0, 0)
         else:
             print("no valid state specified " + state)
+            
+            
+class Button:
+    def __init__(self, SignalPin):
+        #GPIO
+        GPIO.setup(TrigPin, GPIO.OUT)
+        GPIO.setup(EchoPin, GPIO.IN)
