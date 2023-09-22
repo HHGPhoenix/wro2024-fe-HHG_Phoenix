@@ -4,6 +4,19 @@ import threading
 from ctypes import *
 from pixy import *
 import pixy
+import board
+import adafruit_tcs34725
+
+##########################################################
+##                                                      ##
+##                     Classes                          ##
+##                                                      ##
+##########################################################
+
+class CustomException(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+
 
 class Motor:
     def __init__(self, frequency, fpin, rpin, spin):
@@ -18,9 +31,12 @@ class Motor:
         GPIO.setup(rpin, GPIO.OUT)
         GPIO.setup(spin, GPIO.OUT)
         
-        self.pwm = GPIO.PWM(spin, frequency)
+        try:
+            self.pwm = GPIO.PWM(spin, frequency)
+        except:
+            raise CustomException(f"no valid frequency specified {frequency}")
 
-    def drive(self, direction, speed):
+    def drive(self, direction, speed=0):
         self.speed = speed
         if direction == 'f':
             GPIO.output(self.fpin, 1)
@@ -29,15 +45,18 @@ class Motor:
             GPIO.output(self.fpin, 0)
             GPIO.output(self.rpin, 1)
         else:
-            print("no valid direction specified:" + direction)
+            raise CustomException(f"no valid direction specified: {direction}")
 
         try:
             self.pwm.ChangeDutyCycle(speed)
         except:
-            print(f"no valid speed value specified: {speed}")
+            raise CustomException(f"no valid speed value specified: {speed}")
             
     def start(self):
-        self.pwm.start(self.speed)    
+        try:
+            self.pwm.start(self.speed)  
+        except:
+            raise CustomException(f"no valid speed value specified: {self.speed}")  
             
     def stop(self):
         GPIO.output(self.fpin, 0) 
@@ -84,7 +103,7 @@ class SuperSonicSensor:
             # Update self.dist
             self.distance = distance
 
-            time.sleep(0.08)
+            time.sleep(0.04)
 
     def stop_measurement(self):
         self.threadStop = 1
@@ -98,25 +117,19 @@ class Servo:
         #GPIO setup
         GPIO.setup(self.SignalPin, GPIO.OUT)
         
-        self.pwm = GPIO.PWM(SignalPin, frequency)
-        self.pwm.start(6.6)
+        try:
+            self.pwm = GPIO.PWM(SignalPin, frequency)
+            self.pwm.start(6.6)
+        except:
+            raise CustomException(f"no valid frequency specified: {frequency}")
         
-    def steer(self, percentage, Motor, speed):
-        self.Motor = Motor
-        if percentage > 100:
-            print("specified percentage too big: -100 to 100")
-        elif percentage < -100:
-            print("specified percentage too small: -100 to 100")
-        else:
+    def steer(self, percentage):
+        try:
             DutyCycle = 3e-5 * percentage**2 + 0.018 * percentage + 6.57
             self.pwm.ChangeDutyCycle(DutyCycle)
-            if percentage > 50 or percentage < - 50:
-                MotorSpeed = abs(speed * abs(percentage) * 0.015)
-                if MotorSpeed > 100:
-                    MotorSpeed = 100
-                self.Motor.drive("r", MotorSpeed)
-            else:
-                self.Motor.drive("r", speed)
+        
+        except:
+            raise CustomException(f"no valid steering percentage specified: {percentage}")
             
             
 class PixyCam:
@@ -164,7 +177,7 @@ class PixyCam:
         elif state == 0:
             set_lamp(0, 0)
         else:
-            print("no valid state specified " + state)
+            raise CustomException(f"no valid state specified: {state}")
             
             
 class Button:
@@ -178,3 +191,101 @@ class Button:
             return 1
         elif GPIO.input(self.SignalPin) == 1:
             return 0
+        
+         
+class ColorSensor:      #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
+    def __init__(self):
+        self.color_rgb = 0
+        self.color_temperature = 0
+        self.lux = 0
+        
+        
+        #Colorsensor
+        i2c = board.I2C()
+        self.sensor = adafruit_tcs34725.TCS34725(i2c)
+            
+    def start_measurement(self):
+        self.threadStop = 0
+        self.thread = threading.Thread(target=self.read, daemon=True)
+        self.thread.start()
+        
+    def read(self):
+        while self.threadStop == 0:
+            self.color_rgb = self.sensor.color_rgb_bytes
+            self.color_temperature = self.sensor.color_temperature
+            self.lux = self.sensor.lux
+        
+    def stop_measurement(self):
+        self.threadStop = 1
+
+
+class Utility:
+    def __init__(self, Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton):
+        self.Ultraschall1 = Ultraschall1
+        self.Ultraschall2 = Ultraschall2
+        self.Farbsensor = Farbsensor
+        self.Motor1 = Motor1
+        self.Servo1 = Servo1
+        self.StartButton = StartButton
+        self.StopButton = StopButton
+        
+    def cleanup(self):
+        self.Ultraschall1.stop_measurement()
+        self.Ultraschall2.stop_measurement()
+        self.Farbsensor.stop_measurement()
+        self.Motor1.stop()
+        
+        GPIO.cleanup()
+        self.running = False
+    
+    def StartRun(self, MotorSpeed, steer, direction="f"):
+        self.waiting = True
+        while self.running and self.waiting:
+            try:
+                time.sleep(0.01)
+                if self.StartButton.state() == 1:
+                    self.StartTime = time.time()
+                    print("Run started: " + time.time())
+                    
+                    self.Motor1.drive(direction, MotorSpeed)
+                    self.Servo1.steer(steer)
+                    
+                    self.waiting = False
+                    
+            except:
+                self.cleanup()
+
+
+class Functions:
+    def __init__(self, Utils):
+        self.Utils = Utils
+        self.Ultraschall1 = Utils.Ultraschall1
+        self.Ultraschall2 = Utils.Ultraschall2
+        self.Farbsensor = Utils.Farbsensor
+        self.Motor1 = Utils.Motor1
+        self.Servo1 = Utils.Servo1
+        self.StartButton = Utils.StartButton
+        self.StopButton = Utils.StopButton
+    
+    def HoldDistance(self, DISTANCE=50, P=5):
+        self.HoldDistance.P = P
+        self.HoldDistance.DISTANCE = DISTANCE
+        while self.Utils.running and self.rounds < 3:
+            time.sleep(0.01)
+            try:
+                Error = self.Ultraschall1.distance - DISTANCE
+                Correction = P * Error
+                if Correction > 100:
+                    Correction = 100
+                elif Correction < -100:
+                    Correction = -100
+                self.Servo1.steer(-Correction, self.Motor1)
+                
+                if self.Farbsensor.color_temperature >= 1 and self.Farbsensor.color_temperature <= 1:
+                    corners = corners + 1
+                    if corners == 4:
+                        corners = 0
+                        self.rounds = self.rounds + 1
+                
+            except:
+                self.Utils.cleanup()

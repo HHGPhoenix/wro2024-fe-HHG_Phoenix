@@ -1,13 +1,9 @@
-import keyboard
-import RPi.GPIO as GPIO
+import adafruit_tcs34725
 import time
-from RobotCarClasses import *
+import busio
+import board
 
-GPIO.setmode(GPIO.BOARD)
-
-Ultraschallsensor1 = SuperSonicSensor(11, 13)
-Ultraschallsensor1.start_measurement()
-
-while True:
-    print(Ultraschallsensor1.distance)
-    time.sleep(0.1)
+i2c = busio.I2C(3, 2)
+#while not i2c.try_lock():
+#    pass
+print(i2c.scan())

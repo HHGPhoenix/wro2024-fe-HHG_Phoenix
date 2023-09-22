@@ -4,38 +4,68 @@ import time
 from RobotCarClasses import *
 
 
-DISTANCE = 30
+
+##########################################################
+##                                                      ##
+##                      Variables                       ##
+##                                                      ##
+##########################################################
+
+global P, DISTANCE 
+
 P = 5
 
-GPIO.setmode(GPIO.BOARD)
+DISTANCE = 15
 
-StartButton = Button(22)
-StopButton = Button(32)
 
-Ultraschall1 = SuperSonicSensor(11, 13)
 
-Servo1 = Servo(7, 50)
+##########################################################
+##                                                      ##
+##                Sensor Initalization                  ##
+##                                                      ##
+##########################################################
+    
+Farbsensor = ColorSensor()
+Farbsensor.start_measurement()
 
-Motor1 = Motor(1000, 16, 18, 15)
+Motor1 = Motor(1000, 13, 15, 11)
 Motor1.start()
-Motor1.drive("r", 85)
 
+Ultraschall1 = SuperSonicSensor(22, 32)
 Ultraschall1.start_measurement()
 
-running = True
-Start = 0
+Ultraschall2 = SuperSonicSensor(16, 18)
+Ultraschall2.start_measurement()
 
-while running:
-    time.sleep(0.01)
+#PixyCam1 = PixyCam()
+
+Servo1 = Servo(12, 50)
+
+StartButton = Button(37)
+StopButton = Button(33)
+
+CException = CustomException()
+
+Utils = Utility(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton)
+Funcs = Functions(Utils)
+
+
+
+##########################################################
+##                                                      ##
+##                     Main Code                        ##
+##                                                      ##
+##########################################################
+
+running = True
+rounds = 0
+corners = 0
+
+#Main loop
+while Utils.running:
     try:
-        Error = Ultraschall1.distance - DISTANCE
-        Correction = P * Error
-        if Correction > 100:
-            Correction = 100
-        elif Correction < -100:
-            Correction = -100
-        Servo1.steer(-Correction, Motor1, 85)
-    except KeyboardInterrupt:
-        Ultraschall1.stop_measurement()
-        GPIO.cleanup()
-        running = False
+        Utils.StartRun(80, 0)
+        Funcs.HoldDistance()
+        
+    except:
+        Utils.cleanup()
