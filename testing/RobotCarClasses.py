@@ -132,7 +132,7 @@ class Servo:
             raise CustomException(f"no valid steering percentage specified: {percentage}")
             
             
-class PixyCam:
+class PixyCam: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
     def __init__(self):
         self.x = 0
         self.y = 0
@@ -180,7 +180,7 @@ class PixyCam:
             raise CustomException(f"no valid state specified: {state}")
             
             
-class Button:
+class Button: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
     def __init__(self, SignalPin):
         self.SignalPin = SignalPin
         #GPIO
@@ -193,7 +193,7 @@ class Button:
             return 0
         
          
-class ColorSensor:      #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
+class ColorSensor: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
     def __init__(self):
         self.color_rgb = 0
         self.color_temperature = 0
@@ -219,7 +219,7 @@ class ColorSensor:      #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
         self.threadStop = 1
 
 
-class Utility:
+class Utility: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
     def __init__(self, Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton):
         self.Ultraschall1 = Ultraschall1
         self.Ultraschall2 = Ultraschall2
@@ -238,14 +238,14 @@ class Utility:
         GPIO.cleanup()
         self.running = False
     
-    def StartRun(self, MotorSpeed, steer, direction="f"):
+    def StartRun(self, MotorSpeed, steer=0, direction="f"):
         self.waiting = True
         while self.running and self.waiting:
             try:
                 time.sleep(0.01)
                 if self.StartButton.state() == 1:
                     self.StartTime = time.time()
-                    print("Run started: " + time.time())
+                    print(f"Run started: {time.time()}")
                     
                     self.Motor1.drive(direction, MotorSpeed)
                     self.Servo1.steer(steer)
@@ -266,11 +266,16 @@ class Functions:
         self.Servo1 = Utils.Servo1
         self.StartButton = Utils.StartButton
         self.StopButton = Utils.StopButton
-    
-    def HoldDistance(self, DISTANCE=50, P=5):
+        self.rounds = 0
+        self.corners = 0
+
+    def HoldDistance(self, DISTANCE=50, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1):
         self.HoldDistance.P = P
-        self.HoldDistance.DISTANCE = DISTANCE
-        while self.Utils.running and self.rounds < 3:
+        self.HoldDistance.DISTANCE = DISTANCE 
+        self.Motor1.drive(direction, speed)
+        driving = True
+        
+        while self.Utils.running and self.rounds < 3 and driving:
             time.sleep(0.01)
             try:
                 Error = self.Ultraschall1.distance - DISTANCE
@@ -279,13 +284,34 @@ class Functions:
                     Correction = 100
                 elif Correction < -100:
                     Correction = -100
-                self.Servo1.steer(-Correction, self.Motor1)
+                    
+                if direction == "f":
+                    self.Servo1.steer(-Correction)
+                elif direction == "r":
+                    self.Servo1.steer(Correction)
+                else:
+                    raise CustomException(f"no valid direction specified: {direction}")
                 
-                if self.Farbsensor.color_temperature >= 1 and self.Farbsensor.color_temperature <= 1:
+                if self.Farbsensor.color_temperature >= colorTemperature - 100 and self.Farbsensor.color_temperature <= colorTemperature + 100:
                     corners = corners + 1
                     if corners == 4:
                         corners = 0
                         self.rounds = self.rounds + 1
+                        
+                    if HoldAtLine == True:
+                        driving = False
                 
             except:
                 self.Utils.cleanup()
+                
+                
+    def DriveCorner(self, direction="f", speed=0, steer=0, wait=0, stop=True):
+        self.Motor1.drive(direction, speed)
+        self.Servo1.steer(steer)
+        time.sleep(wait)
+        if stop:
+            self.Motor1.drive(direction, 0)
+            self.Servo1.steer(0)
+            
+    def CalMiddle(self, CarWidth=17):
+        self.middledistance = (self.Ultraschall1.distance + self.Ultraschall2.distance + CarWidth) / 2
