@@ -57,15 +57,51 @@ Funcs = Functions(Utils)
 ##                                                      ##
 ##########################################################
 
-running = True
-rounds = 0
-corners = 0
 
-#Main loop
-while Utils.running:
-    try:
-        Utils.StartRun(80, 0)
-        Funcs.HoldDistance()
-        
-    except:
-        Utils.cleanup()
+def Variation1():
+    Utils.running = True
+    
+    #Main loop
+    while Utils.running and Funcs.rounds < 3:
+        time.sleep(0.01)
+        try:
+            Utils.StartRun(80, 0)
+            Funcs.HoldDistance()
+            
+        except:
+            Utils.cleanup()
+            
+    Utils.cleanup()
+            
+            
+def Variation2():
+    Utils.running = True
+    
+    #Main loop
+    Utils.StartRun(80, 0)
+    while Utils.running and Funcs.rounds < 3:
+        time.sleep(0.01)
+        try:
+            Funcs.HoldDistance(50, True)
+            Funcs.DriveCorner("f", 80, 100, 2)
+        except:
+            Utils.cleanup()
+            
+    Utils.cleanup()    
+    
+    
+def Variation3():
+    Utils.running = True
+    
+    #Main loop
+    Utils.StartRun(80, 0)
+    while Utils.running and Funcs.rounds < 3:
+        time.sleep(0.01)
+        try:
+            Funcs.CalMiddle()
+            Funcs.HoldDistance(Funcs.middledistance, True)
+            Funcs.DriveCorner("f", 80, 100, 2)
+        except:
+            Utils.cleanup()
+            
+    Utils.cleanup()    
