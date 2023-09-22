@@ -289,5 +289,3 @@ class Functions:
                 
             except:
                 self.Utils.cleanup()
-                
-#Moin
