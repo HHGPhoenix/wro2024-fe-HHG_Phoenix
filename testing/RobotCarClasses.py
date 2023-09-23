@@ -254,6 +254,12 @@ class Utility: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
                     
             except:
                 self.cleanup()
+                
+    def StopRun(self):
+        self.cleanup()
+        self.StopTime = time.time()
+        print(f"Run ended: {self.StopTime}")
+        print(f"Time needed: {self.StopTime - self.StartTime}")
 
 
 class Functions:
