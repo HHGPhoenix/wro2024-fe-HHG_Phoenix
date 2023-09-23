@@ -71,7 +71,7 @@ def Variation1():
         except:
             Utils.cleanup()
             
-    Utils.cleanup()
+    Utils.StopRun()
             
             
 def Variation2():
@@ -87,7 +87,7 @@ def Variation2():
         except:
             Utils.cleanup()
             
-    Utils.cleanup()    
+    Utils.StopRun()  
     
     
 def Variation3():
@@ -104,4 +104,4 @@ def Variation3():
         except:
             Utils.cleanup()
             
-    Utils.cleanup()    
+    Utils.StopRun()   
