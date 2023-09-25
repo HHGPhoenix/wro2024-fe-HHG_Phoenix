@@ -6,6 +6,9 @@ from pixy import *
 import pixy
 import board
 import adafruit_tcs34725
+import os
+import signal
+
 
 ##########################################################
 ##                                                      ##
@@ -27,6 +30,7 @@ class Motor:
         self.speed = 0
         
         #GPIO setup
+        GPIO.setmode(GPIO.BCM)
         GPIO.setup(fpin, GPIO.OUT)
         GPIO.setup(rpin, GPIO.OUT)
         GPIO.setup(spin, GPIO.OUT)
@@ -59,6 +63,7 @@ class Motor:
             raise CustomException(f"no valid speed value specified: {self.speed}")  
             
     def stop(self):
+        GPIO.setmode(GPIO.BCM)
         GPIO.output(self.fpin, 0) 
         GPIO.output(self.rpin, 0)
         self.pwm.stop()
@@ -80,21 +85,34 @@ class SuperSonicSensor:
         self.thread.start()
         
     def measure_distance(self):
-        GPIO.setmode(GPIO.BOARD)
+        MAXTIME = 0.01
+        StartTime = 0
+        StopTime = 0
+        #GPIO.setmode(GPIO.BOARD)
         while self.threadStop == 0:
             # Trigger
             GPIO.output(self.TrigPin, 0)
-            time.sleep(0.000005)
+            time.sleep(0.03)
+            
             GPIO.output(self.TrigPin, 1)
-            time.sleep(0.000010)
+            time.sleep(0.00001)
             GPIO.output(self.TrigPin, 0)
 
             # Get times
-            while GPIO.input(self.EchoPin) == 0:
+            TIMEOUT = time.time() + MAXTIME
+            while GPIO.input(self.EchoPin) == 0 and StartTime < TIMEOUT:
                 StartTime = time.time()
+            
+            if StartTime > TIMEOUT:
+                print("Timeout1: ", StartTime > TIMEOUT)
 
-            while GPIO.input(self.EchoPin) == 1:
+            TIMEOUT = time.time() + MAXTIME
+            while GPIO.input(self.EchoPin) == 1 and StopTime < TIMEOUT:
                 StopTime = time.time()
+            
+            if StopTime > TIMEOUT:
+                print("Timeout2: ", StopTime > TIMEOUT)
+            
 
             # Calculate distance
             delay = StopTime - StartTime
@@ -102,8 +120,6 @@ class SuperSonicSensor:
 
             # Update self.dist
             self.distance = distance
-
-            time.sleep(0.04)
 
     def stop_measurement(self):
         self.threadStop = 1
@@ -192,6 +208,20 @@ class Button: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
         elif GPIO.input(self.SignalPin) == 1:
             return 0
         
+    def start_StopButton(self):
+        self.threadStop = 0
+        self.thread = threading.Thread(target=self.read_StopButton, daemon=True)
+        self.thread.start()
+        
+    def read_StopButton(self):
+        while self.threadStop == 0:
+            time.sleep(0.01)
+            if self.state() == 1:
+                os.kill(os.getpid(), signal.SIGINT)
+                
+    def stop_StopButton(self):
+        self.threadStop = 1
+        
          
 class ColorSensor: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
     def __init__(self):
@@ -211,6 +241,7 @@ class ColorSensor: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
         
     def read(self):
         while self.threadStop == 0:
+            time.sleep(0.01)
             self.color_rgb = self.sensor.color_rgb_bytes
             self.color_temperature = self.sensor.color_temperature
             self.lux = self.sensor.lux
@@ -220,7 +251,7 @@ class ColorSensor: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
 
 
 class Utility: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
-    def __init__(self, Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton):
+    def __init__(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None):
         self.Ultraschall1 = Ultraschall1
         self.Ultraschall2 = Ultraschall2
         self.Farbsensor = Farbsensor
@@ -230,10 +261,16 @@ class Utility: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
         self.StopButton = StopButton
         
     def cleanup(self):
-        self.Ultraschall1.stop_measurement()
-        self.Ultraschall2.stop_measurement()
-        self.Farbsensor.stop_measurement()
-        self.Motor1.stop()
+        if self.Ultraschall1:
+            self.Ultraschall1.stop_measurement()
+        if self.Ultraschall2:
+            self.Ultraschall2.stop_measurement()
+        if self.Farbsensor:
+            self.Farbsensor.stop_measurement()
+        if self.Motor1:
+            self.Motor1.stop()
+        
+        self.StopButton.stop_StopButton()
         
         GPIO.cleanup()
         self.running = False
@@ -276,20 +313,22 @@ class Functions:
         self.corners = 0
 
     def HoldDistance(self, DISTANCE=50, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1):
-        self.HoldDistance.P = P
-        self.HoldDistance.DISTANCE = DISTANCE 
+        self.P = P
+        self.DISTANCE = DISTANCE 
         self.Motor1.drive(direction, speed)
         driving = True
         
         while self.Utils.running and self.rounds < 3 and driving:
             time.sleep(0.01)
+            #print(f"Distance1: {self.Ultraschall1.distance}, Distance2: {self.Ultraschall2.distance}")
+            #print(self.Farbsensor.color_temperature)
             try:
                 Error = self.Ultraschall1.distance - DISTANCE
                 Correction = P * Error
-                if Correction > 100:
-                    Correction = 100
-                elif Correction < -100:
-                    Correction = -100
+                if Correction > 95:
+                    Correction = 95
+                elif Correction < -95:
+                    Correction = -95
                     
                 if direction == "f":
                     self.Servo1.steer(-Correction)
@@ -297,7 +336,7 @@ class Functions:
                     self.Servo1.steer(Correction)
                 else:
                     raise CustomException(f"no valid direction specified: {direction}")
-                
+
                 if self.Farbsensor.color_temperature >= colorTemperature - 100 and self.Farbsensor.color_temperature <= colorTemperature + 100:
                     corners = corners + 1
                     if corners == 4:
@@ -306,7 +345,6 @@ class Functions:
                         
                     if HoldAtLine == True:
                         driving = False
-                
             except:
                 self.Utils.cleanup()
                 
