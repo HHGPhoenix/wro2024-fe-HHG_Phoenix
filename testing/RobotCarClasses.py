@@ -17,9 +17,12 @@ import signal
 ##########################################################
 
 class CustomException(Exception):
+    #raise and error and print the message at the same time
+    
     def __init__(self, message):
+        print("CustomExeption: "+message)
         super().__init__(message)
-
+        
 
 class Motor:
     def __init__(self, frequency, fpin, rpin, spin):
@@ -70,10 +73,16 @@ class Motor:
         
         
 class SuperSonicSensor:
-    def __init__(self, TrigPin, EchoPin):
+    def __init__(self, TrigPin, EchoPin, smoothing_window_size=40):
         self.EchoPin = EchoPin
         self.TrigPin = TrigPin
         self.distance = 0
+        self.smoothing_window_size = smoothing_window_size
+        self.sDistance = 0
+        
+        #Moving Average
+        self.values = [0] * self.smoothing_window_size
+        self.index = 0
         
         #GPIO setup
         GPIO.setup(TrigPin, GPIO.OUT)
@@ -120,6 +129,10 @@ class SuperSonicSensor:
 
             # Update self.dist
             self.distance = distance
+            
+            self.values[self.index] = self.distance
+            self.index = (self.index + 1) % self.smoothing_window_size
+            self.sDistance = sum(self.values) / self.smoothing_window_size
 
     def stop_measurement(self):
         self.threadStop = 1
@@ -149,7 +162,7 @@ class Servo:
             
             
 class PixyCam: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
-    def __init__(self):
+    def __init__(self, YCutOffTop=0, YCutOffBottom=0):
         self.x = 0
         self.y = 0
         self.width = 0
@@ -159,6 +172,8 @@ class PixyCam: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
         self.age = 0
         self.index = 0
         self.angle = 0
+        self.YCutOffTop = YCutOffTop
+        self.YCutOffBottom = YCutOffBottom
         
         pixy.init()
         pixy.change_prog ("color_connected_components");        
@@ -196,7 +211,7 @@ class PixyCam: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
             raise CustomException(f"no valid state specified: {state}")
             
             
-class Button: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
+class Button:
     def __init__(self, SignalPin):
         self.SignalPin = SignalPin
         #GPIO
@@ -250,7 +265,7 @@ class ColorSensor: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
         self.threadStop = 1
 
 
-class Utility: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
+class Utility: #KOMM WIR WATCHEN 
     def __init__(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None):
         self.Ultraschall1 = Ultraschall1
         self.Ultraschall2 = Ultraschall2
@@ -261,6 +276,7 @@ class Utility: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
         self.StopButton = StopButton
         
     def cleanup(self):
+        GPIO.setmode(GPIO.BCM)
         if self.Ultraschall1:
             self.Ultraschall1.stop_measurement()
         if self.Ultraschall2:
@@ -312,11 +328,12 @@ class Functions:
         self.rounds = 0
         self.corners = 0
 
-    def HoldDistance(self, DISTANCE=50, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1):
+    def HoldDistance(self, DISTANCE=50, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1, LineWaitTime=1):
         self.P = P
         self.DISTANCE = DISTANCE 
         self.Motor1.drive(direction, speed)
         driving = True
+        TIMEOUT = 0
         
         while self.Utils.running and self.rounds < 3 and driving:
             time.sleep(0.01)
@@ -336,8 +353,8 @@ class Functions:
                     self.Servo1.steer(Correction)
                 else:
                     raise CustomException(f"no valid direction specified: {direction}")
-
-                if self.Farbsensor.color_temperature >= colorTemperature - 100 and self.Farbsensor.color_temperature <= colorTemperature + 100:
+                
+                if self.Farbsensor.color_temperature >= colorTemperature - 100 and self.Farbsensor.color_temperature <= colorTemperature + 100 and time.time() > TIMEOUT:
                     corners = corners + 1
                     if corners == 4:
                         corners = 0
@@ -345,6 +362,11 @@ class Functions:
                         
                     if HoldAtLine == True:
                         driving = False
+                        
+                    TIMEOUT = time.time() + LineWaitTime
+                    
+                with open("sensor_data.txt", "a") as data_file:
+                    data_file.write(f"rounds; {self.rounds}; corners; {corners}; Farbtemperatur; {self.Farbsensor.color_temperature}\n")
             except:
                 self.Utils.cleanup()
                 
