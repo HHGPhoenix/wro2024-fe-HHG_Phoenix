@@ -168,7 +168,7 @@ class Servo:
             
             
 class PixyCam: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
-    def __init__(self, YCutOffTop=0, YCutOffBottom=0):
+    def __init__(self):
         self.x = 0
         self.y = 0
         self.width = 0
@@ -381,7 +381,7 @@ class Functions:
             except:
                 self.Utils.cleanup()
             
-    def HoldLane(self, BlockWaitTime=1, LaneCoords=[1, 1], Lane=1, SIZE=1, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1, LineWaitTime=1):
+    def HoldLane(self, YCutOffTop=0, YCutOffBottom=0, BlockWaitTime=1, LaneCoords=[1, 1], Lane=1, SIZE=1, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1, LineWaitTime=1):
         self.P = P
         self.Motor1.drive(direction, speed)
         driving = True
@@ -438,11 +438,18 @@ class Functions:
                 if count >= 1 and time.time() > TIMEOUTPixy:
                     NextObject = -1
                     for x in count:
-                        size = self.Pixy.output[x].m_width * self.Pixy.output[x].m_height
+                        yCoord = self.Pixy.output[x].m_y
                         
-                        if size >= SIZE:
-                            NextObject = x
-                            break
+                        if yCoord > YCutOffTop or yCoord < YCutOffBottom:
+                            
+                            size = self.Pixy.output[x].m_width * self.Pixy.output[x].m_height
+                            
+                            if size >= SIZE:
+                                NextObject = x
+                                break
+                            
+                        else:
+                            NextObject = -1
                     
                     if NextObject >= 0:
                         xCoord = self.Pixy.output[NextObject].m_x
