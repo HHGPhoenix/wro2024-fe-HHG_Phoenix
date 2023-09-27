@@ -178,8 +178,6 @@ class PixyCam: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
         self.age = 0
         self.index = 0
         self.angle = 0
-        self.YCutOffTop = YCutOffTop
-        self.YCutOffBottom = YCutOffBottom
         
         pixy.init()
         pixy.change_prog ("color_connected_components");        
