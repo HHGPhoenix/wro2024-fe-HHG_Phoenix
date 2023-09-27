@@ -41,6 +41,7 @@ class Motor:
         try:
             self.pwm = GPIO.PWM(spin, frequency)
         except:
+            print(f"no valid frequency specified {frequency}")
             raise CustomException(f"no valid frequency specified {frequency}")
 
     def drive(self, direction, speed=0):
@@ -52,17 +53,20 @@ class Motor:
             GPIO.output(self.fpin, 0)
             GPIO.output(self.rpin, 1)
         else:
+            print(f"no valid direction specified: {direction}")
             raise CustomException(f"no valid direction specified: {direction}")
 
         try:
             self.pwm.ChangeDutyCycle(speed)
         except:
+            print(f"no valid direction specified: {direction}")
             raise CustomException(f"no valid speed value specified: {speed}")
             
     def start(self):
         try:
             self.pwm.start(self.speed)  
         except:
+            print(f"no valid speed value specified: {self.speed}")
             raise CustomException(f"no valid speed value specified: {self.speed}")  
             
     def stop(self):
@@ -150,6 +154,7 @@ class Servo:
             self.pwm = GPIO.PWM(SignalPin, frequency)
             self.pwm.start(6.6)
         except:
+            print(f"no valid frequency specified: {frequency}")
             raise CustomException(f"no valid frequency specified: {frequency}")
         
     def steer(self, percentage):
@@ -158,6 +163,7 @@ class Servo:
             self.pwm.ChangeDutyCycle(DutyCycle)
         
         except:
+            print(f"no valid steering percentage specified: {percentage}")
             raise CustomException(f"no valid steering percentage specified: {percentage}")
             
             
@@ -208,6 +214,7 @@ class PixyCam: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
         elif state == 0:
             set_lamp(0, 0)
         else:
+            print(f"no valid state specified: {state}")
             raise CustomException(f"no valid state specified: {state}")
             
             
@@ -266,7 +273,7 @@ class ColorSensor: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
 
 
 class Utility: #KOMM WIR WATCHEN 
-    def __init__(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None):
+    def __init__(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Pixy=None):
         self.Ultraschall1 = Ultraschall1
         self.Ultraschall2 = Ultraschall2
         self.Farbsensor = Farbsensor
@@ -274,6 +281,7 @@ class Utility: #KOMM WIR WATCHEN
         self.Servo1 = Servo1
         self.StartButton = StartButton
         self.StopButton = StopButton
+        self.Pixy = Pixy
         
     def cleanup(self):
         GPIO.setmode(GPIO.BCM)
@@ -325,15 +333,17 @@ class Functions:
         self.Servo1 = Utils.Servo1
         self.StartButton = Utils.StartButton
         self.StopButton = Utils.StopButton
+        self.Pixy = Utils.Pixy
         self.rounds = 0
         self.corners = 0
 
     def HoldDistance(self, DISTANCE=50, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1, LineWaitTime=1):
         self.P = P
-        self.DISTANCE = DISTANCE 
         self.Motor1.drive(direction, speed)
         driving = True
         TIMEOUT = 0
+        
+        
         
         while self.Utils.running and self.rounds < 3 and driving:
             time.sleep(0.01)
@@ -352,6 +362,7 @@ class Functions:
                 elif direction == "r":
                     self.Servo1.steer(Correction)
                 else:
+                    print(f"no valid direction specified: {direction}")
                     raise CustomException(f"no valid direction specified: {direction}")
                 
                 if self.Farbsensor.color_temperature >= colorTemperature - 100 and self.Farbsensor.color_temperature <= colorTemperature + 100 and time.time() > TIMEOUT:
@@ -369,7 +380,88 @@ class Functions:
                     data_file.write(f"rounds; {self.rounds}; corners; {corners}; Farbtemperatur; {self.Farbsensor.color_temperature}\n")
             except:
                 self.Utils.cleanup()
+            
+    def HoldLane(self, BlockWaitTime=1, LaneCoords=[1, 1], Lane=1, SIZE=1, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1, LineWaitTime=1):
+        self.P = P
+        self.Motor1.drive(direction, speed)
+        driving = True
+        TIMEOUT = 0
+        TIMEOUTPixy = 0
+        
+        #clear the sensor data txt file at the start of the run
+        with open("HoldLane.txt", "w") as data_file:
+            data_file.write("")
+     
+        while self.Utils.running and self.rounds < 3 and driving:
+            time.sleep(0.01)
+            try:
+                if Lane == 0:
+                    DISTANCE = 25
+                elif Lane == 1:
+                    DISTANCE = 50
+                elif Lane == 2:
+                    DISTANCE = 75
+                else:
+                    print(f"No valid Lane specified: {Lane}")
+                    raise CustomException(f"No valid Lane specified: {Lane}")
                 
+                #HoldLine
+                Error = self.Ultraschall1.distance - DISTANCE
+                Correction = P * Error
+                if Correction > 95:
+                    Correction = 95
+                elif Correction < -95:
+                    Correction = -95
+                    
+                if direction == "f":
+                    self.Servo1.steer(-Correction)
+                elif direction == "r":
+                    self.Servo1.steer(Correction)
+                else:
+                    print(f"no valid direction specified: {direction}")
+                    raise CustomException(f"no valid direction specified: {direction}")
+                
+                #Count rounds with ColorSensor
+                if self.Farbsensor.color_temperature >= colorTemperature - 100 and self.Farbsensor.color_temperature <= colorTemperature + 100 and time.time() > TIMEOUT:
+                    corners = corners + 1
+                    if corners == 4:
+                        corners = 0
+                        self.rounds = self.rounds + 1
+                        
+                    if HoldAtLine == True:
+                        driving = False
+                        
+                    TIMEOUT = time.time() + LineWaitTime
+                    
+                #get Pixy objects and calculate new lanes
+                count = self.Pixy.count
+                if count >= 1 and time.time() > TIMEOUTPixy:
+                    NextObject = -1
+                    for x in count:
+                        size = self.Pixy.output[x].m_width * self.Pixy.output[x].m_height
+                        
+                        if size >= SIZE:
+                            NextObject = x
+                            break
+                    
+                    if NextObject >= 0:
+                        xCoord = self.Pixy.output[NextObject].m_x
+                        if xCoord < LaneCoords[0]:
+                            Lane = 0
+                        elif xCoord > LaneCoords[1]:
+                            Lane = 2
+                        elif xCoord >= LaneCoords[0] and xCoord <= LaneCoords[1]:
+                            Lane = 1
+                        else:
+                            print(f"Could not calculate new lane from xCoord: {xCoord}")
+                            raise CustomException(f"Could not calculate new lane from xCoord: {xCoord}")
+                    
+                    TIMEOUTPixy = time.time() + BlockWaitTime
+                    
+                with open("HoldLine.txt", "a") as data_file:
+                    data_file.write(f"rounds; {self.rounds}; corners; {corners}; Farbtemperatur; {self.Farbsensor.color_temperature}\n")
+            except:
+                self.Utils.cleanup()
                 
     def DriveCorner(self, direction="f", speed=0, steer=0, wait=0, stop=True):
         self.Motor1.drive(direction, speed)
