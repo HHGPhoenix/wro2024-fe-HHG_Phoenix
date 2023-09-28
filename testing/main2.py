@@ -26,7 +26,7 @@ DISTANCE = 15
 ##########################################################
     
 Farbsensor = ColorSensor()
-#Farbsensor.start_measurement()
+Farbsensor.start_measurement()
 
 Motor1 = Motor(1000, 27, 17, 22)
 #Motor1.start()
@@ -45,11 +45,11 @@ Servo1 = Servo(18, 50)
 StartButton = Button(8)
 
 StopButton = Button(7)
-#StopButton.start_StopButton()
+StopButton.start_StopButton()
 
 #CException = CustomException()
 
-Utils = Utility(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy)
+Utils = Utility(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton)
 Funcs = Functions(Utils)
 
 
@@ -61,10 +61,7 @@ Funcs = Functions(Utils)
 ##########################################################
 
 Utils.running = True
-#clearing the "sensor_data.txt" file
-
-with open("sensor_data.txt", "w") as data_file:
-    data_file.write("")
+Utils.StartData("192.168.178.56", 12345)
 
 while Utils.running and Funcs.rounds < 3:
     time.sleep(0.01)
