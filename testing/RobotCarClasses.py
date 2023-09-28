@@ -226,7 +226,7 @@ class Button:
         
     def read_StopButton(self):
         while self.threadStop == 0:
-            time.sleep(0.01)
+            time.sleep(0.1)
             if self.state() == 1:
                 os.kill(os.getpid(), signal.SIGINT)
                 
@@ -262,7 +262,7 @@ class ColorSensor: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
 
 
 class Utility: #KOMM WIR WATCHEN 
-    def __init__(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Pixy=None):
+    def __init__(self, Funcs, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Pixy=None):
         self.Ultraschall1 = Ultraschall1
         self.Ultraschall2 = Ultraschall2
         self.Farbsensor = Farbsensor
@@ -271,6 +271,7 @@ class Utility: #KOMM WIR WATCHEN
         self.StartButton = StartButton
         self.StopButton = StopButton
         self.Pixy = Pixy
+        self.Funcs = Funcs
         
     def cleanup(self):
         GPIO.setmode(GPIO.BCM)
@@ -325,14 +326,12 @@ class Utility: #KOMM WIR WATCHEN
         
     def GetData(self):
         while self.threadStop == 0:
-            data = f"Farbtemperatur; {self.Farbsensor.color_temperature}; sDistance; {self.Ultraschall1.sDistance}; distance; {self.Ultraschall1.distance}\n"
-            print(data)
-            
+            data = f"Distance1; {self.Ultraschall1.distance}; sDistance1; {self.Ultraschall1.sDistance}; Distance2; {self.Ultraschall2.distance}; sDistance2; {self.Ultraschall2.sDistance}; Farbtemperatur; {self.Farbsensor.color_temperature}; rounds; {self.Funcs.rounds}"
             with open("HoldLine.txt", "a") as data_file:
                 data_file.write(data)
                 
             self.client_socket.send(data.encode())
-            time.sleep(0.1)  # Adjust the delay as needed
+            time.sleep(0.2)  # Adjust the delay as needed
         
     def StopData(self):
         self.client_socket.close()
@@ -340,16 +339,15 @@ class Utility: #KOMM WIR WATCHEN
 
 
 class Functions:
-    def __init__(self, Utils):
-        self.Utils = Utils
-        self.Ultraschall1 = Utils.Ultraschall1
-        self.Ultraschall2 = Utils.Ultraschall2
-        self.Farbsensor = Utils.Farbsensor
-        self.Motor1 = Utils.Motor1
-        self.Servo1 = Utils.Servo1
-        self.StartButton = Utils.StartButton
-        self.StopButton = Utils.StopButton
-        self.Pixy = Utils.Pixy
+    def __init__(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Pixy=None):
+        self.Ultraschall1 = Ultraschall1
+        self.Ultraschall2 = Ultraschall2
+        self.Farbsensor = Farbsensor
+        self.Motor1 = Motor1
+        self.Servo1 = Servo1
+        self.StartButton = StartButton
+        self.StopButton = StopButton
+        self.Pixy = Pixy
         self.rounds = 0
         self.corners = 0
 
