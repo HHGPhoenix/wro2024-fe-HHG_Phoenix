@@ -49,6 +49,11 @@ while True:
 
                 # Loop through each variable in the line
                 for i in range(0, len(values), 2):
+                    # Ensure that there are at least two elements in the 'values' list
+                    if len(values) < i + 2:
+                        print(f"Invalid data format in line: {line}")
+                        break
+
                     # Extract the variable name and value and convert the value to a float
                     var_name = values[i]
                     try:
@@ -76,13 +81,16 @@ while True:
                     for i, (var_name, var_values) in enumerate(variables.items()):
                         axs[i].set_ylabel(var_name)
 
+                    axs[-1].set_xlabel('Line number')
                     # Set the background color to dark gray
+                    plt.pause(0.01)  # Pause to update the plot
 
                 else:
                     for i, (var_name, var_values) in enumerate(variables.items()):
-                        axs[i].clear()  # Clear the previous plot data
-                        axs[i].plot(range(len(var_values)), var_values, color=colors[i])
-                        axs[i].set_ylabel(var_name)
+                        if i < len(axs):
+                            axs[i].clear()  # Clear the previous plot data
+                            axs[i].plot(range(len(var_values)), var_values, color=colors[i])
+                            axs[i].set_ylabel(var_name)
 
                     # Remove extra subplots if the number of variables has decreased
                     num_existing_subplots = len(axs)
@@ -90,8 +98,8 @@ while True:
                         for i in range(num_variables, num_existing_subplots):
                             fig.delaxes(axs[i])
 
-                axs[-1].set_xlabel('Line number')
-                plt.pause(0.01)  # Pause to update the plot
+                    axs[-1].set_xlabel('Line number')
+                    plt.pause(0.01)  # Pause to update the plot
 
     except Exception as e:
         print(f"An error occurred: {e}")
