@@ -4,10 +4,8 @@ import threading
 from ctypes import *
 from pixy import *
 import pixy
-import board
-import adafruit_tcs34725
-import os
-import signal
+import board, adafruit_tcs34725
+import os, signal, socket
 
 
 ##########################################################
@@ -112,20 +110,13 @@ class SuperSonicSensor:
             GPIO.output(self.TrigPin, 0)
 
             # Get times
-            TIMEOUT = time.time() + MAXTIME
-            while GPIO.input(self.EchoPin) == 0 and StartTime < TIMEOUT:
+            TIMEOUT = time.time() + MAXTIME      
+            while GPIO.input(self.EchoPin) == 0 and StopTime < TIMEOUT:
                 StartTime = time.time()
-            
-            if StartTime > TIMEOUT:
-                print("Timeout1: ", StartTime > TIMEOUT)
-
+                
             TIMEOUT = time.time() + MAXTIME
             while GPIO.input(self.EchoPin) == 1 and StopTime < TIMEOUT:
                 StopTime = time.time()
-            
-            if StopTime > TIMEOUT:
-                print("Timeout2: ", StopTime > TIMEOUT)
-            
 
             # Calculate distance
             delay = StopTime - StartTime
@@ -294,6 +285,8 @@ class Utility: #KOMM WIR WATCHEN
         
         self.StopButton.stop_StopButton()
         
+        self.StopData()
+        
         GPIO.cleanup()
         self.running = False
     
@@ -319,6 +312,31 @@ class Utility: #KOMM WIR WATCHEN
         self.StopTime = time.time()
         print(f"Run ended: {self.StopTime}")
         print(f"Time needed: {self.StopTime - self.StartTime}")
+        
+    def StartData(self, ServerIP, ServerPort):
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect((ServerIP, ServerPort))  # Connect to the server 
+        self.threadStop = 0
+        self.thread = threading.Thread(target=self.GetData, daemon=True)
+        self.thread.start()
+        
+        with open("sensor_data.txt", "w") as data_file:
+            data_file.write("")
+        
+    def GetData(self):
+        while self.threadStop == 0:
+            data = f"Farbtemperatur; {self.Farbsensor.color_temperature}; sDistance; {self.Ultraschall1.sDistance}; distance; {self.Ultraschall1.distance}\n"
+            print(data)
+            
+            with open("HoldLine.txt", "a") as data_file:
+                data_file.write(data)
+                
+            self.client_socket.send(data.encode())
+            time.sleep(0.1)  # Adjust the delay as needed
+        
+    def StopData(self):
+        self.client_socket.close()
+        self.threadStop = 1
 
 
 class Functions:
@@ -385,10 +403,6 @@ class Functions:
         driving = True
         TIMEOUT = 0
         TIMEOUTPixy = 0
-        
-        #clear the sensor data txt file at the start of the run
-        with open("HoldLane.txt", "w") as data_file:
-            data_file.write("")
      
         while self.Utils.running and self.rounds < 3 and driving:
             time.sleep(0.01)
@@ -463,8 +477,6 @@ class Functions:
                     
                     TIMEOUTPixy = time.time() + BlockWaitTime
                     
-                with open("HoldLine.txt", "a") as data_file:
-                    data_file.write(f"rounds; {self.rounds}; corners; {corners}; Farbtemperatur; {self.Farbsensor.color_temperature}\n")
             except:
                 self.Utils.cleanup()
                 

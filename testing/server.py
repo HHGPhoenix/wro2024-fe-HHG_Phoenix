@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 # Create a socket for the server
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_socket.bind(('25.58.153.31', 12345))  # Choose a port number
+server_socket.bind(('192.168.178.56', 12345))  # Choose a port number
 server_socket.listen(1)  # Listen for one incoming connection
 
 fig, axs, variables = None, None, {}  # Initialize the figure, axes, and data variables
