@@ -1,4 +1,3 @@
-import keyboard
 import RPi.GPIO as GPIO
 import time
 from RobotCarClasses import *
@@ -65,14 +64,12 @@ def Variation1():
     while Utils.running and Funcs.rounds < 3:
         time.sleep(0.01)
         try:
-            Utils.StartRun(80, 0)
-            Funcs.HoldDistance(50, False, 5, 0, "f", 2200)
+            Utils.StartRun(70, 0)
+            Funcs.HoldDistance(50, False, 3, 70, "f", 2500)
             
         except Exception as e:
             print(e)
             Utils.cleanup()
-            
-    Utils.StopRun()  
             
             
 def Variation2():
@@ -107,8 +104,5 @@ def Variation3():
             Utils.cleanup()
             
     Utils.StopRun()   
-    
-    
-Utils.StartData("192.168.178.56", 12345)
     
 Variation1()
