@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+from download_graph import *
+
 
 # Open the file and read the data
 with open(r'C:\Users\Felix\OneDrive - Helmholtz-Gymnasium\Desktop\GitHub\wro2024-fe-HHG_Phoenix\wro2024-fe-HHG_Phoenix\testing\sensor_data.txt', 'r') as f:
@@ -6,6 +8,18 @@ with open(r'C:\Users\Felix\OneDrive - Helmholtz-Gymnasium\Desktop\GitHub\wro2024
 
 # Initialize a dictionary to store the data
 variables = {}
+
+def download_graphs():
+    raspberrypi_ip = "pi.local"
+    username = "pi"
+    password = "pi"
+    remote_file_path = r"/home/pi/wro/testing/HoldLine.txt"
+    local_file_path = r"C:\Users\Felix\OneDrive - Helmholtz-Gymnasium\Desktop\Github\wro2024-fe-HHG_Phoenix\wro2024-fe-HHG_Phoenix\testing\HoldLine.txt"
+
+    # Call the function to copy the file
+    copy_file_to_windows(raspberrypi_ip, username, password, remote_file_path, local_file_path)
+
+download_graphs()
 
 # Loop through each line in the file
 for line in data:

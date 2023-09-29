@@ -24,11 +24,8 @@ class CustomException(Exception):
 
 class Motor:
     def __init__(self, frequency, fpin, rpin, spin):
-        self.frequency = frequency
-        self.fpin = fpin
-        self.rpin = rpin
-        self.spin = spin
-        self.speed = 0
+        #setup Variables
+        self.frequency, self.fpin, self.rpin, self.spin, self.speed = frequency, fpin, rpin, spin, 0
         
         #GPIO setup
         GPIO.setmode(GPIO.BCM)
@@ -43,7 +40,15 @@ class Motor:
             raise CustomException(f"no valid frequency specified {frequency}")
 
     def drive(self, direction, speed=0):
+        #GPIO setup
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.fpin, GPIO.OUT)
+        GPIO.setup(self.rpin, GPIO.OUT)
+        GPIO.setup(self.spin, GPIO.OUT)
+
         self.speed = speed
+        
+        #set direction
         if direction == 'f':
             GPIO.output(self.fpin, 1)
             GPIO.output(self.rpin, 0)
@@ -54,6 +59,7 @@ class Motor:
             print(f"no valid direction specified: {direction}")
             raise CustomException(f"no valid direction specified: {direction}")
 
+        #set speed
         try:
             self.pwm.ChangeDutyCycle(speed)
         except:
@@ -61,6 +67,7 @@ class Motor:
             raise CustomException(f"no valid speed value specified: {speed}")
             
     def start(self):
+        #Start Motor
         try:
             self.pwm.start(self.speed)  
         except:
@@ -68,6 +75,8 @@ class Motor:
             raise CustomException(f"no valid speed value specified: {self.speed}")  
             
     def stop(self):
+        #Stop Motor
+        #GPIO setup
         GPIO.setmode(GPIO.BCM)
         GPIO.output(self.fpin, 0) 
         GPIO.output(self.rpin, 0)
@@ -75,18 +84,16 @@ class Motor:
         
         
 class SuperSonicSensor:
-    def __init__(self, TrigPin, EchoPin, smoothing_window_size=20):
-        self.EchoPin = EchoPin
-        self.TrigPin = TrigPin
-        self.distance = 0
-        self.smoothing_window_size = smoothing_window_size
-        self.sDistance = 0
+    def __init__(self, TrigPin, EchoPin, smoothing_window_size=3):
+        #Variables
+        self.EchoPin, self.TrigPin, self.distance, self.smoothing_window_size, self.sDistance = EchoPin, TrigPin, 0, smoothing_window_size, 0
         
         #Moving Average
         self.values = [0] * self.smoothing_window_size
         self.index = 0
         
         #GPIO setup
+        GPIO.setmode(GPIO.BCM)
         GPIO.setup(TrigPin, GPIO.OUT)
         GPIO.setup(EchoPin, GPIO.IN)
         
@@ -96,11 +103,18 @@ class SuperSonicSensor:
         self.thread.start()
         
     def measure_distance(self):
+        #Variables
         MAXTIME = 0.01
         StartTime = 0
         StopTime = 0
-        #GPIO.setmode(GPIO.BOARD)
+        
+        #GPIO setup
+
+        
         while self.threadStop == 0:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(self.TrigPin, GPIO.OUT)
+            GPIO.setup(self.EchoPin, GPIO.IN)
             # Trigger
             GPIO.output(self.TrigPin, 0)
             time.sleep(0.03)
@@ -135,12 +149,13 @@ class SuperSonicSensor:
         
 class Servo:
     def __init__(self, SignalPin, frequency):
-        self.SignalPin = SignalPin
-        self.frequency = frequency
+        self.SignalPin, self.frequency = SignalPin, frequency
         
         #GPIO setup
+        GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.SignalPin, GPIO.OUT)
         
+        #Start steering at 0
         try:
             self.pwm = GPIO.PWM(SignalPin, frequency)
             self.pwm.start(6.6)
@@ -149,26 +164,22 @@ class Servo:
             raise CustomException(f"no valid frequency specified: {frequency}")
         
     def steer(self, percentage):
+        #GPIO setup
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.SignalPin, GPIO.OUT)
+        
+        #calculate DutyCycle and set it
         try:
             DutyCycle = 3e-5 * percentage**2 + 0.018 * percentage + 6.57
             self.pwm.ChangeDutyCycle(DutyCycle)
-        
         except:
             print(f"no valid steering percentage specified: {percentage}")
             raise CustomException(f"no valid steering percentage specified: {percentage}")
             
             
-class PixyCam: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
+class PixyCam:
     def __init__(self):
-        self.x = 0
-        self.y = 0
-        self.width = 0
-        self.height = 0
-        self.threadStop = 0
-        self.count = 0
-        self.age = 0
-        self.index = 0
-        self.angle = 0
+        self.x = 0; self.y = 0; self.width = 0; self.height = 0; self.threadStop = 0; self.count = 0; self.age = 0; self.index = 0; self.angle = 0
         
         pixy.init()
         pixy.change_prog ("color_connected_components");        
@@ -209,11 +220,19 @@ class PixyCam: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
             
 class Button:
     def __init__(self, SignalPin):
+        #Variables
         self.SignalPin = SignalPin
-        #GPIO
+        
+        #GPIO setup
+        GPIO.setmode(GPIO.BCM)
         GPIO.setup(SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         
     def state(self):
+        #GPIO setup
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        
+        #read button state
         if GPIO.input(self.SignalPin) == 0:
             return 1
         elif GPIO.input(self.SignalPin) == 1:
@@ -225,23 +244,26 @@ class Button:
         self.thread.start()
         
     def read_StopButton(self):
+        #GPIO setup
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        
+        #stop program if stopbutton is pressed
         while self.threadStop == 0:
             time.sleep(0.1)
             if self.state() == 1:
+                print("StopButton pressed")
                 os.kill(os.getpid(), signal.SIGINT)
                 
     def stop_StopButton(self):
         self.threadStop = 1
         
          
-class ColorSensor: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
+class ColorSensor:
     def __init__(self):
-        self.color_rgb = 0
-        self.color_temperature = 0
-        self.lux = 0
+        self.color_rgb, self.color_temperature, self.lux = 0, 0, 0
         
-        
-        #Colorsensor
+        #Colorsensor init
         i2c = board.I2C()
         self.sensor = adafruit_tcs34725.TCS34725(i2c)
             
@@ -251,6 +273,7 @@ class ColorSensor: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
         self.thread.start()
         
     def read(self):
+        #Write sensor data to variables
         while self.threadStop == 0:
             time.sleep(0.01)
             self.color_rgb = self.sensor.color_rgb_bytes
@@ -261,37 +284,32 @@ class ColorSensor: #KOMM WIR WATCHEN NEN MUHFIEEEEEEEEEEEE
         self.threadStop = 1
 
 
-class Utility: #KOMM WIR WATCHEN 
+class Utility:
     def __init__(self, Funcs, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Pixy=None):
-        self.Ultraschall1 = Ultraschall1
-        self.Ultraschall2 = Ultraschall2
-        self.Farbsensor = Farbsensor
-        self.Motor1 = Motor1
-        self.Servo1 = Servo1
-        self.StartButton = StartButton
-        self.StopButton = StopButton
-        self.Pixy = Pixy
-        self.Funcs = Funcs
-        
+        self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.Funcs = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, Funcs
+
     def cleanup(self):
-        GPIO.setmode(GPIO.BCM)
-        if self.Ultraschall1:
-            self.Ultraschall1.stop_measurement()
-        if self.Ultraschall2:
-            self.Ultraschall2.stop_measurement()
-        if self.Farbsensor:
-            self.Farbsensor.stop_measurement()
-        if self.Motor1:
-            self.Motor1.stop()
+        print("Started cleanup")
+        #Stop all Threads and cleanup GPIO
+        self.Ultraschall1.stop_measurement()
+        #self.Ultraschall2.stop_measurement()
+        
+        self.Farbsensor.stop_measurement()
+
+        self.Motor1.drive("f", 0)
+        self.Motor1.stop()
         
         self.StopButton.stop_StopButton()
         
-        self.StopData()
+        #self.StopData()
         
+        time.sleep(0.1)
         GPIO.cleanup()
         self.running = False
+        print("Finished cleanup")
     
     def StartRun(self, MotorSpeed, steer=0, direction="f"):
+        #Wait until StartButton is pressed
         self.waiting = True
         while self.running and self.waiting:
             try:
@@ -303,18 +321,31 @@ class Utility: #KOMM WIR WATCHEN
                     self.Motor1.drive(direction, MotorSpeed)
                     self.Servo1.steer(steer)
                     
-                    self.waiting = False
-                    
+                    self.waiting = False   
             except:
                 self.cleanup()
                 
     def StopRun(self):
+        #Stop Motor and cleanup
+        self.Motor1.drive("f", 0)
         self.cleanup()
         self.StopTime = time.time()
         print(f"Run ended: {self.StopTime}")
-        print(f"Time needed: {self.StopTime - self.StartTime}")
+        seconds = round(self.StopTime - self.StartTime, 2)
         
+        #Print time needed
+        minutes = seconds // 60
+        hours = minutes // 60
+        if hours > 0:
+            print(f"{hours} hour(s), {minutes % 60} minute(s), {seconds % 60} second(s) needed")
+        elif minutes > 0:
+            print(f"{minutes} minute(s), {seconds % 60} second(s) needed")
+        else:
+            print(f"{seconds} second(s) needed")
+            
+"""   
     def StartData(self, ServerIP, ServerPort):
+        #Try to connect to Server
         try:
             self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client_socket.connect((ServerIP, ServerPort))  # Connect to the server 
@@ -332,52 +363,44 @@ class Utility: #KOMM WIR WATCHEN
         
     def GetData(self):
         while self.threadStop == 0:
-            data = f"Distance1; {self.Ultraschall1.distance}; sDistance1; {self.Ultraschall1.sDistance}; Distance2; {self.Ultraschall2.distance}; sDistance2; {self.Ultraschall2.sDistance}; Farbtemperatur; {self.Farbsensor.color_temperature}; rounds; {self.Funcs.rounds}"
-            with open("HoldLine.txt", "a") as data_file:
-                data_file.write(data)
-                
             self.client_socket.send(data.encode())
             time.sleep(0.2)  # Adjust the delay as needed
         
     def StopData(self):
         self.client_socket.close()
         self.threadStop = 1
-
+"""
 
 class Functions:
     def __init__(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Pixy=None):
-        self.Ultraschall1 = Ultraschall1
-        self.Ultraschall2 = Ultraschall2
-        self.Farbsensor = Farbsensor
-        self.Motor1 = Motor1
-        self.Servo1 = Servo1
-        self.StartButton = StartButton
-        self.StopButton = StopButton
-        self.Pixy = Pixy
-        self.rounds = 0
-        self.corners = 0
+        self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.rounds, self.corners = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, 0, 0
         
     def information(self, Utils):
+        #Get Utils, because it is initialized after Functions
         self.Utils = Utils
 
     def HoldDistance(self, DISTANCE=50, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1, LineWaitTime=1):
+        #Variables
         self.P = P
         self.Motor1.drive(direction, speed)
         driving = True
         TIMEOUT = 0
+
+        #Clear data file
+        with open("HoldLine.txt", "w") as data_file:
+            data_file.write("")
         
+        #Hold Distance to wall
         while self.Utils.running and self.rounds < 3 and driving:
-            time.sleep(0.01)
-            #print(f"Distance1: {self.Ultraschall1.distance}, Distance2: {self.Ultraschall2.distance}")
-            #print(self.Farbsensor.color_temperature)
             try:
+                time.sleep(0.05)
                 Error = self.Ultraschall1.sDistance - DISTANCE
                 Correction = P * Error
                 if Correction > 95:
                     Correction = 95
                 elif Correction < -95:
                     Correction = -95
-                    
+                
                 if direction == "f":
                     self.Servo1.steer(-Correction)
                 elif direction == "r":
@@ -386,27 +409,36 @@ class Functions:
                     print(f"no valid direction specified: {direction}")
                     raise CustomException(f"no valid direction specified: {direction}")
                 
+                #Count rounds with ColorSensor
                 if self.Farbsensor.color_temperature >= colorTemperature - 100 and self.Farbsensor.color_temperature <= colorTemperature + 100 and time.time() > TIMEOUT:
                     corners = corners + 1
                     if corners == 4:
                         corners = 0
                         self.rounds = self.rounds + 1
+                        print(f"Round: {self.rounds}")
                         
                     if HoldAtLine == True:
                         driving = False
                         
                     TIMEOUT = time.time() + LineWaitTime
+
+                #Write data to file
+                data = f"Distance1; {self.Ultraschall1.distance}; sDistance1; {self.Ultraschall1.sDistance}; Distance2; {self.Ultraschall2.distance}; sDistance2; {self.Ultraschall2.sDistance}; Farbtemperatur; {self.Farbsensor.color_temperature}; rounds; {self.rounds}"
+                with open("HoldLine.txt", "a") as data_file:
+                    data_file.write(data)
                     
             except:
                 self.Utils.cleanup()
             
     def HoldLane(self, YCutOffTop=0, YCutOffBottom=0, BlockWaitTime=1, LaneCoords=[1, 1], Lane=1, SIZE=1, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1, LineWaitTime=1):
+        #Variables
         self.P = P
         self.Motor1.drive(direction, speed)
         driving = True
         TIMEOUT = 0
         TIMEOUTPixy = 0
-     
+
+        #Hold Lane
         while self.Utils.running and self.rounds < 3 and driving:
             time.sleep(0.01)
             try:
@@ -482,7 +514,8 @@ class Functions:
                     
             except:
                 self.Utils.cleanup()
-                
+      
+"""          
     def DriveCorner(self, direction="f", speed=0, steer=0, wait=0, stop=True):
         self.Motor1.drive(direction, speed)
         self.Servo1.steer(steer)
@@ -493,3 +526,4 @@ class Functions:
             
     def CalMiddle(self, CarWidth=17):
         self.middledistance = (self.Ultraschall1.distance + self.Ultraschall2.distance + CarWidth) / 2
+"""
