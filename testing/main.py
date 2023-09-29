@@ -34,23 +34,21 @@ Motor1.start()
 Ultraschall1 = SuperSonicSensor(24, 23)
 Ultraschall1.start_measurement()
 
-Ultraschall2 = SuperSonicSensor(12, 25)
+Ultraschall2 = SuperSonicSensor(8, 25)
 #Ultraschall2.start_measurement()
-
-#PixyCam1 = PixyCam()
-
 
 Servo1 = Servo(18, 50)
 
-StartButton = Button(8)
+StartButton = Button(7)
 
-StopButton = Button(7)
+StopButton = Button(1)
 StopButton.start_StopButton()
 
 #CException = CustomException()
 
-Utils = Utility(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton)
-Funcs = Functions(Utils)
+Funcs = Functions(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton)
+Utils = Utility(Funcs, Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton)
+Funcs.information(Utils)
 
 
 
@@ -59,7 +57,6 @@ Funcs = Functions(Utils)
 ##                     Main Code                        ##
 ##                                                      ##
 ##########################################################
-
 
 def Variation1():
     Utils.running = True
@@ -111,5 +108,7 @@ def Variation3():
             
     Utils.StopRun()   
     
+    
+Utils.StartData("192.168.178.56", 12345)
     
 Variation1()

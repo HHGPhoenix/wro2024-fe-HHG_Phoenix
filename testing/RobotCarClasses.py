@@ -75,7 +75,7 @@ class Motor:
         
         
 class SuperSonicSensor:
-    def __init__(self, TrigPin, EchoPin, smoothing_window_size=40):
+    def __init__(self, TrigPin, EchoPin, smoothing_window_size=20):
         self.EchoPin = EchoPin
         self.TrigPin = TrigPin
         self.distance = 0
@@ -315,8 +315,14 @@ class Utility: #KOMM WIR WATCHEN
         print(f"Time needed: {self.StopTime - self.StartTime}")
         
     def StartData(self, ServerIP, ServerPort):
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect((ServerIP, ServerPort))  # Connect to the server 
+        try:
+            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.client_socket.connect((ServerIP, ServerPort))  # Connect to the server 
+        except:
+            print(f"Could not connect to Server: {ServerIP}:{ServerPort}")
+            print("Running without data transfer")
+            return
+        
         self.threadStop = 0
         self.thread = threading.Thread(target=self.GetData, daemon=True)
         self.thread.start()
@@ -350,6 +356,9 @@ class Functions:
         self.Pixy = Pixy
         self.rounds = 0
         self.corners = 0
+        
+    def information(self, Utils):
+        self.Utils = Utils
 
     def HoldDistance(self, DISTANCE=50, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1, LineWaitTime=1):
         self.P = P
@@ -357,14 +366,12 @@ class Functions:
         driving = True
         TIMEOUT = 0
         
-        
-        
         while self.Utils.running and self.rounds < 3 and driving:
             time.sleep(0.01)
             #print(f"Distance1: {self.Ultraschall1.distance}, Distance2: {self.Ultraschall2.distance}")
             #print(self.Farbsensor.color_temperature)
             try:
-                Error = self.Ultraschall1.distance - DISTANCE
+                Error = self.Ultraschall1.sDistance - DISTANCE
                 Correction = P * Error
                 if Correction > 95:
                     Correction = 95
@@ -390,8 +397,6 @@ class Functions:
                         
                     TIMEOUT = time.time() + LineWaitTime
                     
-                with open("sensor_data.txt", "a") as data_file:
-                    data_file.write(f"rounds; {self.rounds}; corners; {corners}; Farbtemperatur; {self.Farbsensor.color_temperature}\n")
             except:
                 self.Utils.cleanup()
             
