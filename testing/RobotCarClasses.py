@@ -275,10 +275,9 @@ class ColorSensor:
     def read(self):
         #Write sensor data to variables
         while self.threadStop == 0:
-            time.sleep(0.01)
-            self.color_rgb = self.sensor.color_rgb_bytes
             self.color_temperature = self.sensor.color_temperature
-            self.lux = self.sensor.lux
+            #self.color_rgb = self.sensor.color_rgb_bytes
+            #self.lux = self.sensor.lux
         
     def stop_measurement(self):
         self.threadStop = 1
@@ -292,7 +291,7 @@ class Utility:
         print("Started cleanup")
         #Stop all Threads and cleanup GPIO
         self.Ultraschall1.stop_measurement()
-        #self.Ultraschall2.stop_measurement()
+        self.Ultraschall2.stop_measurement()
         
         self.Farbsensor.stop_measurement()
 
@@ -300,8 +299,6 @@ class Utility:
         self.Motor1.stop()
         
         self.StopButton.stop_StopButton()
-        
-        #self.StopData()
         
         time.sleep(0.1)
         GPIO.cleanup()
@@ -342,6 +339,15 @@ class Utility:
             print(f"{minutes} minute(s), {seconds % 60} second(s) needed")
         else:
             print(f"{seconds} second(s) needed")
+            
+    def log(self):
+        try:
+            data = f"Distance1; {self.Ultraschall1.distance}; sDistance1; {self.Ultraschall1.sDistance}; Distance2; {self.Ultraschall2.distance}; sDistance2; {self.Ultraschall2.sDistance}; Farbtemperatur; {self.Farbsensor.color_temperature}; rounds; {self.Funcs.rounds}"
+            with open("HoldLine.txt", "a") as data_file:
+                data_file.write(data)
+                
+        except Exception as e:
+            print(f"Could not write data to file: {e}")
             
 """   
     def StartData(self, ServerIP, ServerPort):
@@ -393,7 +399,7 @@ class Functions:
         #Hold Distance to wall
         while self.Utils.running and self.rounds < 3 and driving:
             try:
-                time.sleep(0.05)
+                time.sleep(0.01)
                 Error = self.Ultraschall1.sDistance - DISTANCE
                 Correction = P * Error
                 if Correction > 95:
@@ -421,12 +427,8 @@ class Functions:
                         driving = False
                         
                     TIMEOUT = time.time() + LineWaitTime
-
-                #Write data to file
-                data = f"Distance1; {self.Ultraschall1.distance}; sDistance1; {self.Ultraschall1.sDistance}; Distance2; {self.Ultraschall2.distance}; sDistance2; {self.Ultraschall2.sDistance}; Farbtemperatur; {self.Farbsensor.color_temperature}; rounds; {self.rounds}"
-                with open("HoldLine.txt", "a") as data_file:
-                    data_file.write(data)
                     
+                self.Utils.log()
             except:
                 self.Utils.cleanup()
             
