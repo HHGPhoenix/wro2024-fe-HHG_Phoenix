@@ -343,7 +343,7 @@ class Utility:
     def log(self):
         try:
             data = f"Distance1; {self.Ultraschall1.distance}; sDistance1; {self.Ultraschall1.sDistance}; Distance2; {self.Ultraschall2.distance}; sDistance2; {self.Ultraschall2.sDistance}; Farbtemperatur; {self.Farbsensor.color_temperature}; rounds; {self.Funcs.rounds}"
-            with open("HoldLine.txt", "a") as data_file:
+            with open("Sensor_Output.txt", "a") as data_file:
                 data_file.write(data)
                 
         except Exception as e:

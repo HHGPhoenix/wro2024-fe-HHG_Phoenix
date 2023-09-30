@@ -27,8 +27,8 @@ if __name__ == "__main__":
     raspberrypi_ip = "pi.local"
     username = "pi"
     password = "pi"
-    remote_file_path = r"/home/pi/wro/testing/HoldLine.txt"
-    local_file_path = r"C:\Users\Felix\OneDrive - Helmholtz-Gymnasium\Desktop\Github\wro2024-fe-HHG_Phoenix\wro2024-fe-HHG_Phoenix\testing\HoldLine.txt"
+    remote_file_path = r"/home/pi/wro/prototypes/V2/Code/Sensor_Output.txt"
+    local_file_path = r"C:\Users\Felix\OneDrive - Helmholtz-Gymnasium\Desktop\Github\wro\output\Sensor_Output.txt"
 
     # Call the function to copy the file
     copy_file_to_windows(raspberrypi_ip, username, password, remote_file_path, local_file_path)
