@@ -1,3 +1,5 @@
+# Parts planned for using
+
 Raspberry Pi 4
 
 Powerbank
