@@ -104,5 +104,6 @@ def Variation3():
             Utils.cleanup()
             
     Utils.StopRun()   
-    
-Variation1()
+   
+if __name__ == "__main__": 
+    Variation1()
