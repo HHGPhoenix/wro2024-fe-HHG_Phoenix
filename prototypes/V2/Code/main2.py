@@ -1,3 +1,4 @@
+import keyboard
 import RPi.GPIO as GPIO
 import time
 from RobotCarClasses import *
@@ -23,7 +24,10 @@ DISTANCE = 15
 ##                Sensor Initalization                  ##
 ##                                                      ##
 ##########################################################
-    
+
+Pixy = PixyCam()
+Pixy.start_reading()
+
 Farbsensor = ColorSensor()
 Farbsensor.start_measurement()
 
@@ -45,8 +49,8 @@ StopButton.start_StopButton()
 
 #CException = CustomException()
 
-Funcs = Functions(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton)
-Utils = Utility(Funcs, Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton)
+Funcs = Functions(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy)
+Utils = Utility(Funcs, Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy)
 Funcs.information(Utils)
 
 
@@ -57,53 +61,17 @@ Funcs.information(Utils)
 ##                                                      ##
 ##########################################################
 
-def Variation1():
-    Utils.running = True
-    
-    #Main loop
-    while Utils.running and Funcs.rounds < 3:
-        time.sleep(0.01)
-        try:
-            Utils.StartRun(70, 0)
-            Funcs.HoldDistance(40, False, 5, 70, "f", 2500)
-            
-        except Exception as e:
-            print(e)
-            Utils.cleanup()
-            
-            
-def Variation2():
-    Utils.running = True
-    
-    #Main loop
-    Utils.StartRun(80, 0)
-    while Utils.running and Funcs.rounds < 3:
-        time.sleep(0.01)
-        try:
-            Funcs.HoldDistance(50, True)
-            Funcs.DriveCorner("f", 80, 100, 2)
-        except Exception as e:
-            print(e)
-            Utils.cleanup()
-            
-    Utils.StopRun()  
-    
-    
-def Variation3():
-    Utils.running = True
-    
-    #Main loop
-    Utils.StartRun(80, 0)
-    while Utils.running and Funcs.rounds < 3:
-        time.sleep(0.01)
-        try:
-            Funcs.CalMiddle()
-            Funcs.HoldDistance(Funcs.middledistance, True)
-            Funcs.DriveCorner("f", 80, 100, 2)
-        except:
-            Utils.cleanup()
-            
-    Utils.StopRun()   
-   
-if __name__ == "__main__": 
-    Variation1()
+Utils.running = True
+#Utils.StartData("192.168.178.56", 12345)
+
+while Utils.running and Funcs.rounds < 3:
+    time.sleep(0.01)
+    try:
+        #print(Pixy.output[0].m_signature)
+        Utils.StartRun(65, 0)
+        Funcs.HoldLane()
+    except Exception as e:
+        print(e)
+        Utils.cleanup()
+        
+Utils.StopRun()

@@ -4,7 +4,7 @@ import threading
 from ctypes import *
 from pixy import *
 import pixy
-import board, adafruit_tcs34725, adafruit_mpu6050, adafruit_ads1x15
+import board, adafruit_tcs34725
 import os, signal, socket
 
 
@@ -104,7 +104,7 @@ class SuperSonicSensor:
         
     def measure_distance(self):
         #Variables
-        MAXTIME = 0.04
+        MAXTIME = 0.01
         StartTime = 0
         StopTime = 0
         
@@ -115,7 +115,7 @@ class SuperSonicSensor:
             GPIO.setup(self.EchoPin, GPIO.IN)
             # Trigger
             GPIO.output(self.TrigPin, 0)
-            time.sleep(0.003)
+            time.sleep(0.002)
             
             GPIO.output(self.TrigPin, 1)
             time.sleep(0.00001)
@@ -266,7 +266,6 @@ class ColorSensor:
         self.sensor = adafruit_tcs34725.TCS34725(i2c)
             
     def start_measurement(self):
-        self.sensor.active = True
         self.threadStop = 0
         self.thread = threading.Thread(target=self.read, daemon=True)
         self.thread.start()
@@ -274,13 +273,12 @@ class ColorSensor:
     def read(self):
         #Write sensor data to variables
         while self.threadStop == 0:
-            time.sleep(0.003)
+            time.sleep(0.01)
             self.color_temperature = self.sensor.color_temperature
             #self.color_rgb = self.sensor.color_rgb_bytes
             #self.lux = self.sensor.lux
         
     def stop_measurement(self):
-        self.sensor.active = False
         self.threadStop = 1
 
 
