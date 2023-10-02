@@ -4,9 +4,22 @@ import threading
 from ctypes import *
 from pixy import *
 import pixy
-import board, adafruit_tcs34725, adafruit_mpu6050, adafruit_ads1x15, sh1106
+import board, adafruit_tcs34725, adafruit_mpu6050
+import adafruit_ads1x15.ads1015 as ADS
+from adafruit_ads1x15.analog_in import AnalogIn
 import os, signal, socket
+from luma.core.interface.serial import i2c
+from luma.core.render import canvas
+from luma.oled.device import sh1106
+from gpiozero import CPUTemperature
+import psutil
+import busio
 
+os.system('cls' if os.name == 'nt' else 'clear')
+
+global printlist
+
+printlist = []
 
 ##########################################################
 ##                                                      ##
@@ -15,11 +28,36 @@ import os, signal, socket
 ##########################################################
 
 class CustomException(Exception):
-    #raise and error and print the message at the same time
-    
     def __init__(self, message):
-        print("CustomExeption: "+message)
+        print(message)  # Print the custom message
         super().__init__(message)
+
+
+class UtilityFunctions:
+    
+    
+    def convert_to_two_decimal_point(self, number):
+        # Format CPU temperature with 2 decimal places
+        number = float(number)
+        formated_string = f"{number:.2f}"
+
+        # Check if there is a decimal point
+        if '.' in formated_string:
+            integer_part, decimal_part = formated_string.split('.')
+            
+            # Add a zero if there's only one decimal place
+            if len(decimal_part) == 1:
+                formated_string += '0'
+        else:
+            # Add ".00" if there are no decimal places
+            formated_string += '.00'
+
+        return formated_string
+    
+    def convert_to_one_decimal_point(self, number):
+        return round(float(number), 1)
+    
+ 
         
 
 class Motor:
@@ -84,9 +122,10 @@ class Motor:
         
         
 class SuperSonicSensor:
-    def __init__(self, TrigPin, EchoPin, smoothing_window_size=3):
+    def __init__(self, TrigPin, EchoPin, ID=0, smoothing_window_size=3):
         #Variables
         self.EchoPin, self.TrigPin, self.distance, self.smoothing_window_size, self.sDistance = EchoPin, TrigPin, 0, smoothing_window_size, 0
+        self.ID = ID
         
         #Moving Average
         self.values = [0] * self.smoothing_window_size
@@ -136,10 +175,12 @@ class SuperSonicSensor:
 
             # Update self.dist
             self.distance = distance
-            
+            #print(f"Measured distance: {self.distance} my ID is {self.ID}")
+            """
             self.values[self.index] = self.distance
             self.index = (self.index + 1) % self.smoothing_window_size
             self.sDistance = sum(self.values) / self.smoothing_window_size
+            """
 
     def stop_measurement(self):
         self.threadStop = 1
@@ -284,44 +325,117 @@ class ColorSensor:
         self.threadStop = 1
         
         
-class GyroSensor:
+class Gyroscope:
     def __init__(self):
-        self.accelData, self.gyroData = 0, 0
-        
-        #Gyrosensor init
         i2c = board.I2C()
         self.sensor = adafruit_mpu6050.MPU6050(i2c)
-        self.sensor.active = True
-        
-    def read(self):
-        #self.accelData = self.sensor.acceleration
-        self.gyroData = self.sensor.gyro
-        
-        return self.gyroData
+        self.sensor._gyro_range = 0
 
+        # Initialize variables for storing the angle and time
+        self.angle = 0.0  # Initial angle
+        self.last_time = time.time()
 
+    def get_angle(self):
+        # Read gyroscope data
+        gyro_data = self.sensor.gyro
+
+        # Get the current time
+        current_time = time.time()
+
+        # Calculate the time elapsed since the last measurement
+        delta_time = current_time - self.last_time
+
+        # Integrate the gyroscope readings to get the change in angle
+        if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
+            gyro_data = 0
+        else:
+            gyro_data = gyro_data[0]
+            
+        delta_angle = gyro_data * delta_time
+
+        # Update the angle
+        self.angle += delta_angle
+
+        # Update the last time for the next iteration
+        self.last_time = current_time
+
+        return self.angle * 210
+        
+        
 class AnalogDigitalConverter:
     def __init__(self):
-        self.adc = adafruit_ads1x15.ads1115.ADS1115(board.I2C())
-        self.adc.active = True
+        i2c = busio.I2C(board.D1, board.D0)
+        self.ads = ADS.ADS1015(i2c)
+        self.ads.active = True
+        self.chan = AnalogIn(self.ads, ADS.P0)
         
-    def read(self, channel):
-        return self.adc.read(channel)
+    def read(self):
+        return self.chan.voltage * 4.35
 
 
-class DisplayOled:
-    def __init__(self, width=128, height=64):
-        i2c = board.I2C()
-        self.display = sh1106.SH1106_I2C(width, height, i2c)
+class DisplayOled(UtilityFunctions):
+    def __init__(self, ADC=None):
+        serial = i2c(port=0, address=0x3C)
+        self.device = sh1106(serial)
         
-    def start_display(self):
-        self.display.fill(0)
-        self.display.show()
+        self.first_line = ""
+        self.second_line = ""
+        self.ADC = ADC
         
-    def write(self, text):
-        self.display.fill(0)
-        self.display.text(text, 0, 0, 1)
-        self.display.show()
+        with canvas(self.device) as draw:
+            draw.rectangle(self.device.bounding_box, outline="white", fill="black")
+        
+    def clear(self):
+        with canvas(self.device) as draw:
+            draw.rectangle(self.device.bounding_box, outline="white", fill="black")
+        
+    def write(self, first_line="", second_line="",reset=False, xCoord=0, yCoord=17):
+        if reset:
+            self.first_line = ""
+            self.second_line = ""
+        
+        if first_line != "":
+            self.first_line = first_line
+        if second_line != "":
+            self.second_line = second_line
+                
+    def start_update(self):
+        self.threadStop = 0
+        self.thread = threading.Thread(target=self.update, daemon=True)
+        self.thread.start()
+
+    def update(self): #Guys wir watchen nen Movie
+        while self.threadStop == 0:
+            cpuTemp = CPUTemperature()
+
+            self.cpu_usage = psutil.cpu_percent(interval=0)
+            self.ram = psutil.virtual_memory()
+            self.disk = psutil.disk_usage('/')
+            
+            cpu_temp_formatted = self.convert_to_one_decimal_point(cpuTemp.temperature)
+            cpu_usage_formatted = self.convert_to_one_decimal_point(self.cpu_usage)
+            ram_usage_formatted = self.convert_to_one_decimal_point(self.ram.percent)
+            disk_usage_formatted = self.convert_to_one_decimal_point(self.disk.percent)
+            voltage_value_formatted = self.convert_to_two_decimal_point(self.ADC.read())
+            
+            
+            with canvas(self.device) as draw:
+                #top
+                draw.text((0, 0), f"{cpu_temp_formatted}°C", fill="white", align="left")
+                draw.text((40, 0), f"DISK:{int(disk_usage_formatted)}%", fill="white")
+                draw.text((92, 0), f"{voltage_value_formatted}V", fill="white")
+                
+                #bottom
+                draw.text((0, 50), f"CPU:{cpu_usage_formatted}%", fill="white")
+                draw.text((75, 50), f"RAM:{ram_usage_formatted}%", fill="white")
+                
+                #custom
+                draw.multiline_text((0, 15), f"{self.first_line}\n{self.second_line}", fill="white", align="center", anchor="ma")
+            
+            #time.sleep(0.3)
+            
+    def stop_update(self):
+        self.threadStop = 1
 
 
 class Utility:
