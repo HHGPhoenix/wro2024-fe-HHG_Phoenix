@@ -43,7 +43,11 @@ StartButton = Button(7)
 StopButton = Button(1)
 StopButton.start_StopButton()
 
-#CException = CustomException()
+Gyro = GyroSensor()
+
+ADC = AnalogDigitalConverter()
+
+Display = DisplayOled()
 
 Funcs = Functions(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton)
 Utils = Utility(Funcs, Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton)

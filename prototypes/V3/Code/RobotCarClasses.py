@@ -4,7 +4,7 @@ import threading
 from ctypes import *
 from pixy import *
 import pixy
-import board, adafruit_tcs34725, adafruit_mpu6050, adafruit_ads1x15
+import board, adafruit_tcs34725, adafruit_mpu6050, adafruit_ads1x15, sh1106
 import os, signal, socket
 
 
@@ -282,6 +282,46 @@ class ColorSensor:
     def stop_measurement(self):
         self.sensor.active = False
         self.threadStop = 1
+        
+        
+class GyroSensor:
+    def __init__(self):
+        self.accelData, self.gyroData = 0, 0
+        
+        #Gyrosensor init
+        i2c = board.I2C()
+        self.sensor = adafruit_mpu6050.MPU6050(i2c)
+        self.sensor.active = True
+        
+    def read(self):
+        #self.accelData = self.sensor.acceleration
+        self.gyroData = self.sensor.gyro
+        
+        return self.gyroData
+
+
+class AnalogDigitalConverter:
+    def __init__(self):
+        self.adc = adafruit_ads1x15.ads1115.ADS1115(board.I2C())
+        self.adc.active = True
+        
+    def read(self, channel):
+        return self.adc.read(channel)
+
+
+class DisplayOled:
+    def __init__(self, width=128, height=64):
+        i2c = board.I2C()
+        self.display = sh1106.SH1106_I2C(width, height, i2c)
+        
+    def start_display(self):
+        self.display.fill(0)
+        self.display.show()
+        
+    def write(self, text):
+        self.display.fill(0)
+        self.display.text(text, 0, 0, 1)
+        self.display.show()
 
 
 class Utility:
@@ -350,34 +390,7 @@ class Utility:
                 
         except Exception as e:
             print(f"Could not write data to file: {e}")
-            
-"""   
-    def StartData(self, ServerIP, ServerPort):
-        #Try to connect to Server
-        try:
-            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.client_socket.connect((ServerIP, ServerPort))  # Connect to the server 
-        except:
-            print(f"Could not connect to Server: {ServerIP}:{ServerPort}")
-            print("Running without data transfer")
-            return
-        
-        self.threadStop = 0
-        self.thread = threading.Thread(target=self.GetData, daemon=True)
-        self.thread.start()
-        
-        with open("sensor_data.txt", "w") as data_file:
-            data_file.write("")
-        
-    def GetData(self):
-        while self.threadStop == 0:
-            self.client_socket.send(data.encode())
-            time.sleep(0.2)  # Adjust the delay as needed
-        
-    def StopData(self):
-        self.client_socket.close()
-        self.threadStop = 1
-"""
+
 
 class Functions:
     def __init__(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Pixy=None):
