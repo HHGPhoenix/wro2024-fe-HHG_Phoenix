@@ -27,16 +27,28 @@ import busio
 class CustomException(Exception):
     def __init__(self, message):
         print(message)  # Print the custom message
-        super().__init__(message)
 
 
 
 #A class that has some necessary tools for calculating, usw.
 class Utility:
-
-    def transferSensorData(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Pixy=None, Funcs=None):
-        self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.Funcs = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, Funcs
+    #Transfer data so it can be used in other classes
+    def transferSensorData(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Funcs=None, Display=None, Pixy=None):
+        #self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.Funcs = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, Funcs
+        self.Ultraschall1 = Ultraschall1
+        self.Ultraschall2 = Ultraschall2
+        self.Farbsensor = Farbsensor
+        self.Motor1 = Motor1
+        self.Servo1 = Servo1
+        self.StartButton = StartButton
+        self.StopButton = StopButton
+        self.Funcs = Funcs
+        self.Pixy = Pixy
+        self.Display = Display
+        
         self.ActivSensor = 0
+        self.file_path = "/tmp/StandbyScript.lock"
+        self.StartTime = None
         
     #Cleanup after the run is finished or an error occured
     def cleanup(self):
@@ -68,6 +80,9 @@ class Utility:
         GPIO.cleanup()
         self.running = False
         print("Finished cleanup")
+        
+        #Start StandbyScript
+        os.remove(self.file_path)
     
     
     #Do some init and wait until StartButton is pressed
@@ -75,7 +90,10 @@ class Utility:
         self.waiting = True
         while self.running and self.waiting:
             try:
-                time.sleep(0.01)
+                #Stop StandbyScript if it is running
+                
+                
+                time.sleep(0.1)
                 if self.StartButton.state() == 1:
                     self.StartTime = time.time()
                     print(f"Run started: {time.time()}")
@@ -119,35 +137,45 @@ class Utility:
             self.StopRun()
 
     
-    #Convert a number to a number with two decimal points
-    def convert_to_two_decimal_point(self, number):
+    #Convert a number to a specified number of decimal points
+    def convert_to_decimal_points(self, number, decimal_points):
         try:
-            # Format CPU temperature with 2 decimal places
             number = float(number)
-            formated_string = f"{number:.2f}"
-
-            # Check if there is a decimal point
-            if '.' in formated_string:
-                integer_part, decimal_part = formated_string.split('.')
-                
-                #Add a zero if there's only one decimal place
-                if len(decimal_part) == 1:
-                    formated_string += '0'
-            else:
-                #Add ".00" if there are no decimal places
-                formated_string += '.00'
-
-            return formated_string
-        
+            formatted_string = f"{number:.{decimal_points}f}"
+            return formatted_string
         except Exception as e:
-            print(f"Could not convert number to two decimal points number: {e}")
-            self.StopRun()
-    
-    #Convert a number to a number with one decimal point
-    def convert_to_one_decimal_point(self, number):
-        return round(float(number), 1)
-    
+            print(f"Could not convert number to {decimal_points} decimal points: {e}")
+            # Handle the error or return an appropriate value if needed
+
+
+    #Convert a number to a specified number of digits
+    def convert_to_specified_digits(self, number, num_digits):
+        # Check if the input number is a valid float or int
+        if not isinstance(number, (float, int)):
+            raise CustomException(f"Invalid input: Please provide a valid number: {number}")
         
+        # Convert the number to a string
+        num_str = str(number)
+        
+        # Split the number into its integer and decimal parts
+        if '.' in num_str:
+            integer_part, decimal_part = num_str.split('.')
+        else:
+            integer_part, decimal_part = num_str, '0'
+        
+        # If the integer part has more digits than the specified number, return it as is
+        if len(integer_part) >= num_digits:
+            return integer_part
+        
+        # Otherwise, pad the integer part with leading zeros to match the specified number of digits
+        padded_integer_part = integer_part.zfill(num_digits)
+        
+        # Reconstruct the final number with the decimal part
+        final_number = f"{padded_integer_part}.{decimal_part}"
+        
+        return final_number
+
+
     #Start a new thread for reading the sensor    
     def toggle_supersonic_sensor(self, ID):
         try: 
@@ -289,6 +317,19 @@ class SuperSonicSensor(Utility):
             self.StopRun()
         
     
+    #Start a new thread for measuring the sensor   
+    def start_measurement(self):
+        try:
+            self.threadStop = 0
+            self.thread = threading.Thread(target=self.measure_distance, daemon=True)
+            self.thread.start()
+            
+        except Exception as e:
+            print(f"An Error occured in SuperSonicSensor.start_measurement: {e}")
+            self.StopRun()
+    
+    
+    #measure the distance with the sensor
     def measure_distance(self):
         #Variables
         MAXTIME = 0.04
@@ -479,22 +520,16 @@ class Button(Utility):
     
     #Function that kills the program if the StopButton is pressed    
     def read_StopButton(self):
-        try:
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-            
-            #Stop program if stopbutton is pressed
-            while self.threadStop == 0:
-                time.sleep(0.1)
-                if self.state() == 1:
-                    print("StopButton pressed")
-                    os.kill(os.getpid(), signal.SIGINT)
-                    
-        except Exception as e:
-            print(f"An Error occured in Button.read_StopButton: {e}")
-            self.StopRun()
+        #GPIO setup
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         
+        #Stop program if stopbutton is pressed
+        while self.threadStop == 0:
+            time.sleep(0.1)
+            if self.state() == 1:
+                print("StopButton pressed")
+                self.StopRun()
           
     #Stop the Thread for reading the StopButton      
     def stop_StopButton(self):
@@ -706,17 +741,17 @@ class DisplayOled(Utility):
                 self.disk = psutil.disk_usage('/')
                 
                 #Format them to always have the same number of decimal points
-                cpu_temp_formatted = self.convert_to_one_decimal_point(cpuTemp.temperature)
-                cpu_usage_formatted = self.convert_to_one_decimal_point(self.cpu_usage)
-                ram_usage_formatted = self.convert_to_one_decimal_point(self.ram.percent)
-                disk_usage_formatted = self.convert_to_one_decimal_point(self.disk.percent)
-                voltage_value_formatted = self.convert_to_two_decimal_point(self.ADC.read())
+                cpu_temp_formatted = self.convert_to_decimal_points(cpuTemp.temperature, 1)
+                cpu_usage_formatted = self.convert_to_decimal_points(self.cpu_usage, 1)
+                ram_usage_formatted = self.convert_to_decimal_points(self.ram.percent, 1)
+                disk_usage_formatted = self.convert_to_decimal_points(self.disk.percent, 1)
+                voltage_value_formatted = self.convert_to_decimal_points(self.ADC.read(), 2)
                 
                 #Draw all the data on the Display
                 with canvas(self.device) as draw:
                     #top
                     draw.text((0, 0), f"{cpu_temp_formatted}°C", fill="white", align="left")
-                    draw.text((40, 0), f"DISK:{int(disk_usage_formatted)}%", fill="white")
+                    draw.text((40, 0), f"DISK:{(int(float(disk_usage_formatted)))}%", fill="white")
                     draw.text((92, 0), f"{voltage_value_formatted}V", fill="white")
                     
                     #bottom
@@ -744,13 +779,19 @@ class DisplayOled(Utility):
 
 
 
-class Functions:
-    def __init__(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Pixy=None):
-        self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.rounds, self.corners = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, 0, 0
+class Functions(Utility):
+    def __init__(self, Utils, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Display=None, Pixy=None):
+        self.Ultraschall1 = Ultraschall1
+        self.Ultraschall2 = Ultraschall2
+        self.Farbsensor = Farbsensor
+        self.Motor1 = Motor1
+        self.Servo1 = Servo1
+        self.StartButton = StartButton
+        self.StopButton = StopButton
+        self.Pixy = Pixy
+        self.Display = Display
         
-        
-    def information(self, Utils):
-        #Get Utils, because it is initialized after Functions
+        self.rounds = 0
         self.Utils = Utils
 
 

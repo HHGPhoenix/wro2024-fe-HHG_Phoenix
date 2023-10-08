@@ -40,20 +40,24 @@ Servo1 = Servo(18, 50)
 
 StartButton = Button(7)
 
-StopButton = Button(1)
+StopButton = Button(26)
 StopButton.start_StopButton()
 
-Gyro = GyroSensor()
-
+#Gyro = Gyroscope()
 ADC = AnalogDigitalConverter()
+Display = DisplayOled(ADC)
 
-Display = DisplayOled()
 
-Funcs = Functions(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton)
 Utils = Utility()
-Utils.transferSensorData(Funcs, Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Farbsensor)
-Funcs.information(Utils)
+Funcs = Functions(Utils, Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Display)
+Utils.transferSensorData(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Funcs, Display)
+with open(Utils.file_path, 'w'):
+    pass  # Using 'pass' as a placeholder for no content
+time.sleep(1)
 
+
+Display.start_update()
+time.sleep(1)
 
 
 ##########################################################
