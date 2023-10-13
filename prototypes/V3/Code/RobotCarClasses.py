@@ -14,6 +14,7 @@ from luma.oled.device import sh1106
 from gpiozero import CPUTemperature
 import psutil
 import busio
+import multiprocessing as mp
 
 
 
@@ -86,13 +87,25 @@ class Utility:
     
     
     #Do some init and wait until StartButton is pressed
-    def StartRun(self, MotorSpeed, steer=0, direction="f"):
+    def StartRun(self, MotorSpeed=0, steer=0, direction="f"):
+        #Stop StandbyScript.py
+        with open(self.file_path, 'w'):
+            pass  # Using 'pass' as a placeholder for no content
+        time.sleep(1)
+        
+        #Start Processes
+        p1 = mp.Process(target=self.Display.start_update())
+        p1.start()
+        p2 = mp.Process(target=self.StopButton.start_StopButton())
+        p2.start()
+        p3 = mp.Process(target=self.Farbsensor.start_measurement())
+        p3.start()
+        
+        #Wait for StartButton to be pressed
+        self.running = True
         self.waiting = True
         while self.running and self.waiting:
             try:
-                #Stop StandbyScript if it is running
-                
-                
                 time.sleep(0.1)
                 if self.StartButton.state() == 1:
                     self.StartTime = time.time()
@@ -338,6 +351,7 @@ class SuperSonicSensor(Utility):
         
         while self.threadStop == 0:
             try:
+                StartTime2 = time.time()
                 #GPIO setup
                 GPIO.setmode(GPIO.BCM)
                 GPIO.setup(self.TrigPin, GPIO.OUT)
@@ -366,6 +380,8 @@ class SuperSonicSensor(Utility):
                 self.values[self.index] = self.distance
                 self.index = (self.index + 1) % self.smoothing_window_size
                 self.sDistance = sum(self.values) / self.smoothing_window_size
+                StopTime2 = time.time()
+                print(f"SuperSonicSensor read took: {StopTime2 - StartTime2}")
             
             except Exception as e:
                 print(f"An Error occured in SuperSonicSensor: {e}")
@@ -526,10 +542,13 @@ class Button(Utility):
         
         #Stop program if stopbutton is pressed
         while self.threadStop == 0:
+            StartTime = time.time()
             time.sleep(0.1)
             if self.state() == 1:
                 print("StopButton pressed")
                 self.StopRun()
+            StopTime = time.time()
+            print(f"StopButton read took: {StopTime - StartTime}")
           
     #Stop the Thread for reading the StopButton      
     def stop_StopButton(self):
@@ -576,10 +595,13 @@ class ColorSensor(Utility):
         try:
             #Write sensor data to variables
             while self.threadStop == 0:
+                StartTime = time.time()
                 time.sleep(0.003)
                 self.color_temperature = self.sensor.color_temperature
                 #self.color_rgb = self.sensor.color_rgb_bytes
                 #self.lux = self.sensor.lux
+                StopTime = time.time()
+                print(f"ColorSensor read took: {StopTime - StartTime}")
                 
         except Exception as e:
             print(f"An Error occured in ColorSensor.read: {e}")
@@ -734,6 +756,7 @@ class DisplayOled(Utility):
     def update(self):
         try:
             while self.threadStop == 0:
+                StartTime = time.time()
                 #Get CPU temperature, CPU usage, RAM usage and Disk usage
                 cpuTemp = CPUTemperature()
                 self.cpu_usage = psutil.cpu_percent(interval=0)
@@ -762,6 +785,8 @@ class DisplayOled(Utility):
                     draw.multiline_text((0, 15), f"{self.first_line}\n{self.second_line}", fill="white", align="center", anchor="ma")
                 
                 time.sleep(0.5)
+                StopTime = time.time()
+                print(f"Display update took: {StopTime - StartTime}")
                 
         except Exception as e:
             print(f"An Error occured in DisplayOled.update: {e}")
