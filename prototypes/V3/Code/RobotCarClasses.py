@@ -92,7 +92,7 @@ class Utility:
         with open(self.file_path, 'w'):
             pass  # Using 'pass' as a placeholder for no content
         time.sleep(1)
-        
+
         #Start Processes
         p1 = mp.Process(target=self.Display.start_update())
         p1.start()
@@ -100,6 +100,8 @@ class Utility:
         p2.start()
         p3 = mp.Process(target=self.Farbsensor.start_measurement())
         p3.start()
+        p4 = mp.Process(target=self.Ultraschall2.start_measurement())
+        p4.start()
         
         #Wait for StartButton to be pressed
         self.running = True
@@ -381,7 +383,6 @@ class SuperSonicSensor(Utility):
                 self.index = (self.index + 1) % self.smoothing_window_size
                 self.sDistance = sum(self.values) / self.smoothing_window_size
                 StopTime2 = time.time()
-                print(f"SuperSonicSensor read took: {StopTime2 - StartTime2}")
             
             except Exception as e:
                 print(f"An Error occured in SuperSonicSensor: {e}")
@@ -400,7 +401,7 @@ class SuperSonicSensor(Utility):
         
         
 
-#A class for controlling the Servo that is use for steering        
+#A class for controlling the Servo that is used for steering        
 class Servo(Utility):
     def __init__(self, SignalPin, frequency):
         try:
@@ -548,7 +549,6 @@ class Button(Utility):
                 print("StopButton pressed")
                 self.StopRun()
             StopTime = time.time()
-            print(f"StopButton read took: {StopTime - StartTime}")
           
     #Stop the Thread for reading the StopButton      
     def stop_StopButton(self):
@@ -601,7 +601,6 @@ class ColorSensor(Utility):
                 #self.color_rgb = self.sensor.color_rgb_bytes
                 #self.lux = self.sensor.lux
                 StopTime = time.time()
-                print(f"ColorSensor read took: {StopTime - StartTime}")
                 
         except Exception as e:
             print(f"An Error occured in ColorSensor.read: {e}")
@@ -620,7 +619,7 @@ class ColorSensor(Utility):
         
         
 
-#A class for reading a MPU6050 Gyroscope
+#A class for reading a MPU6050 Gyroscope ############################ WIP #########################################  
 class Gyroscope(Utility):
     def __init__(self):
         try:
@@ -671,14 +670,29 @@ class Gyroscope(Utility):
     
         
 
-#A class for reading a ADS1015 ADC        
+#A class for reading a ADS1015 ADC ############################ WIP #########################################         
 class AnalogDigitalConverter(Utility):
-    def __init__(self):
+    def __init__(self, channel=0):
         try:
+            #Variables
+            self.channel = channel
+            
+            #ADC init
             i2c = busio.I2C(board.D1, board.D0)
             self.ads = ADS.ADS1015(i2c)
             self.ads.active = True
-            self.chan = AnalogIn(self.ads, ADS.P0)
+            
+            #Channel init
+            if channel == 0:
+                self.chan = AnalogIn(self.ads, ADS.P0)
+            elif channel == 1:
+                self.chan = AnalogIn(self.ads, ADS.P1)
+            elif channel == 2:
+                self.chan = AnalogIn(self.ads, ADS.P2)
+            elif channel == 3:
+                self.chan = AnalogIn(self.ads, ADS.P3)
+            else:
+                raise CustomException(f"No valid ADC channel specified: {channel}")
         
         except Exception as e:
             print(f"An Error occured in AnalogDigitalConverter initialization: {e}")
@@ -691,6 +705,68 @@ class AnalogDigitalConverter(Utility):
 
 
 
+#A class for reading a LM393 speed sensor ############################ testing needed #########################################  
+class SpeedSensor(Utility):
+    def __init__(self, SignalPin, NumberSlots):
+        try:
+            #Variables
+            self.SignalPin = SignalPin
+            self.speed = 0
+            self.NumSlots = NumberSlots
+            
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(SignalPin, GPIO.IN)
+            
+        except Exception as e:
+            print(f"An Error occured in SpeedSensor initialization: {e}")
+            self.StopRun()
+            
+    
+    #Start a new thread for measuring the sensor
+    def start_measurement(self):
+        try:
+            self.threadStop = 0
+            self.thread = threading.Thread(target=self.measure_speed, daemon=True)
+            self.thread.start()
+            
+        except Exception as e:
+            print(f"An Error occured in SpeedSensor.start_measurement: {e}")
+            self.StopRun()
+            
+    
+    #Measure the speed with the sensor
+    def measure_speed(self):
+        try:
+            lastPulseTime = time.time()
+            while self.threadStop == 0:
+                #GPIO setup
+                GPIO.setmode(GPIO.BCM)
+                GPIO.setup(self.SignalPin, GPIO.IN)
+                
+                #Measure speed
+                while GPIO.input(self.SignalPin) == 0:
+                    PulseTime = time.time()
+                    
+                self.speed = (60 * 100 * 10) / (self.NumSlots * (PulseTime - lastPulseTime)) / 100000 * 1.5
+                lastPulseTime = PulseTime
+                
+        except Exception as e:
+            print(f"An Error occured in SpeedSensor.measure_speed: {e}")
+            self.StopRun()
+        
+      
+    #Stop the thread for measuring the sensor  
+    def stop_measurement(self):
+        try:
+            self.threadStop = 1
+        
+        except Exception as e:
+            print(f"An Error occured in SpeedSensor.stop_measurement: {e}")
+            self.StopRun()
+        
+        
+        
 #A class for writing to a OLED Display
 class DisplayOled(Utility):
     def __init__(self, ADC=None):
@@ -786,7 +862,6 @@ class DisplayOled(Utility):
                 
                 time.sleep(0.5)
                 StopTime = time.time()
-                print(f"Display update took: {StopTime - StartTime}")
                 
         except Exception as e:
             print(f"An Error occured in DisplayOled.update: {e}")
@@ -804,6 +879,7 @@ class DisplayOled(Utility):
 
 
 
+#A class for driving functions
 class Functions(Utility):
     def __init__(self, Utils, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Display=None, Pixy=None):
         self.Ultraschall1 = Ultraschall1
@@ -986,16 +1062,3 @@ class Functions(Utility):
             except Exception as e:
                 print(e)
                 self.Utils.cleanup()
-      
-"""          
-    def DriveCorner(self, direction="f", speed=0, steer=0, wait=0, stop=True):
-        self.Motor1.drive(direction, speed)
-        self.Servo1.steer(steer)
-        time.sleep(wait)
-        if stop:
-            self.Motor1.drive(direction, 0)
-            self.Servo1.steer(0)
-            
-    def CalMiddle(self, CarWidth=17):
-        self.middledistance = (self.Ultraschall1.distance + self.Ultraschall2.distance + CarWidth) / 2
-"""

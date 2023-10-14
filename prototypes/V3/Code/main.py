@@ -58,7 +58,8 @@ def Variation1():
         time.sleep(0.01)
         try:
             Utils.StartRun(70, 0)
-            Funcs.HoldDistance(40, False, 5, 70, "f", 2500)
+            while True:
+                print(Ultraschall2.distance)
             
         except Exception as e:
             print(e)
