@@ -1,0 +1,6 @@
+*.py linguist-detectable
+*.so linguist-vendored
+*.cpp linguist-vendored
+*.i linguist-vendored
+*.cxx linguist-vendored
+*.dat linguist-vendored
