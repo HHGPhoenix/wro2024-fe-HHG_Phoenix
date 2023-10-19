@@ -1,1 +1,2 @@
-# wro-fe-HHG_Phoenix
+# WRO Future Engineers -- Team HHG_Phoenix
+
