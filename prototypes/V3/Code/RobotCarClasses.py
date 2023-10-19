@@ -49,7 +49,8 @@ class Utility:
         
         self.ActivSensor = 0
         self.file_path = "/tmp/StandbyScript.lock"
-        self.StartTime = None
+        self.StartTime = 0
+        
         
     #Cleanup after the run is finished or an error occured
     def cleanup(self):
@@ -118,7 +119,7 @@ class Utility:
                     
                     self.waiting = False   
             except:
-                self.cleanup()
+                self.StopRun()
           
     
     #Stop the run and calculate the time needed            
@@ -141,15 +142,86 @@ class Utility:
         self.cleanup()
           
     
-    #Write specified data to file        
-    def log(self, data):
+    #Setup datalogging
+    def setupDataLog(self):
         try:
-            with open("Sensor_Output.txt", "a") as data_file:
-                data_file.write(data)
-                
+            #Create datalogger
+            self.datalogger = logging.getLogger("DataLogger")
+            self.datalogger.setLevel(logging.DEBUG)
+
+            
+            #Create file handler and set level to debug
+            fh = logging.FileHandler("DataLog.log", 'w')
+            fh.setLevel(logging.DEBUG)
+            self.datalogger.addHandler(fh)
+
+            #Start Process to log data while the program is running
+            self.DataLoggerStop = 0
+            PDataLogger = mp.Process(target=self.LogData)
+            PDataLogger.start()
+            
         except Exception as e:
-            print(f"Could not write data to file: {e}")
+            print(f"An Error occured in Utility.setupDataLog: {e}")
             self.StopRun()
+            
+
+    #Log Sensor values
+    def LogData(self):
+        while self.DataLoggerStop == 0:
+            try:
+                data = f"Ultraschall1: "
+                self.datalogger.debug(data)
+            except Exception as e:
+                print(f"An Error occured in Utility.LogData: {e}")
+                self.StopRun()
+        
+    
+    #Stop the DataLogger Process
+    def StopDataLog(self):
+        self.DataLoggerStop = 1
+        
+        
+    #Setup logging
+    def setupLog(self, name='Log', filename='Debug.log'):
+        try:
+            #Create logger
+            self.logger = logging.getLogger(name)
+            self.logger.setLevel(logging.DEBUG)
+            
+            #Create console handler and set level to debug
+            ch = logging.StreamHandler()
+            ch.setLevel(logging.DEBUG)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            
+            #Create file handler and set level to debug
+            fh = logging.FileHandler(filename, 'w')
+            fh.setLevel(logging.DEBUG)
+            fh.setFormatter(formatter)
+            ch.setFormatter(formatter)
+            
+            #Add handlers to logger
+            self.logger.addHandler(ch)
+            self.logger.addHandler(fh)
+        except Exception as e:
+            print(f"An Error occured in Utility.setupLog: {e}")
+            self.StopRun()
+        
+        
+    #Log debug messages
+    def LogDebug(self, message):
+        self.logger.debug(message)
+        
+    def LogInfo(self, message):
+        self.logger.info(message)
+        
+    def LogWarning(self, message):
+        self.logger.warning(message)
+        
+    def LogError(self, message):
+        self.logger.error(message)
+        
+    def LogCritical(self, message):
+        self.logger.critical(message)
 
     
     #Convert a number to a specified number of decimal points
@@ -894,59 +966,7 @@ class Functions(Utility):
         
         self.rounds = 0
         self.Utils = Utils
-
-
-    def HoldDistance(self, DISTANCE=50, HoldAtLine=False, P=5, speed=0, direction="f", colorTemperature=1, LineWaitTime=1):
-        #Variables
-        self.P = P
-        self.Motor1.drive(direction, speed)
-        driving = True
-        TIMEOUT = 0
-        corners = 0
-
-        #Clear data file
-        with open("Sensor_Output.txt", "w") as data_file:
-            data_file.write("")
-        
-        #Hold Distance to wall
-        while self.Utils.running and self.rounds < 3 and driving:
-            try:
-                time.sleep(0.05)
-                print(self.Ultraschall2.distance)
-                Error = self.Ultraschall2.distance - DISTANCE
-                Correction = P * Error
-                if Correction > 95:
-                    Correction = 95
-                elif Correction < -95:
-                    Correction = -95
-                
-                if direction == "f":
-                    self.Servo1.steer(Correction)
-                elif direction == "r":
-                    self.Servo1.steer(-Correction)
-                else:
-                    print(f"no valid direction specified: {direction}")
-                    raise CustomException(f"no valid direction specified: {direction}")
-                
-                #Count rounds with ColorSensor
-                if self.Farbsensor.color_temperature >= colorTemperature - 100 and self.Farbsensor.color_temperature <= colorTemperature + 100 and time.time() > TIMEOUT:
-                    corners = corners + 1
-                    if corners == 4:
-                        corners = 0
-                        self.rounds = self.rounds + 1
-                        print(f"Round: {self.rounds}")
-                        
-                    if HoldAtLine == True:
-                        driving = False
-                        
-                    TIMEOUT = time.time() + LineWaitTime
-                    
-                #print(-Correction)
-                #self.Utils.log()
-            except Exception as e:
-                print(e)
-                self.Utils.cleanup()
-         
+     
             
     def HoldLane(self, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, Lane=1, SIZE=1, HoldAtLine=False, P=7, speed=65, direction="f", colorTemperature=1, LineWaitTime=1, Sensor=2):
         #Variables
