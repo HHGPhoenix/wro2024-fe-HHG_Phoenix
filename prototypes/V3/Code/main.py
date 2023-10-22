@@ -1,5 +1,5 @@
 import time
-from RobotCarClasses import Motor, Servo, ColorSensor, SuperSonicSensor, Button, AnalogDigitalConverter, DisplayOled, Utility
+from RobotCarClasses import *
 
 
 
@@ -9,7 +9,7 @@ from RobotCarClasses import Motor, Servo, ColorSensor, SuperSonicSensor, Button,
 ##                                                      ##
 ##########################################################
 #Constants
-SPEED = 70
+SPEED = 0
 DISTANCETOWALL = 50
 KP = 5
 LINECOLORTEMPERATURE = 2500
@@ -24,24 +24,27 @@ rounds = 0
 ##        Sensor / Class Initalization                  ##
 ##                                                      ##
 ##########################################################    
-Farbsensor = ColorSensor()
-
-Motor1 = Motor(1000, 27, 17, 22)
-Motor1.start()
-Servo1 = Servo(18, 50)
-
-Ultraschall1 = SuperSonicSensor(24, 23, 1)
-Ultraschall2 = SuperSonicSensor(8, 25, 2)
-
-StartButton = Button(7)
-StopButton = Button(26)
-#Gyro = Gyroscope()
-ADC = AnalogDigitalConverter()
-Display = DisplayOled(ADC)
-
-
 Utils = Utility()
-Utils.transferSensorData(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Display)
+
+Farbsensor = ColorSensor(Utils)
+
+Motor1 = Motor(1000, 21, 20, 16, Utils)
+Motor1.start()
+Servo1 = Servo(27, 50, Utils)
+
+Ultraschall1 = SuperSonicSensor(23, 24, 1, Utils)
+Ultraschall2 = SuperSonicSensor(19, 13, 2, Utils)
+
+StartButton = Button(17, Utils)
+StopButton = Button(4, Utils)
+
+#Gyro = Gyroscope()
+ADC = AnalogDigitalConverter(Utils)
+Display = DisplayOled(ADC, Utils)
+
+Buzzer1 = Buzzer(18, Utils)
+
+Utils.transferSensorData(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Display, ADC, Buzzer1)
 
 
 
@@ -57,12 +60,13 @@ def HoldDistance(Utils, DISTANCE=50, P=5, speed=0, ColorTemperature=1, LineWaitT
     rounds = 0
     
     #Start driving
-    Motor1.drive("f", speed)
+    Utils.Motor1.drive("f", speed)
     
     #Hold Distance to wall
     while Utils.running and rounds < 3:
         try:
             time.sleep(0.01)
+            #print(Utils.Ultraschall2.distance)
             Error = Utils.Ultraschall2.distance - DISTANCE
             Correction = P * Error
             
@@ -71,16 +75,22 @@ def HoldDistance(Utils, DISTANCE=50, P=5, speed=0, ColorTemperature=1, LineWaitT
                 Correction = 95
             elif Correction < -95:
                 Correction = -95
+                
+            Utils.Servo1.steer(Correction)
             
             #Count rounds with ColorSensor
-            if Utils.Farbsensor.color_temperature >= ColorTemperature - 100 and Utils.Farbsensor.color_temperature <= colorTemperature + 100 and time.time() > TIMEOUT:
+            if Utils.Farbsensor.color_temperature >= ColorTemperature - 100 and Utils.Farbsensor.color_temperature <= ColorTemperature + 100 and time.time() > TIMEOUT:
                 corners = corners + 1
+                Utils.Display.write(f"Rounds: {rounds}", f"Corners: {corners}")
+                Utils.Buzzer1.buzz(1000, 80, 0.1)
                 if corners == 4:
                     corners = 0
-                    rounds = rounds + 1
+                    rounds = rounds + 1 
                     print(f"Round: {rounds}")
                     
                 TIMEOUT = time.time() + LineWaitTime
+                
+            
                 
         except Exception as exception:
             print(exception)
