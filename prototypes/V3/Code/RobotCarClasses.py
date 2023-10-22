@@ -34,7 +34,7 @@ class CustomException(Exception):
 #A class that has some necessary tools for calculating, usw.
 class Utility:
     #Transfer data so it can be used in other classes
-    def transferSensorData(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Funcs=None, Display=None, Pixy=None):
+    def transferSensorData(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Display=None, ADC=None, Buzzer1=None, Pixy=None):
         #self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.Funcs = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, Funcs
         self.Ultraschall1 = Ultraschall1
         self.Ultraschall2 = Ultraschall2
@@ -43,13 +43,15 @@ class Utility:
         self.Servo1 = Servo1
         self.StartButton = StartButton
         self.StopButton = StopButton
-        self.Funcs = Funcs
         self.Pixy = Pixy
         self.Display = Display
+        self.ADC = ADC
+        self.Buzzer1 = Buzzer1
+        self.StartTime = time.time()
         
         self.ActivSensor = 0
         self.file_path = "/tmp/StandbyScript.lock"
-        self.StartTime = 0
+        self.Startime = 0
         
         
     #Cleanup after the run is finished or an error occured
@@ -65,6 +67,9 @@ class Utility:
             self.Farbsensor.stop_measurement()
         if self.Pixy != None:
             self.Pixy.stop_reading()
+            
+        self.Buzzer1.buzz(1000, 80, 2)
+        
         if self.Display != None:
             self.Display.stop_update()
         if self.StopButton != None:
@@ -89,6 +94,9 @@ class Utility:
     
     #Do some init and wait until StartButton is pressed
     def StartRun(self, MotorSpeed=0, steer=0, direction="f"):
+        #clear console
+        os.system('cls' if os.name=='nt' else 'clear')
+        
         #Stop StandbyScript.py
         with open(self.file_path, 'w'):
             pass  # Using 'pass' as a placeholder for no content
@@ -107,19 +115,25 @@ class Utility:
         #Wait for StartButton to be pressed
         self.running = True
         self.waiting = True
+        self.Display.write("Waiting for Button", "to be pressed...")
+        self.Buzzer1.buzz(1000, 80, 0.1)
+        time.sleep(0.1)
+        self.Buzzer1.buzz(1000, 80, 0.1)
         while self.running and self.waiting:
             try:
                 time.sleep(0.1)
                 if self.StartButton.state() == 1:
-                    self.StartTime = time.time()
+                    self.Starttime = time.time()
                     print(f"Run started: {time.time()}")
                     
                     self.Motor1.drive(direction, MotorSpeed)
                     self.Servo1.steer(steer)
                     
-                    self.waiting = False   
+                    self.waiting = False
+                    self.Display.write("Run started:", f"{time.time()}")  
+                    self.Buzzer1.buzz(1000, 80, 0.2) 
             except:
-                self.StopRun()
+                self.Utils.StopRun()
           
     
     #Stop the run and calculate the time needed            
@@ -134,10 +148,13 @@ class Utility:
             hours = minutes // 60
             if hours > 0:
                 print(f"{hours} hour(s), {minutes % 60} minute(s), {seconds % 60} second(s) needed")
+                self.Display.write("Time needed:", f"{hours}h {minutes % 60}m {seconds % 60}s")
             elif minutes > 0:
                 print(f"{minutes} minute(s), {seconds % 60} second(s) needed")
+                self.Display.write("Time needed:", f"{minutes}m {seconds % 60}s")
             else:
                 print(f"{seconds} second(s) needed")
+                self.Display.write("Time needed:", f"{seconds}s")
             
         self.cleanup()
           
@@ -162,18 +179,18 @@ class Utility:
             
         except Exception as e:
             print(f"An Error occured in Utility.setupDataLog: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
             
 
     #Log Sensor values
     def LogData(self):
         while self.DataLoggerStop == 0:
             try:
-                data = f"Ultraschall1: "
+                data = f"Ultraschall1; {self.Ultraschall1.distance}; Ultraschall2; {self.Ultraschall2.distance}; Farbsensor; {self.Farbsensor.color_temperature}; Motor1; {self.Motor1.speed}; Servo1; {self.Servo1.percentage}; CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}"
                 self.datalogger.debug(data)
             except Exception as e:
                 print(f"An Error occured in Utility.LogData: {e}")
-                self.StopRun()
+                self.Utils.StopRun()
         
     
     #Stop the DataLogger Process
@@ -204,7 +221,7 @@ class Utility:
             self.logger.addHandler(fh)
         except Exception as e:
             print(f"An Error occured in Utility.setupLog: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
         
     #Log debug messages
@@ -304,17 +321,17 @@ class Utility:
             
         except Exception as e:
             print(f"An Error occured in Utility.toggle_supersonic_sensor: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
   
     
     
 #Class for the drive Motor
 class Motor(Utility):
-    def __init__(self, frequency, fpin, rpin, spin):
+    def __init__(self, frequency, fpin, rpin, spin, Utils):
         try:
             #Setup Variables
             self.frequency, self.fpin, self.rpin, self.spin, self.speed = frequency, fpin, rpin, spin, 0
-            
+            self.Utils = Utils
             #GPIO setup
             GPIO.setmode(GPIO.BCM)
             GPIO.setup(fpin, GPIO.OUT)
@@ -325,7 +342,7 @@ class Motor(Utility):
             
         except Exception as e:
             print(f"An Error occured in Motor initialization: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
 
 
     #Set the direction and speed of the Motor
@@ -355,7 +372,7 @@ class Motor(Utility):
             
         except Exception as e:
             print(f"An Error occured in Motor.drive: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
 
        
     #Start the Motor with the last known speed        
@@ -364,7 +381,7 @@ class Motor(Utility):
             self.pwm.start(self.speed)  
         except Exception as e:
             print(f"An Error occured in Motor.start: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
        
        
     #Stop the Motor        
@@ -376,18 +393,19 @@ class Motor(Utility):
             self.pwm.stop()
         except Exception as e:
             print(f"An Error occured in Motor.stop: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
         
 
 #Class for reading a SuperSonicSensor        
 class SuperSonicSensor(Utility):
-    def __init__(self, TrigPin, EchoPin, ID, smoothing_window_size=3):
+    def __init__(self, TrigPin, EchoPin, ID, Utils, smoothing_window_size=3):
         try:
             #Variable init
             self.EchoPin, self.TrigPin, self.distance, self.smoothing_window_size, self.sDistance = EchoPin, TrigPin, 0, smoothing_window_size, 0
             self.ID = ID
             self.ThreadStop = 0
+            self.Utils = Utils
             #Moving Average init
             self.values = [0] * self.smoothing_window_size
             self.index = 0
@@ -401,7 +419,7 @@ class SuperSonicSensor(Utility):
             
         except Exception as e:
             print(f"An Error occured in SuperSonicSensor initialization: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
     
     #Start a new thread for measuring the sensor   
@@ -413,7 +431,7 @@ class SuperSonicSensor(Utility):
             
         except Exception as e:
             print(f"An Error occured in SuperSonicSensor.start_measurement: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
     
     
     #measure the distance with the sensor
@@ -455,11 +473,12 @@ class SuperSonicSensor(Utility):
                 self.index = (self.index + 1) % self.smoothing_window_size
                 self.sDistance = sum(self.values) / self.smoothing_window_size
                 StopTime2 = time.time()
+                #print(self.distance)
             
             except Exception as e:
                 print(f"An Error occured in SuperSonicSensor: {e}")
                 self.threadStop = 1
-                self.StopRun()
+                self.Utils.StopRun()
        
     
     #Stop the thread for measuring the sensor
@@ -469,16 +488,17 @@ class SuperSonicSensor(Utility):
         
         except Exception as e:
             print(f"An Error occured in SuperSonicSensor.stop_measurement: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
         
 
 #A class for controlling the Servo that is used for steering        
 class Servo(Utility):
-    def __init__(self, SignalPin, frequency):
+    def __init__(self, SignalPin, frequency, Utils):
         try:
             #Variable init
             self.SignalPin, self.frequency = SignalPin, frequency
+            self.Utils = Utils
             
             #GPIO setup
             GPIO.setmode(GPIO.BCM)
@@ -491,7 +511,7 @@ class Servo(Utility):
             
         except Exception as e:
             print(f"An Error occured in Servo initialization: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
 
         
     #Calculate the DutyCycle from a steering percentage and steer the Servo    
@@ -501,9 +521,11 @@ class Servo(Utility):
             GPIO.setmode(GPIO.BCM)
             GPIO.setup(self.SignalPin, GPIO.OUT)
             
+            self.percentage = percentage
+            
             #Calculate DutyCycle and set it
             try:
-                DutyCycle = 3e-5 * percentage**2 + 0.018 * percentage + 6.57
+                DutyCycle = 3e-5 * self.percentage**2 + 0.018 * self.percentage + 6.57
                 self.pwm.ChangeDutyCycle(DutyCycle)
             except:
                 print(f"No valid steering percentage specified: {percentage}")
@@ -511,15 +533,15 @@ class Servo(Utility):
             
         except Exception as e:
             print(f"An Error occured in Servo.steer: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
             
          
 
 #A class for reading the PixyCam ############################ WIP #########################################            
 class PixyCam(Utility):
-    def __init__(self):
+    def __init__(self, Utils):
         self.count, self.output = 0, ()
-        
+        self.Utils = Utils
         pixy.init()
         pixy.change_prog ("color_connected_components");        
         
@@ -564,10 +586,11 @@ class PixyCam(Utility):
 
 #A class for reading a Button; A Button that instantly stops the program if pressed            
 class Button(Utility):
-    def __init__(self, SignalPin):
+    def __init__(self, SignalPin, Utils):
         try:
             #Variables
             self.SignalPin = SignalPin
+            self.Utils = Utils
             
             #GPIO setup
             GPIO.setmode(GPIO.BCM)
@@ -575,7 +598,7 @@ class Button(Utility):
             
         except Exception as e:
             print(f"An Error occured in Button initialization: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
     
     #Read the state of the Button -- 1 if pressed, 0 if not    
@@ -593,7 +616,7 @@ class Button(Utility):
         
         except Exception as e:
             print(f"An Error occured in Button.state: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
       
     
     #Start the Thread for reading the StopButton    
@@ -604,7 +627,7 @@ class Button(Utility):
             self.thread.start()
         except Exception as e:
             print(f"An Error occured in Button.start_StopButton: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
     
     #Function that kills the program if the StopButton is pressed    
@@ -619,7 +642,7 @@ class Button(Utility):
             time.sleep(0.1)
             if self.state() == 1:
                 print("StopButton pressed")
-                self.StopRun()
+                self.Utils.StopRun()
             StopTime = time.time()
           
     #Stop the Thread for reading the StopButton      
@@ -629,16 +652,17 @@ class Button(Utility):
             
         except Exception as e:
             print(f"An Error occured in Button.stop_StopButton: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
      
      
         
 #A class for reading a TCS34725 ColorSensor         
 class ColorSensor(Utility):
-    def __init__(self):
+    def __init__(self, Utils):
         try:
             #Variable init
             self.color_rgb, self.color_temperature, self.lux = 0, 0, 0
+            self.Utils = Utils
             
             #Colorsensor init
             i2c = board.I2C()
@@ -646,7 +670,7 @@ class ColorSensor(Utility):
             
         except Exception as e:
             print(f"An Error occured in ColorSensor initialization: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
             
     
     #Start a new thread for reading the sensor        
@@ -659,7 +683,7 @@ class ColorSensor(Utility):
             
         except Exception as e:
             print(f"An Error occured in ColorSensor.start_measurement: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
         
     #Read the sensor data    
@@ -667,16 +691,13 @@ class ColorSensor(Utility):
         try:
             #Write sensor data to variables
             while self.threadStop == 0:
-                StartTime = time.time()
-                time.sleep(0.003)
                 self.color_temperature = self.sensor.color_temperature
                 #self.color_rgb = self.sensor.color_rgb_bytes
                 #self.lux = self.sensor.lux
-                StopTime = time.time()
                 
         except Exception as e:
             print(f"An Error occured in ColorSensor.read: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
     
     #Stop the thread for reading the sensor   
@@ -687,17 +708,18 @@ class ColorSensor(Utility):
         
         except Exception as e:
             print(f"An Error occured in ColorSensor.stop_measurement: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
         
 
 #A class for reading a MPU6050 Gyroscope ############################ WIP #########################################  
 class Gyroscope(Utility):
-    def __init__(self):
+    def __init__(self, Utils):
         try:
             i2c = board.I2C()
             self.sensor = adafruit_mpu6050.MPU6050(i2c)
             self.sensor._gyro_range = 0
+            self.Utils = Utils
 
             #Initialize variables for storing the angle and time
             self.angle = 0.0  # Initial angle
@@ -705,7 +727,7 @@ class Gyroscope(Utility):
             
         except Exception as e:
             print(f"An Error occured in Gyroscope initialization: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
 
 
     #Read the gyroscope data and calculate the angle
@@ -738,13 +760,13 @@ class Gyroscope(Utility):
         
         except Exception as e:
             print(f"An Error occured in Gyroscope.get_angle: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
     
         
 
-#A class for reading a ADS1015 ADC ############################ WIP #########################################         
+#A class for reading a ADS1015 ADC        
 class AnalogDigitalConverter(Utility):
-    def __init__(self, channel=0):
+    def __init__(self, Utils, channel=2):
         try:
             #Variables
             self.channel = channel
@@ -753,6 +775,7 @@ class AnalogDigitalConverter(Utility):
             i2c = busio.I2C(board.D1, board.D0)
             self.ads = ADS.ADS1015(i2c)
             self.ads.active = True
+            self.Utils = Utils
             
             #Channel init
             if channel == 0:
@@ -768,7 +791,7 @@ class AnalogDigitalConverter(Utility):
         
         except Exception as e:
             print(f"An Error occured in AnalogDigitalConverter initialization: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
        
     
     #Read the voltage from the ADC    
@@ -779,12 +802,13 @@ class AnalogDigitalConverter(Utility):
 
 #A class for reading a LM393 speed sensor ############################ testing needed #########################################  
 class SpeedSensor(Utility):
-    def __init__(self, SignalPin, NumberSlots):
+    def __init__(self, SignalPin, NumberSlots, Utils):
         try:
             #Variables
             self.SignalPin = SignalPin
             self.speed = 0
             self.NumSlots = NumberSlots
+            self.Utils = Utils
             
             #GPIO setup
             GPIO.setmode(GPIO.BCM)
@@ -792,7 +816,7 @@ class SpeedSensor(Utility):
             
         except Exception as e:
             print(f"An Error occured in SpeedSensor initialization: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
             
     
     #Start a new thread for measuring the sensor
@@ -804,7 +828,7 @@ class SpeedSensor(Utility):
             
         except Exception as e:
             print(f"An Error occured in SpeedSensor.start_measurement: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
             
     
     #Measure the speed with the sensor
@@ -825,7 +849,7 @@ class SpeedSensor(Utility):
                 
         except Exception as e:
             print(f"An Error occured in SpeedSensor.measure_speed: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
       
     #Stop the thread for measuring the sensor  
@@ -835,13 +859,13 @@ class SpeedSensor(Utility):
         
         except Exception as e:
             print(f"An Error occured in SpeedSensor.stop_measurement: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
         
         
 #A class for writing to a OLED Display
 class DisplayOled(Utility):
-    def __init__(self, ADC=None):
+    def __init__(self, ADC, Utils):
         try:
             serial = i2c(port=0, address=0x3C)
             self.device = sh1106(serial)
@@ -850,6 +874,7 @@ class DisplayOled(Utility):
             self.first_line = ""
             self.second_line = ""
             self.ADC = ADC
+            self.Utils = Utils
             
             #Wake the screen by drawing an outline
             with canvas(self.device) as draw:
@@ -857,7 +882,7 @@ class DisplayOled(Utility):
         
         except Exception as e:
             print(f"An Error occured in DisplayOled initialization: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
        
     #Clear the Display 
@@ -868,7 +893,7 @@ class DisplayOled(Utility):
                 
         except Exception as e:
             print(f"An Error occured in DisplayOled.clear: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
        
     
     #Write lines in variables so they get written by the update function   
@@ -885,7 +910,7 @@ class DisplayOled(Utility):
         
         except Exception as e:
             print(f"An Error occured in DisplayOled.write: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
         
 
     #Start a new thread for updating the Display
@@ -897,7 +922,7 @@ class DisplayOled(Utility):
             
         except Exception as e:
             print(f"An Error occured in DisplayOled.start_update: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
 
     
     #Update the Display
@@ -937,7 +962,7 @@ class DisplayOled(Utility):
                 
         except Exception as e:
             print(f"An Error occured in DisplayOled.update: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
          
     
     #Stop the thread for updating the Display      
@@ -947,7 +972,33 @@ class DisplayOled(Utility):
 
         except Exception as e:
             print(f"An Error occured in DisplayOled.stop_update: {e}")
-            self.StopRun()
+            self.Utils.StopRun()
+
+
+
+class Buzzer(Utility):
+    def __init__(self, SignalPin, Utils):
+        try:
+            self.SignalPin = SignalPin
+            self.Utils = Utils
+            
+        except Exception as e:
+            print(f"An Error occured in Buzzer initialization: {e}")
+            self.Utils.StopRun()
+            
+    def buzz(self, frequency, volume, duration):
+        try:
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(self.SignalPin, GPIO.OUT)
+            pwm = GPIO.PWM(self.SignalPin, frequency)
+            pwm.start(volume)
+            time.sleep(duration)
+            pwm.stop()
+            
+        except Exception as e:
+            print(f"An Error occured in Buzzer.buzz: {e}")
+            self.Utils.StopRun()
 
 
 
