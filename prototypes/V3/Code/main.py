@@ -1,5 +1,6 @@
 import time
 from RobotCarClasses import *
+import RPi.GPIO as GPIO
 
 
 
@@ -9,10 +10,11 @@ from RobotCarClasses import *
 ##                                                      ##
 ##########################################################
 #Constants
-SPEED = 0
+SPEED = 50
 DISTANCETOWALL = 50
 KP = 5
 LINECOLORTEMPERATURE = 2500
+NUMBERSLOTS = 8
 
 #Variables
 rounds = 0
@@ -43,8 +45,10 @@ ADC = AnalogDigitalConverter(Utils)
 Display = DisplayOled(ADC, Utils)
 
 Buzzer1 = Buzzer(18, Utils)
+SpeedSens = SpeedSensor(26, NUMBERSLOTS, Utils, 40)
 
-Utils.transferSensorData(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Display, ADC, Buzzer1)
+Utils.transferSensorData(Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Display, ADC, Buzzer1, SpeedSens)
+Utils.setupLog()
 
 
 
@@ -66,8 +70,8 @@ def HoldDistance(Utils, DISTANCE=50, P=5, speed=0, ColorTemperature=1, LineWaitT
     while Utils.running and rounds < 3:
         try:
             time.sleep(0.01)
-            #print(Utils.Ultraschall2.distance)
             Error = Utils.Ultraschall2.distance - DISTANCE
+            #print(Utils.Ultraschall2.distance)
             Correction = P * Error
             
             #Limit steering
@@ -105,7 +109,9 @@ def HoldDistance(Utils, DISTANCE=50, P=5, speed=0, ColorTemperature=1, LineWaitT
 ##########################################################
 if __name__ == "__main__":
     try:  
+        GPIO.setmode(GPIO.BCM)
         Utils.StartRun(SPEED, 0, "f")
+        Motor1.setMotorSpeed(3)
         HoldDistance(Utils, DISTANCETOWALL, KP, SPEED, LINECOLORTEMPERATURE, 0.5)
     
     except Exception as e:
