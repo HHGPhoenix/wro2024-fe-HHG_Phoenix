@@ -7,7 +7,7 @@ import pixy
 import board, adafruit_tcs34725, adafruit_mpu6050
 import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
-import os, signal, socket
+import os, signal, socket 
 from luma.core.interface.serial import i2c
 from luma.core.render import canvas
 from luma.oled.device import sh1106
@@ -35,7 +35,7 @@ class CustomException(Exception):
 #A class that has some necessary tools for calculating, usw.
 class Utility:
     #Transfer data so it can be used in other classes
-    def transferSensorData(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Display=None, ADC=None, Buzzer1=None, SpeedSensor=None, Pixy=None):
+    def transferSensorData(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Display=None, ADC=None, Buzzer1=None, Pixy=None):
         #self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.Funcs = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, Funcs
         self.Ultraschall1 = Ultraschall1
         self.Ultraschall2 = Ultraschall2
@@ -48,7 +48,6 @@ class Utility:
         self.Display = Display
         self.ADC = ADC
         self.Buzzer1 = Buzzer1
-        self.SpeedSensor = SpeedSensor
         self.StartTime = time.time()
         
         self.ActivSensor = 0
@@ -69,8 +68,6 @@ class Utility:
             self.Farbsensor.stop_measurement()
         if self.Pixy != None:
             self.Pixy.stop_reading()
-        if self.SpeedSensor != None:
-            self.SpeedSensor.stop_measurement()
             
         self.Buzzer1.buzz(1000, 80, 2)
         self.StopDataLog()
@@ -116,8 +113,8 @@ class Utility:
         p3.start()
         p4 = mp.Process(target=self.Ultraschall2.start_measurement())
         p4.start()
-        p5 = mp.Process(target=self.SpeedSensor.start_measurement())
-        p5.start()
+        #p5 = mp.Process(target=self.setupDataLog())
+        #p5.start()
         
         #Wait for StartButton to be pressed
         self.running = True
@@ -351,8 +348,7 @@ class Motor(Utility):
             GPIO.setup(rpin, GPIO.OUT)
             GPIO.setup(spin, GPIO.OUT)
             
-            self.pwm = GPIO.PWM(self.spin, self.frequency)
-            self.MotorSpeed = 0
+            self.pwm = GPIO.PWM(spin, frequency)
             
         except Exception as e:
             self.Utils.LogError(f"An Error occured in Motor initialization: {e}")
@@ -366,6 +362,7 @@ class Motor(Utility):
             GPIO.setmode(GPIO.BCM)
             GPIO.setup(self.fpin, GPIO.OUT)
             GPIO.setup(self.rpin, GPIO.OUT)
+            GPIO.setup(self.spin, GPIO.OUT)
 
             self.speed = speed
             
@@ -408,14 +405,9 @@ class Motor(Utility):
             self.Utils.LogError(f"An Error occured in Motor.stop: {e}")
             self.Utils.StopRun()
         
-    
-    #Set a motor speed that gets controlled by the Speed Sensor, if it was started   
-    def setMotorSpeed(self, Speed):
-        self.MotorSpeed = Speed
         
 
-
-#Class for reading a SuperSonicSensor
+#Class for reading a SuperSonicSensor        
 class SuperSonicSensor(Utility):
     def __init__(self, TrigPin, EchoPin, ID, Utils, smoothing_window_size=3):
         try:
@@ -475,33 +467,23 @@ class SuperSonicSensor(Utility):
                 GPIO.output(self.TrigPin, 0)
 
                 #Get times
-                GPIO.add_event_detect(self.EchoPin, GPIO.RISING)
-                TIMEOUT = time.time() + MAXTIME
-                while not GPIO.event_detected(self.EchoPin) and StopTime < TIMEOUT:
+                TIMEOUT = time.time() + MAXTIME      
+                while GPIO.input(self.EchoPin) == 0 and StopTime < TIMEOUT:
                     StartTime = time.time()
-                GPIO.remove_event_detect(self.EchoPin)
                     
-                GPIO.add_event_detect(self.EchoPin, GPIO.FALLING)
                 TIMEOUT = time.time() + MAXTIME
                 while GPIO.input(self.EchoPin) == 1 and StopTime < TIMEOUT:
                     StopTime = time.time()
-                GPIO.remove_event_detect(self.EchoPin)
 
                 #Calculate distance
                 delay = StopTime - StartTime
-                distance = (delay * 34030) / 2
-                
-                if distance < 0:
-                    self.distance = 0
-                elif distance > 500:
-                    self.distance = 500
-                else:
-                    self.distance = distance
+                self.distance = (delay * 34030) / 2
                 
                 self.values[self.index] = self.distance
                 self.index = (self.index + 1) % self.smoothing_window_size
                 self.sDistance = sum(self.values) / self.smoothing_window_size
                 StopTime2 = time.time()
+                #self.Utils.LogError(self.distance)
             
             except Exception as e:
                 self.Utils.LogError(f"An Error occured in SuperSonicSensor: {e}")
@@ -794,8 +776,8 @@ class Gyroscope(Utility):
         
 
 #A class for reading a ADS1015 ADC        
-class AnalogDigitalConverter(Utility):
-    def __init__(self, Utils, channel=2):
+class AnalogDigitalConverter():
+    def __init__(self, channel=2):
         try:
             #Variables
             self.channel = channel
@@ -805,7 +787,6 @@ class AnalogDigitalConverter(Utility):
             i2c = busio.I2C(board.D1, board.D0)
             self.ads = ADS.ADS1015(i2c)
             self.ads.active = True
-            self.Utils = Utils
             
             #Channel init
             if channel == 0:
@@ -831,16 +812,15 @@ class AnalogDigitalConverter(Utility):
 
 
 
-#A class for reading a LM393 speed sensor
+#A class for reading a LM393 speed sensor ############################ testing needed #########################################  
 class SpeedSensor(Utility):
-    def __init__(self, SignalPin, NumberSlots, Utils, P=1):
+    def __init__(self, SignalPin, NumberSlots, Utils):
         try:
             #Variables
             self.SignalPin = SignalPin
             self.speed = 0
             self.NumSlots = NumberSlots
             self.Utils = Utils
-            self.P = P
             
             #GPIO setup
             GPIO.setmode(GPIO.BCM)
@@ -854,9 +834,8 @@ class SpeedSensor(Utility):
     #Start a new thread for measuring the sensor
     def start_measurement(self):
         try:
-            GPIO.setmode(GPIO.BCM)
             self.threadStop = 0
-            self.thread = threading.Thread(target=self.hold_speed, daemon=True, args=(self.Utils, self.NumSlots,))
+            self.thread = threading.Thread(target=self.measure_speed, daemon=True)
             self.thread.start()
             
         except Exception as e:
@@ -865,46 +844,23 @@ class SpeedSensor(Utility):
             
     
     #Measure the speed with the sensor
-    def hold_speed(self, Utils, NumSlots):
+    def measure_speed(self):
         try:
-            GPIO.setmode(GPIO.BCM)
-            self.Utils = Utils
-            PulseTime = time.time()
-            lastPulseTime = 0
+            lastPulseTime = time.time()
             while self.threadStop == 0:
-                try:
-                    if self.Utils.Motor1.MotorSpeed != 0:
-                        while GPIO.input(self.SignalPin) == 1:
-                            time.sleep(0.01)
-                            
-                        #GPIO setup
-                        GPIO.setmode(GPIO.BCM)
-                        GPIO.setup(self.SignalPin, GPIO.IN)
-                        
-                        #Measure speed
-                        while GPIO.input(self.SignalPin) == 0:
-                            time.sleep(0.01)
-                            PulseTime = time.time()
-                            
-                        self.speed = (60 * 1000) / (NumSlots * (PulseTime - lastPulseTime)) / 100000 * 1.5
-                        lastPulseTime = PulseTime
-                        
-                        Error = self.speed - self.Utils.Motor1.MotorSpeed
-                        Correction = self.P * Error * -1
-                        
-                        if Correction > 100:
-                            Correction = 100
-                        elif Correction < 0:
-                            Correction = 0
-                            
-                        self.Utils.Motor1.drive('f', Correction)
-                        
-                except Exception as e:
-                    self.Utils.LogError(f"An Error occured in SpeedSensor.hold_speed: {e}")
-                    self.Utils.StopRun()
+                #GPIO setup
+                GPIO.setmode(GPIO.BCM)
+                GPIO.setup(self.SignalPin, GPIO.IN)
+                
+                #Measure speed
+                while GPIO.input(self.SignalPin) == 0:
+                    PulseTime = time.time()
+                    
+                self.speed = (60 * 100 * 10) / (self.NumSlots * (PulseTime - lastPulseTime)) / 100000 * 1.5
+                lastPulseTime = PulseTime
                 
         except Exception as e:
-            self.Utils.LogError(f"An Error occured in SpeedSensor.hold_speed: {e}")
+            self.Utils.LogError(f"An Error occured in SpeedSensor.measure_speed: {e}")
             self.Utils.StopRun()
         
       
@@ -921,7 +877,7 @@ class SpeedSensor(Utility):
         
 #A class for writing to a OLED Display
 class DisplayOled(Utility):
-    def __init__(self, ADC, Utils):
+    def __init__(self, ADC):
         try:
             serial = i2c(port=0, address=0x3C)
             self.device = sh1106(serial)
@@ -930,7 +886,6 @@ class DisplayOled(Utility):
             self.first_line = ""
             self.second_line = ""
             self.ADC = ADC
-            self.Utils = Utils
             
             #Wake the screen by drawing an outline
             with canvas(self.device) as draw:
@@ -1032,7 +987,6 @@ class DisplayOled(Utility):
 
 
 
-#A class for making sounds with a Buzzer
 class Buzzer(Utility):
     def __init__(self, SignalPin, Utils):
         try:
@@ -1052,7 +1006,6 @@ class Buzzer(Utility):
             pwm.start(volume)
             time.sleep(duration)
             pwm.stop()
-            time.sleep(0.01)
             
         except Exception as e:
             self.Utils.LogError(f"An Error occured in Buzzer.buzz: {e}")
