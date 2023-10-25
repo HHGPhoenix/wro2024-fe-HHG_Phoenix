@@ -136,12 +136,15 @@ class Utility:
                     self.Starttime = time.time()
                     self.LogDebug(f"Run started: {time.time()}")
                     
+                    time.sleep(1)
+                    self.Display.write("Run started:", f"{time.time()}")  
+                    self.Buzzer1.buzz(1000, 80, 0.2) 
+
                     self.Motor1.drive(direction, MotorSpeed)
                     self.Servo1.steer(steer)
                     
                     self.waiting = False
-                    self.Display.write("Run started:", f"{time.time()}")  
-                    self.Buzzer1.buzz(1000, 80, 0.2) 
+                    
             except:
                 self.Utils.StopRun()
           
@@ -455,7 +458,7 @@ class SuperSonicSensor(Utility):
     #measure the distance with the sensor
     def measure_distance(self):
         #Variables
-        MAXTIME = 0.04
+        MAXTIME = 40
         StartTime = 0
         StopTime = 0
         
@@ -475,17 +478,20 @@ class SuperSonicSensor(Utility):
                 GPIO.output(self.TrigPin, 0)
 
                 #Get times
+                time.sleep(0.010)
                 GPIO.add_event_detect(self.EchoPin, GPIO.RISING)
                 TIMEOUT = time.time() + MAXTIME
                 while not GPIO.event_detected(self.EchoPin) and StopTime < TIMEOUT:
                     StartTime = time.time()
                 GPIO.remove_event_detect(self.EchoPin)
-                    
+            
+              
                 GPIO.add_event_detect(self.EchoPin, GPIO.FALLING)
                 TIMEOUT = time.time() + MAXTIME
                 while GPIO.input(self.EchoPin) == 1 and StopTime < TIMEOUT:
                     StopTime = time.time()
                 GPIO.remove_event_detect(self.EchoPin)
+               
 
                 #Calculate distance
                 delay = StopTime - StartTime
@@ -874,17 +880,15 @@ class SpeedSensor(Utility):
             while self.threadStop == 0:
                 try:
                     if self.Utils.Motor1.MotorSpeed != 0:
-                        while GPIO.input(self.SignalPin) == 1:
-                            time.sleep(0.01)
+                        GPIO.wait_for_edge(self.SignalPin, GPIO.FALLING)
                             
                         #GPIO setup
                         GPIO.setmode(GPIO.BCM)
                         GPIO.setup(self.SignalPin, GPIO.IN)
                         
                         #Measure speed
-                        while GPIO.input(self.SignalPin) == 0:
-                            time.sleep(0.01)
-                            PulseTime = time.time()
+                        GPIO.wait_for_edge(self.SignalPin, GPIO.RISING)
+                        PulseTime = time.time()
                             
                         self.speed = (60 * 1000) / (NumSlots * (PulseTime - lastPulseTime)) / 100000 * 1.5
                         lastPulseTime = PulseTime
