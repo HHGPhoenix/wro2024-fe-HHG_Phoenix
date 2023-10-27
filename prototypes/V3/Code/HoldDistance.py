@@ -111,6 +111,7 @@ if __name__ == "__main__":
     try:  
         GPIO.setmode(GPIO.BCM)
         Utils.StartRun(SPEED, 0, "f")
+        Utils.toggle_supersonic_sensor(2)
         Motor1.setMotorSpeed(3)
         HoldDistance(Utils, DISTANCETOWALL, KP, SPEED, LINECOLORTEMPERATURE, 0.3)
     

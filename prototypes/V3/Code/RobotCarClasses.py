@@ -54,6 +54,7 @@ class Utility:
         self.ActivSensor = 0
         self.file_path = "/tmp/StandbyScript.lock"
         self.Startime = 0
+        self.UltraschallThreadStop = 1
         
         
     #Cleanup after the run is finished or an error occured
@@ -114,10 +115,8 @@ class Utility:
         p2.start()
         p3 = mp.Process(target=self.Farbsensor.start_measurement())
         p3.start()
-        p4 = mp.Process(target=self.Ultraschall2.start_measurement())
+        p4 = mp.Process(target=self.SpeedSensor.start_measurement())
         p4.start()
-        p5 = mp.Process(target=self.SpeedSensor.start_measurement())
-        p5.start()
         
         #Wait for StartButton to be pressed
         self.running = True
@@ -299,40 +298,28 @@ class Utility:
     #Start a new thread for reading the sensor    
     def toggle_supersonic_sensor(self, ID):
         try: 
+            #Turn off both sensors
             if ID == 0:
-                for thread in threading.enumerate():
-                    if thread.name == "Ultraschall1":
-                        self.Ultraschall1.threadStop = 1
-                        thread.join()
-                    if thread.name == "Ultraschall2":
-                        self.Ultraschall2.threadStop = 1 
-                        thread.join()    
-                return
+                self.UltraschallThreadStop = 1
                 
+            #Toggle to sensor left
             if ID == 1:
-                for thread in threading.enumerate():
-                    if thread.name == "Ultraschall2Thread":
-                        self.Ultraschall2.threadStop = 1
-                        thread.join()
-                    if thread.name == "Ultraschall1Thread":
-                        return 
-                        
-                self.Ultraschall1.threadStop = 0
-                Ultraschall1Thread = threading.Thread(target=self.Ultraschall1.measure_distance, name="Ultraschall1Thread", daemon=True)
-                Ultraschall1Thread.start()
+                self.UltraschallThreadStop = 1
+                   
+                time.sleep(0.1)     
+                p_Ultra1 = mp.Process(target=self.Ultraschall1.start_measurement())
+                p_Ultra1.start()
+                
                 return
             
+            #Toggle to sensor right
             if ID == 2:
-                for thread in threading.enumerate():
-                    if thread.name == "Ultraschall1Thread":
-                        self.Ultraschall1.threadStop = 1
-                        thread.join()
-                    if thread.name == "Ultraschall2Thread":
-                        return 
+                self.UltraschallThreadStop = 1
                    
-                self.Ultraschall2.threadStop = 0     
-                Ultraschall2Thread = threading.Thread(target=self.Ultraschall2.measure_distance, name="Ultraschall2Thread", daemon=True)
-                Ultraschall2Thread.start()
+                time.sleep(0.1)
+                p_Ultra2 = mp.Process(target=self.Ultraschall2.start_measurement())
+                p_Ultra2.start()
+
                 return
             
         except Exception as e:
@@ -446,8 +433,9 @@ class SuperSonicSensor(Utility):
     #Start a new thread for measuring the sensor   
     def start_measurement(self):
         try:
-            self.threadStop = 0
-            self.thread = threading.Thread(target=self.measure_distance, daemon=True)
+            #GPIO.remove_event_detect(self.EchoPin)
+            self.Utils.UltraschallThreadStop = 0
+            self.thread = threading.Thread(target=self.measure_distance, daemon=True, name=f"Ultraschall{self.ID}", args=(self.Utils,))
             self.thread.start()
             
         except Exception as e:
@@ -456,13 +444,15 @@ class SuperSonicSensor(Utility):
     
     
     #measure the distance with the sensor
-    def measure_distance(self):
+    def measure_distance(self, Utils):
+        GPIO.remove_event_detect(self.EchoPin)
+        GPIO.add_event_detect(self.EchoPin, GPIO.RISING)
         #Variables
         MAXTIME = 40
         StartTime = 0
         StopTime = 0
         
-        while self.threadStop == 0:
+        while Utils.UltraschallThreadStop == 0:
             try:
                 StartTime2 = time.time()
                 #GPIO setup
@@ -479,18 +469,13 @@ class SuperSonicSensor(Utility):
 
                 #Get times
                 time.sleep(0.010)
-                GPIO.add_event_detect(self.EchoPin, GPIO.RISING)
                 TIMEOUT = time.time() + MAXTIME
                 while not GPIO.event_detected(self.EchoPin) and StopTime < TIMEOUT:
                     StartTime = time.time()
-                GPIO.remove_event_detect(self.EchoPin)
-            
-              
-                GPIO.add_event_detect(self.EchoPin, GPIO.FALLING)
+
                 TIMEOUT = time.time() + MAXTIME
                 while GPIO.input(self.EchoPin) == 1 and StopTime < TIMEOUT:
                     StopTime = time.time()
-                GPIO.remove_event_detect(self.EchoPin)
                
 
                 #Calculate distance
@@ -510,7 +495,7 @@ class SuperSonicSensor(Utility):
                 StopTime2 = time.time()
             
             except Exception as e:
-                self.Utils.LogError(f"An Error occured in SuperSonicSensor: {e}")
+                self.Utils.LogError(f"An Error occured in SuperSonicSensor.measure_distance: {e}")
                 self.threadStop = 1
                 self.Utils.StopRun()
        
@@ -518,7 +503,7 @@ class SuperSonicSensor(Utility):
     #Stop the thread for measuring the sensor
     def stop_measurement(self):
         try:
-            self.threadStop = 1
+            self.Utils.UltraschallThreadStop = 1
         
         except Exception as e:
             self.Utils.LogError(f"An Error occured in SuperSonicSensor.stop_measurement: {e}")
@@ -588,16 +573,6 @@ class PixyCam(Utility):
        
         
     def read(self):
-        class Blocks (Structure):
-            _fields_ = [ ("m_signature", c_uint),
-                ("m_x", c_uint),
-                ("m_y", c_uint),
-                ("m_width", c_uint),
-                ("m_height", c_uint),
-                ("m_angle", c_uint),
-                ("m_index", c_uint),
-                ("m_age", c_uint) ]
-            
         self.output = BlockArray(100)
             
         while self.threadStop == 0:
@@ -1061,137 +1036,3 @@ class Buzzer(Utility):
         except Exception as e:
             self.Utils.LogError(f"An Error occured in Buzzer.buzz: {e}")
             self.Utils.StopRun()
-
-
-
-#A class for driving functions
-class Functions(Utility):
-    def __init__(self, Utils, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Display=None, Pixy=None):
-        self.Ultraschall1 = Ultraschall1
-        self.Ultraschall2 = Ultraschall2
-        self.Farbsensor = Farbsensor
-        self.Motor1 = Motor1
-        self.Servo1 = Servo1
-        self.StartButton = StartButton
-        self.StopButton = StopButton
-        self.Pixy = Pixy
-        self.Display = Display
-        
-        self.rounds = 0
-        self.Utils = Utils
-     
-            
-    def HoldLane(self, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, Lane=1, SIZE=1, HoldAtLine=False, P=7, speed=65, direction="f", colorTemperature=1, LineWaitTime=1, Sensor=2):
-        #Variables
-        self.P = P
-        self.Motor1.drive(direction, speed)
-        driving = True
-        TIMEOUT = 0
-        TIMEOUTPixy = 0
-
-        #Hold Lane
-        while self.Utils.running and self.rounds < 3 and driving:
-            try:
-                time.sleep(0.05)
-                if Lane == 0:
-                    DISTANCE = 25
-                    Sensor = 2
-                elif Lane == 1:
-                    DISTANCE = 50
-                    Sensor = 2
-                elif Lane == 2:
-                    DISTANCE = 25
-                    Sensor = 1
-                else:
-                    self.Utils.LogError(f"No valid Lane specified: {Lane}")
-                    raise CustomException(f"No valid Lane specified: {Lane}")
-
-                #HoldLine
-                if Sensor == 1:
-                    self.Utils.LogError(self.Ultraschall1.distance)
-                    Error = self.Ultraschall1.sDistance - DISTANCE
-                    Correction = P * Error
-                    if Correction > 95:
-                        Correction = 95
-                    elif Correction < -95:
-                        Correction = -95
-                        
-                    self.Utils.LogError(Correction)
-                    if direction == "f":
-                        self.Servo1.steer(-Correction)
-                    elif direction == "r":
-                        self.Servo1.steer(Correction)
-                    else:
-                        self.Utils.LogError(f"no valid direction specified: {direction}")
-                        raise CustomException(f"no valid direction specified: {direction}")  
-                elif Sensor == 2:
-                    self.Utils.LogError(self.Ultraschall2.distance)
-                    Error = self.Ultraschall2.sDistance - DISTANCE
-                    Correction = P * Error
-                    if Correction > 95:
-                        Correction = 95
-                    elif Correction < -95:
-                        Correction = -95
-                        
-                    self.Utils.LogError(Correction)
-                    if direction == "f":
-                        self.Servo1.steer(Correction)
-                    elif direction == "r":
-                        self.Servo1.steer(-Correction)
-                    else:
-                        self.Utils.LogError(f"no valid direction specified: {direction}")
-                        raise CustomException(f"no valid direction specified: {direction}")
-                else:
-                    self.Utils.LogError(f"No valid Sensor specified: {Sensor}")
-                    raise CustomException(f"No valid Sensor specified: {Sensor}")
-                
-                #Count rounds with ColorSensor
-                if self.Farbsensor.color_temperature >= colorTemperature - 100 and self.Farbsensor.color_temperature <= colorTemperature + 100 and time.time() > TIMEOUT:
-                    corners = corners + 1
-                    if corners == 4:
-                        corners = 0
-                        self.rounds = self.rounds + 1
-                        
-                    if HoldAtLine == True:
-                        driving = False
-                        
-                    TIMEOUT = time.time() + LineWaitTime
-                    
-                #get Pixy objects and calculate new lanes#
-                if time.time() > TIMEOUTPixy:
-                    count = self.Pixy.count
-                    if count >= 1:
-                        NextObject = -1
-                        for x in range(count):
-                            yCoord = self.Pixy.output[x].m_y
-                            
-                            if yCoord < YCutOffTop and yCoord > YCutOffBottom:
-                                
-                                size = self.Pixy.output[x].m_width * self.Pixy.output[x].m_height
-                                
-                                if size >= SIZE:
-                                    NextObject = x
-                                    break
-                                
-                            else:
-                                NextObject = -1
-                        
-                        if NextObject >= 0:
-                            signature = self.Pixy.output[NextObject].m_signature
-                            self.Utils.LogError(signature)
-                            if signature == 1:
-                                Lane = 0
-                            elif signature == 2:
-                                Lane = 2
-                            else:
-                                Lane = 1
-
-                            TIMEOUTPixy = time.time() + BlockWaitTime
-
-                    else:
-                        Lane = 1
-                        
-                    
-            except Exception as e:
-                self.Utils.LogError(e)
-                self.Utils.cleanup()
