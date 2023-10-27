@@ -61,6 +61,9 @@ class Utility:
     def cleanup(self):
         self.LogDebug("Started cleanup")
         
+        if self.Motor1 != None:
+            self.Motor1.drive("f", 0)
+        
         #Stop all Threads if the class has been initialized
         if self.Ultraschall1 != None:
             self.Ultraschall1.stop_measurement()
@@ -122,6 +125,8 @@ class Utility:
         self.running = True
         self.waiting = True
         
+        self.Motor1.drive("f", 0)
+        
         self.LogDebug("Waiting for Button to be pressed...")
         self.Display.write("Waiting for Button", "to be pressed...")
         self.Buzzer1.buzz(1000, 80, 0.1)
@@ -152,6 +157,10 @@ class Utility:
     def StopRun(self):
         self.StopTime = time.time()
         self.LogDebug(f"Run ended: {self.StopTime}")
+        
+        if self.Motor1 != None:
+            self.Motor1.drive("f", 0)
+        
         if self.Starttime != None:
             seconds = round(self.StopTime - self.StartTime, 2)
         
@@ -350,7 +359,7 @@ class Motor(Utility):
 
 
     #Set the direction and speed of the Motor
-    def drive(self, direction, speed=0):
+    def drive(self, direction="f", speed=0):
         try:
             #GPIO setup
             GPIO.setmode(GPIO.BCM)
@@ -407,7 +416,7 @@ class Motor(Utility):
 
 #Class for reading a SuperSonicSensor
 class SuperSonicSensor(Utility):
-    def __init__(self, TrigPin, EchoPin, ID, Utils, smoothing_window_size=3):
+    def __init__(self, TrigPin, EchoPin, ID, Utils, smoothing_window_size=7):
         try:
             #Variable init
             self.EchoPin, self.TrigPin, self.distance, self.smoothing_window_size, self.sDistance = EchoPin, TrigPin, 0, smoothing_window_size, 0
@@ -451,14 +460,14 @@ class SuperSonicSensor(Utility):
         MAXTIME = 40
         StartTime = 0
         StopTime = 0
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.TrigPin, GPIO.OUT)
+        GPIO.setup(self.EchoPin, GPIO.IN)
         
         while Utils.UltraschallThreadStop == 0:
             try:
                 StartTime2 = time.time()
                 #GPIO setup
-                GPIO.setmode(GPIO.BCM)
-                GPIO.setup(self.TrigPin, GPIO.OUT)
-                GPIO.setup(self.EchoPin, GPIO.IN)
                 #Trigger
                 GPIO.output(self.TrigPin, 0)
                 time.sleep(0.03)
@@ -536,11 +545,7 @@ class Servo(Utility):
         
     #Calculate the DutyCycle from a steering percentage and steer the Servo    
     def steer(self, percentage):
-        try:
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.SignalPin, GPIO.OUT)
-            
+        try:    
             self.percentage = percentage
             
             #Calculate DutyCycle and set it
@@ -576,6 +581,7 @@ class PixyCam(Utility):
         self.output = BlockArray(100)
             
         while self.threadStop == 0:
+            time.sleep(0.01)
             self.count = pixy.ccc_get_blocks(100, self.output)
        
             
@@ -659,7 +665,6 @@ class Button(Utility):
     def stop_StopButton(self):
         try:
             self.threadStop = 1
-            
         except Exception as e:
             self.Utils.LogError(f"An Error occured in Button.stop_StopButton: {e}")
             self.Utils.StopRun()
@@ -852,14 +857,15 @@ class SpeedSensor(Utility):
             self.Utils = Utils
             PulseTime = time.time()
             lastPulseTime = 0
+            GPIO.setup(self.SignalPin, GPIO.IN)
+            
             while self.threadStop == 0:
                 try:
                     if self.Utils.Motor1.MotorSpeed != 0:
                         GPIO.wait_for_edge(self.SignalPin, GPIO.FALLING)
                             
                         #GPIO setup
-                        GPIO.setmode(GPIO.BCM)
-                        GPIO.setup(self.SignalPin, GPIO.IN)
+                        #GPIO.setmode(GPIO.BCM)
                         
                         #Measure speed
                         GPIO.wait_for_edge(self.SignalPin, GPIO.RISING)
