@@ -61,13 +61,15 @@ Utils.setupLog()
 ##                     Functions                        ##
 ##                                                      ##
 ##########################################################
-def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0.01, Lane=1, SIZE=1, P=7, speed=65, direction="f", colorTemperature=1, LineWaitTime=1, Sensor=2):
+def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0.01, Lane=1, SIZE=1, P=2.5, ServoWaitTime=0.015, direction="f", colorTemperature=1, LineWaitTime=1, Sensor=2):
     #Variables
     TIMEOUT = 0
     TIMEOUTPixy = 0
+    ServoTimeout = 0
+    corners = 0
     rounds = 0
     Sensor = 0
-
+    
     #Hold Lane
     while Utils.running and rounds < 3:
         try:
@@ -78,53 +80,54 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
                 DISTANCE = 25
                 Utils.toggle_supersonic_sensor(2)
                 Sensor = 2
+                print("Switched to Sensor 2")
                 
             elif Lane == 1 and Sensor != 2:
                 DISTANCE = 50
                 Utils.toggle_supersonic_sensor(2)
                 Sensor = 2
+                print("Switched to Sensor 2")
                 
             elif Lane == 2 and Sensor != 1:
                 DISTANCE = 25
                 Utils.toggle_supersonic_sensor(1)
                 Sensor = 1
+                print("Switched to Sensor 1")
+
 
             #HoldLane
             if Sensor == 1:
                 Error = Utils.Ultraschall1.distance - DISTANCE
                 Correction = P * Error
                 
-                if Correction > 92:
-                    Correction = 92
-                elif Correction < -92:
-                    Correction = -92
+                if Correction > 90:
+                    Correction = 90
+                elif Correction < -90:
+                    Correction = -90
                     
-                if direction == "f":
+                if direction == "f" and ServoTimeout < time.time():
                     Utils.Servo1.steer(-Correction)
-                elif direction == "r":
+                elif direction == "r" and ServoTimeout < time.time():
                     Utils.Servo1.steer(Correction)
-                else:
-                    Utils.LogError(f"no valid direction specified: {direction}")
-                    raise CustomException(f"no valid direction specified: {direction}")  
+
                 
             elif Sensor == 2:
-                Error = Utils.Ultraschall2.distance - DISTANCE
+                Error = Utils.Ultraschall2.sDistance - DISTANCE
                 Correction = P * Error
                 
-                print(Correction)
+                #print(Correction)
                 
-                if Correction > 92:
-                    Correction = 92
-                elif Correction < -92:
-                    Correction = -92
+                if Correction > 90:
+                    Correction = 90
+                elif Correction < -90:
+                    Correction = -90
                     
-                if direction == "f":
+                if direction == "f" and ServoTimeout < time.time():
                     Utils.Servo1.steer(Correction)
-                elif direction == "r":
+                    ServoTimeout = time.time() + ServoWaitTime
+                elif direction == "r" and ServoTimeout < time.time():
                     Utils.Servo1.steer(-Correction)
-                else:
-                    Utils.LogError(f"no valid direction specified: {direction}")
-                    raise CustomException(f"no valid direction specified: {direction}")
+                    ServoTimeout = time.time() + ServoWaitTime
                 
             else:
                 Utils.LogError(f"No valid Sensor specified: {Sensor}")
@@ -197,8 +200,9 @@ if __name__ == "__main__":
     try: 
         GPIO.setmode(GPIO.BCM)
         Utils.StartRun(SPEED, 0, "f")
-        Motor1.setMotorSpeed(3)
-        HoldLane(Utils)
+        Motor1.setMotorSpeed(3.3)
+        Pixy.LED(1)
+        HoldLane(Utils, SIZE=500, colorTemperature=2000)
     
     except Exception as e:
         Utils.LogError(e)
