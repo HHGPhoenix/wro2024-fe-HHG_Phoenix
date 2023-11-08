@@ -1,7 +1,6 @@
 import time
 from RobotCarClasses import *
 import RPi.GPIO as GPIO
-import serial
 
 
 
@@ -10,6 +9,8 @@ import serial
 ##                      Variables                       ##
 ##                                                      ##
 ##########################################################
+global direction, rounds
+
 #Constants
 SPEED = 50
 DISTANCETOWALL = 30
@@ -19,7 +20,7 @@ NUMBERSLOTS = 8
 
 #Variables
 rounds = 0
-
+direction = 0 #0 = clockwise; 1 = counterclockwise
 
 
 ##########################################################
@@ -31,23 +32,19 @@ Utils = Utility()
 
 Farbsensor = ColorSensor(Utils)
 
-Motor1 = Motor(1000, 21, 20, 16, Utils)
-Motor1.start()
-
-StartButton = Button(17, Utils)
-StopButton = Button(4, Utils)
+StartButton = Button(5, Utils)
+StopButton = Button(6, Utils)
 
 #Gyro = Gyroscope()
 ADC = AnalogDigitalConverter(Utils)
 Display = DisplayOled(ADC, Utils)
 
-Buzzer1 = Buzzer(18, Utils)
-SpeedSens = SpeedSensor(26, NUMBERSLOTS, Utils, 45)
+Buzzer1 = Buzzer(12, Utils)
 
 Pixy = PixyCam(Utils)
 Pixy.start_reading()
 
-Utils.transferSensorData(Farbsensor=Farbsensor, Motor1=Motor1, StartButton=StartButton, StopButton=StopButton, Display=Display, ADC=ADC, Buzzer1=Buzzer1, SpeedSens=SpeedSens, Pixy=Pixy)
+Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Pixy)
 Utils.setupLog()
 
 
@@ -57,43 +54,61 @@ Utils.setupLog()
 ##                     Functions                        ##
 ##                                                      ##
 ##########################################################
-def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0.01, Lane=1, SIZE=1, P=2.5, ServoWaitTime=0.015, direction="f", colorTemperature=1, LineWaitTime=1, Sensor=2):
+def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0.01, Lane=1, SIZE=1, colorTemperature=1, LineWaitTime=1, Sensor=2):
     #Variables
     TIMEOUT = 0
     TIMEOUTPixy = 0
-    ServoTimeout = 0
     corners = 0
-    rounds = 0
     Sensor = 0
     
     #Hold Lane
     while Utils.running and rounds < 3:
         try:
             time.sleep(0.001)
-            #Choose distance and sensor to hold lane
-            if Lane == 0 and Sensor != 2:
-                DISTANCE = 25
-                Sensor = 2
-                print("Switched to Sensor 2")
-                arduino.write(f"D {DISTANCE}\n".encode())
-                arduino.write(f"S2\n".encode())
-                
-            elif Lane == 1 and Sensor != 2:
-                DISTANCE = 50
-                Utils.toggle_supersonic_sensor(2)
-                Sensor = 2
-                print("Switched to Sensor 2")
-                arduino.write(f"D {DISTANCE}\n".encode())
-                arduino.write(f"S2\n".encode())
-                
-            elif Lane == 2 and Sensor != 1:
-                DISTANCE = 25
-                Utils.toggle_supersonic_sensor(1)
-                Sensor = 1
-                print("Switched to Sensor 1")
-                arduino.write(f"D {DISTANCE}\n".encode())
-                arduino.write(f"S1\n".encode())
-            
+            #Choose distance and sensor to hold lane based on Pixy and direction
+            if direction == 0:
+                if Lane == 0 and Sensor != 2:
+                    DISTANCE = 25
+                    Sensor = 2
+                    print("Switched to Sensor 2")
+                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
+                    Utils.EspHoldDistance.write(f"S2\n".encode())
+                    
+                elif Lane == 1 and Sensor != 2:
+                    DISTANCE = 50
+                    Sensor = 2
+                    print("Switched to Sensor 2")
+                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
+                    Utils.EspHoldDistance.write(f"S2\n".encode())
+                    
+                elif Lane == 2 and Sensor != 1:
+                    DISTANCE = 25
+                    Sensor = 1
+                    print("Switched to Sensor 1")
+                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
+                    Utils.EspHoldDistance.write(f"S1\n".encode())
+            else:
+                if Lane == 0 and Sensor != 1:
+                    DISTANCE = 25
+                    Sensor = 1
+                    print("Switched to Sensor 1")
+                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
+                    Utils.EspHoldDistance.write(f"S1\n".encode())
+                    
+                elif Lane == 1 and Sensor != 1:
+                    DISTANCE = 50
+                    Sensor = 1
+                    print("Switched to Sensor 1")
+                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
+                    Utils.EspHoldDistance.write(f"S1\n".encode())
+                    
+                elif Lane == 2 and Sensor != 2:
+                    DISTANCE = 25
+                    Sensor = 2
+                    print("Switched to Sensor 2")
+                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
+                    Utils.EspHoldDistance.write(f"S2\n".encode())
+                    
             #Count rounds with ColorSensor
             if Utils.Farbsensor.color_temperature >= colorTemperature - 200 and Utils.Farbsensor.color_temperature <= colorTemperature + 200 and time.time() > TIMEOUT:
                 corners = corners + 1
@@ -144,7 +159,17 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
                 else:
                     Lane = 1
                     TIMEOUTPixy = time.time() + WaitTime
+              
+            #check for direction
+            if Utils.EspHoldDistance.in_waiting > 0:
+                response = Utils.EspHoldDistance.read(Utils.EspHoldDistance.in_waiting).decode("utf-8")
+                if "Drive direction counterclockwise" in response:
+                    direction = 1
+                elif "Drive direction clockwise" in response:
+                    direction = 0
                     
+                Utils.LogDebug(f"Response from EspHoldDistance: {response}")
+                  
                 
         except Exception as e:
             Utils.LogError(e)
@@ -159,12 +184,11 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
 ##########################################################
 if __name__ == "__main__":
     try: 
-        arduino = serial.Serial('COM3', 9600)
         GPIO.setmode(GPIO.BCM)
-        Utils.StartRun(SPEED, 0, "f")
-        Motor1.setMotorSpeed(3.3)
-        Pixy.LED(0)
-        HoldLane(Utils, SIZE=500, colorTemperature=2000)
+        Utils.StartRun()
+        Utils.EspHoldSpeed.write(f"SPEED{SPEED}\n".encode())
+        Pixy.LED(1)
+        HoldLane(Utils, SIZE=200, colorTemperature=2000)
     
     except Exception as e:
         Utils.LogError(e)

@@ -16,6 +16,7 @@ import psutil
 import busio
 import multiprocessing as mp
 import logging
+import serial
 
 
 
@@ -35,25 +36,20 @@ class CustomException(Exception):
 #A class that has some necessary tools for calculating, usw.
 class Utility:
     #Transfer data so it can be used in other classes
-    def transferSensorData(self, Ultraschall1=None, Ultraschall2=None, Farbsensor=None, Motor1=None, Servo1=None, StartButton=None, StopButton=None, Display=None, ADC=None, Buzzer1=None, SpeedSensor=None, Pixy=None):
+    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Display=None, ADC=None, Buzzer1=None, Pixy=None):
         #self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.Funcs = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, Funcs
-        self.Ultraschall1 = Ultraschall1
-        self.Ultraschall2 = Ultraschall2
         self.Farbsensor = Farbsensor
-        self.Motor1 = Motor1
-        self.Servo1 = Servo1
         self.StartButton = StartButton
         self.StopButton = StopButton
         self.Pixy = Pixy
         self.Display = Display
         self.ADC = ADC
         self.Buzzer1 = Buzzer1
-        self.SpeedSensor = SpeedSensor
         self.StartTime = time.time()
         
         self.ActivSensor = 0
         self.file_path = "/tmp/StandbyScript.lock"
-        self.Startime = 0
+        self.Starttime = 0
         self.UltraschallThreadStop = 1
         
         
@@ -61,55 +57,42 @@ class Utility:
     def cleanup(self):
         self.LogDebug("Started cleanup")
         
-        if self.Motor1 != None:
-            self.Motor1.drive("f", 0)
         
         #Stop all Threads if the class has been initialized
-        if self.Ultraschall1 != None:
-            self.Ultraschall1.stop_measurement()
-        if self.Ultraschall2 != None:
-            self.Ultraschall2.stop_measurement()
         if self.Farbsensor != None:
             self.Farbsensor.stop_measurement()
         if self.Pixy != None:
             self.Pixy.stop_reading()
-        if self.SpeedSensor != None:
-            self.SpeedSensor.stop_measurement()
-            
-        self.Buzzer1.buzz(1000, 80, 2)
-        self.StopDataLog()
-        
         if self.Display != None:
             self.Display.stop_update()
         if self.StopButton != None:
             self.StopButton.stop_StopButton()
-        #Stop the Motor if it has been initialized
-        if self.Motor1 != None:
-            self.Motor1.drive("f", 0)
-            self.Motor1.stop()
+        
+        #Stop Nodemcu's
+        self.StopNodemcus()
         
         #Wait a short time to make sure all threads are stopped
-        time.sleep(0.5)
+        self.Buzzer1.buzz(1000, 80, 0.5)
         
         #GPIO cleanup and Program exit
         GPIO.cleanup()
         self.running = False
         
-        #Start StandbyScript
-        os.remove(self.file_path)
+        time.sleep(0.1)
+        self.EspHoldDistance.close()
+        time.sleep(0.1)
+        self.EspHoldSpeed.close()
         
         os.kill(os.getpid(), signal.SIGTERM)
     
     
     #Do some init and wait until StartButton is pressed
-    def StartRun(self, MotorSpeed=0, steer=0, direction="f"):
+    def StartRun(self):
         #clear console
         os.system('cls' if os.name=='nt' else 'clear')
-        
-        #Stop StandbyScript.py
-        with open(self.file_path, 'w'):
-            pass  # Using 'pass' as a placeholder for no content
-        time.sleep(1)
+
+        self.EspHoldDistance = serial.Serial('/dev/ttyUSB0', 115200)
+        self.EspHoldSpeed = serial.Serial('/dev/ttyUSB1', 115200)
 
         #Start Processes
         p1 = mp.Process(target=self.Display.start_update())
@@ -118,17 +101,14 @@ class Utility:
         p2.start()
         p3 = mp.Process(target=self.Farbsensor.start_measurement())
         p3.start()
-        p4 = mp.Process(target=self.SpeedSensor.start_measurement())
-        p4.start()
-        
+
         #Wait for StartButton to be pressed
         self.running = True
         self.waiting = True
         
-        self.Motor1.drive("f", 0)
-        
         self.LogDebug("Waiting for Button to be pressed...")
         self.Display.write("Waiting for Button", "to be pressed...")
+        
         self.Buzzer1.buzz(1000, 80, 0.1)
         time.sleep(0.1)
         self.Buzzer1.buzz(1000, 80, 0.1)
@@ -137,29 +117,24 @@ class Utility:
             try:
                 time.sleep(0.1)
                 if self.StartButton.state() == 1:
+                    
+                    self.StartNodemcus()
+                    
                     self.Starttime = time.time()
                     self.LogDebug(f"Run started: {time.time()}")
-                    
-                    time.sleep(1)
                     self.Display.write("Run started:", f"{time.time()}")  
-                    self.Buzzer1.buzz(1000, 80, 0.2) 
+                    self.Buzzer1.buzz(1000, 80, 0.1) 
 
-                    self.Motor1.drive(direction, MotorSpeed)
-                    self.Servo1.steer(steer)
-                    
                     self.waiting = False
                     
             except:
                 self.Utils.StopRun()
-          
+    
     
     #Stop the run and calculate the time needed            
     def StopRun(self):
         self.StopTime = time.time()
         self.LogDebug(f"Run ended: {self.StopTime}")
-        
-        if self.Motor1 != None:
-            self.Motor1.drive("f", 0)
         
         if self.Starttime != None:
             seconds = round(self.StopTime - self.StartTime, 2)
@@ -334,8 +309,55 @@ class Utility:
         except Exception as e:
             self.LogError(f"An Error occured in Utility.toggle_supersonic_sensor: {e}")
             self.Utils.StopRun()
-  
     
+    
+    #Start both NodeMCUs and wait for responses
+    def StartNodemcus(self):
+        for esp in [self.EspHoldDistance, self.EspHoldSpeed]:
+            esp.write(f"START\n".encode())
+            waitingForResponse = True
+            responseTimeout = time.time() + 5
+
+            while waitingForResponse:
+                try:
+                    response = esp.read(esp.inWaiting())
+                    if "Received START command. Performing action..." in response.decode():
+                        waitingForResponse = False
+                    elif time.time() > responseTimeout:
+                        self.LogError("No response from NodeMCU")
+                        self.StopRun()
+                    else:
+                        time.sleep(0.01)
+                except Exception as e:
+                    self.LogError(f"An exception occurred in Utility.StartRun: {e}")
+                    self.StopRun()
+                    
+            time.sleep(0.01)
+                    
+                    
+    #Stop both NodeMCUs and wait for responses
+    def StopNodemcus(self):
+        for esp in [self.EspHoldDistance, self.EspHoldSpeed]:
+            esp.write(f"STOP\n".encode())
+            waitingForResponse = True
+            responseTimeout = time.time() + 5
+
+            while waitingForResponse:
+                try:
+                    response = esp.read(esp.inWaiting())
+                    if "Received STOP command. Performing action..." in response.decode():
+                        waitingForResponse = False
+                    elif time.time() > responseTimeout:
+                        self.LogError("No response from NodeMCU")
+                        self.StopRun()
+                    else:
+                        time.sleep(0.01)
+                except Exception as e:
+                    self.LogError(f"An exception occurred in Utility.StartRun: {e}")
+                    self.StopRun()
+        
+        time.sleep(0.01)
+        
     
 #Class for the drive Motor
 class Motor(Utility):
@@ -410,6 +432,8 @@ class Motor(Utility):
     
     #Set a motor speed that gets controlled by the Speed Sensor, if it was started   
     def setMotorSpeed(self, Speed):
+        self.drive("f", 100)
+        time.sleep(0.01)
         self.MotorSpeed = Speed
         
 
