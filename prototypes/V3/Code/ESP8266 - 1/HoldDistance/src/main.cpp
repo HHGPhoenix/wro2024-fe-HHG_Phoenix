@@ -22,7 +22,7 @@ int activeSensor = 0; // select sensor 1 or 2
 bool started = false; // switch between start and stop
 bool manual = false; // switch between manual and automatic mode
 bool firstCornerDetected = false; // special detection for drive direction
-int ServoMiddlePosition = 60;
+int ServoMiddlePosition = 90;
 int distanceEdgeDetection = -1; // distance in cm to detect an edge
 int edgeDetectionCounter = 0;
 
@@ -52,6 +52,10 @@ void loop() {
         servo.write(ServoMiddlePosition);
         digitalWrite(InternalLed, LOW);
         started = true;
+      }
+      // Identity response
+      else if (command == "IDENT") {
+        Serial.println("HoldDistance");
       }
 
       delay(10);
@@ -130,15 +134,15 @@ void loop() {
           float correction = error * KP;
 
           //  limit correction to servo range
-          if (correction > 60) {
-            correction = 60;
+          if (correction > 70) {
+            correction = 70;
           } else if (correction < -60) {
             correction = -60;
           }
 
-          servo.write(ServoMiddlePosition + correction); // Set servo position
+          servo.write(ServoMiddlePosition - correction); // Set servo position
 
-          if (!firstCornerDetected) {
+          if (!firstCornerDetected && (distanceEdgeDetection > 0)) {
             if (distance1 > distanceEdgeDetection) {
               firstCornerDetected = true;
               Serial.println("Drive direction counterclockwise");
@@ -163,15 +167,15 @@ void loop() {
           float correction = error * KP;
 
           //  limit correction to servo range
-          if (correction > 65) {
-            correction = 65;
-          } else if (correction < -50) {
-            correction = -50;
+          if (correction > 70) {
+            correction = 70;
+          } else if (correction < -60) {
+            correction = -60;
           }
           
-          servo.write(ServoMiddlePosition - correction); // Set servo position
+          servo.write(ServoMiddlePosition + correction); // Set servo position
 
-          if (!firstCornerDetected) {
+          if (!firstCornerDetected && (distanceEdgeDetection > 0)) {
             if (distance2 > distanceEdgeDetection) {
               firstCornerDetected = true;
               Serial.println("Drive direction clockwise");

@@ -2,7 +2,7 @@ import serial
 import time
 
 # Define the serial port and baud rate
-serial_port = '/dev/ttyUSB1'
+serial_port = '/dev/ttyUSB0'
 baud_rate = 115200  # You should set this to the appropriate baud rate
 
 try:

@@ -9,18 +9,12 @@ import RPi.GPIO as GPIO
 ##                      Variables                       ##
 ##                                                      ##
 ##########################################################
-global direction, rounds
-
 #Constants
 SPEED = 50
 DISTANCETOWALL = 30
 KP = 2.5
 LINECOLORTEMPERATURE = 2000
 NUMBERSLOTS = 8
-
-#Variables
-rounds = 0
-direction = 0 #0 = clockwise; 1 = counterclockwise
 
 
 ##########################################################
@@ -59,7 +53,9 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
     TIMEOUT = 0
     TIMEOUTPixy = 0
     corners = 0
+    rounds = 0
     Sensor = 0
+    direction = 0
     
     #Hold Lane
     while Utils.running and rounds < 3:
@@ -187,6 +183,8 @@ if __name__ == "__main__":
         GPIO.setmode(GPIO.BCM)
         Utils.StartRun()
         Utils.EspHoldSpeed.write(f"SPEED{SPEED}\n".encode())
+        time.sleep(0.1)
+        Utils.EspHoldDistance.write(f"KP{2}\n".encode())
         Pixy.LED(1)
         HoldLane(Utils, SIZE=200, colorTemperature=2000)
     
