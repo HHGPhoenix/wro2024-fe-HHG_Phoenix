@@ -63,51 +63,52 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
             time.sleep(0.001)
             #Choose distance and sensor to hold lane based on Pixy and direction
             if direction == 0:
-                if Lane == 0 and Sensor != 2:
-                    DISTANCE = 25
-                    Sensor = 2
-                    print("Switched to Sensor 2")
-                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
-                    Utils.EspHoldDistance.write(f"S2\n".encode())
-                    
-                elif Lane == 1 and Sensor != 2:
-                    DISTANCE = 50
-                    Sensor = 2
-                    print("Switched to Sensor 2")
-                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
-                    Utils.EspHoldDistance.write(f"S2\n".encode())
-                    
-                elif Lane == 2 and Sensor != 1:
-                    DISTANCE = 25
-                    Sensor = 1
-                    print("Switched to Sensor 1")
-                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
-                    Utils.EspHoldDistance.write(f"S1\n".encode())
-            else:
                 if Lane == 0 and Sensor != 1:
                     DISTANCE = 25
                     Sensor = 1
-                    print("Switched to Sensor 1")
+                    print("Switched to Sensor 2")
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S1\n".encode())
                     
                 elif Lane == 1 and Sensor != 1:
                     DISTANCE = 50
                     Sensor = 1
-                    print("Switched to Sensor 1")
+                    print("Switched to Sensor 2")
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S1\n".encode())
                     
                 elif Lane == 2 and Sensor != 2:
                     DISTANCE = 25
                     Sensor = 2
-                    print("Switched to Sensor 2")
+                    print("Switched to Sensor 1")
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S2\n".encode())
+            else:
+                if Lane == 0 and Sensor != 2:
+                    DISTANCE = 25
+                    Sensor = 2
+                    print("Switched to Sensor 1")
+                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
+                    Utils.EspHoldDistance.write(f"S2\n".encode())
+                    
+                elif Lane == 1 and Sensor != 2:
+                    DISTANCE = 50
+                    Sensor = 2  
+                    print("Switched to Sensor 1")
+                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
+                    Utils.EspHoldDistance.write(f"S2\n".encode())
+                    
+                elif Lane == 2 and Sensor != 1:
+                    DISTANCE = 25
+                    Sensor = 1
+                    print("Switched to Sensor 2")
+                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
+                    Utils.EspHoldDistance.write(f"S1\n".encode())
                     
             #Count rounds with ColorSensor
             if Utils.Farbsensor.color_temperature >= colorTemperature - 200 and Utils.Farbsensor.color_temperature <= colorTemperature + 200 and time.time() > TIMEOUT:
                 corners = corners + 1
+                Utils.LogDebug(f"Corner: {corners}")
                 if corners == 4:
                     corners = 0
                     rounds = rounds + 1
@@ -165,11 +166,13 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
                     direction = 0
                     
                 Utils.LogDebug(f"Response from EspHoldDistance: {response}")
-                  
                 
         except Exception as e:
             Utils.LogError(e)
             Utils.StopRun()
+            
+    Utils.LogDebug("HoldLane finished")
+    Utils.StopRun()
 
 
 
@@ -184,7 +187,9 @@ if __name__ == "__main__":
         Utils.StartRun()
         Utils.EspHoldSpeed.write(f"SPEED{SPEED}\n".encode())
         time.sleep(0.1)
-        Utils.EspHoldDistance.write(f"KP{2}\n".encode())
+        Utils.EspHoldDistance.write(f"KP{3}\n".encode())
+        time.sleep(0.1)
+        Utils.EspHoldDistance.write(f"ED{100}\n".encode())
         Pixy.LED(1)
         HoldLane(Utils, SIZE=200, colorTemperature=2000)
     

@@ -70,7 +70,11 @@ class Utility:
             self.StopButton.stop_StopButton()
         
         #Stop Nodemcu's
-        self.StopNodemcus()
+        self.EspHoldDistance.write(f"STOP\n".encode())
+        time.sleep(0.1)
+        self.EspHoldSpeed.write(f"STOP\n".encode())
+        
+       # self.StopNodemcus()
         
         #Wait a short time to make sure all threads are stopped
         self.Buzzer1.buzz(1000, 80, 0.5)
@@ -101,6 +105,8 @@ class Utility:
         p2.start()
         p3 = mp.Process(target=self.Farbsensor.start_measurement())
         p3.start()
+        p4 = mp.Process(target=self.Pixy.start_reading())
+        p4.start()
 
         #Wait for StartButton to be pressed
         self.running = True
@@ -389,6 +395,7 @@ class Utility:
     #Stop both NodeMCUs and wait for responses
     def StopNodemcus(self):
         for esp in [self.EspHoldDistance, self.EspHoldSpeed]:
+            esp.flush()
             esp.write(f"STOP\n".encode())
             waitingForResponse = True
             responseTimeout = time.time() + 5
@@ -407,7 +414,7 @@ class Utility:
                     self.LogError(f"An exception occurred in Utility.StartRun: {e}")
                     self.StopRun()
         
-        time.sleep(0.01)
+        time.sleep(0.1)
         
     
 #Class for the drive Motor
