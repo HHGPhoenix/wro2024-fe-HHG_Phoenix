@@ -17,6 +17,7 @@ import busio
 import multiprocessing as mp
 import logging
 import serial
+import subprocess
 
 
 
@@ -91,8 +92,7 @@ class Utility:
         #clear console
         os.system('cls' if os.name=='nt' else 'clear')
 
-        self.EspHoldDistance = serial.Serial('/dev/ttyUSB0', 115200)
-        self.EspHoldSpeed = serial.Serial('/dev/ttyUSB1', 115200)
+        self.InitNodemcus()
 
         #Start Processes
         p1 = mp.Process(target=self.Display.start_update())
@@ -311,8 +311,59 @@ class Utility:
             self.Utils.StopRun()
     
     
+    #Init both NodeMCUs
+    def InitNodemcus(self):
+        usb_devices = []
+        try:
+            # Run the 'ls /dev/tty*' command using a shell and capture the output
+            result = subprocess.run('ls /dev/tty*', shell=True, stdout=subprocess.PIPE, text=True, check=True)
+            
+            # Split the output into lines and print each line
+            devices = result.stdout.split('\n')
+            for device in devices:
+                if "/dev/ttyUSB" in device:
+                    usb_devices.append(device)
+            
+        except Exception as e:
+            self.LogError(f"An Error occured in Utility.StartNodemcus: {e}")
+            self.Utils.StopRun()
+
+        if len(usb_devices) != 2:
+            self.LogError(f"Could not find both NodeMCUs: {usb_devices}")
+            self.Utils.StopRun()
+            
+        #Identify both NodeMCUs
+        for device in usb_devices:
+            try:
+                ESP = serial.Serial(device, 115200)
+                ESP.write(f"IDENT\n".encode())
+                
+                #wait for response
+                Timeout = time.time() + 5
+                self.LogDebug(f"Waiting for response from {device} ...")
+                while not ESP.in_waiting and time.time() < Timeout:
+                    time.sleep(0.01)
+                response = ESP.read(ESP.inWaiting())
+                self.LogDebug(f"Received response from {device}")
+                
+                if "HoldDistance" in response.decode():
+                    ESP.close()
+                    self.EspHoldDistance = serial.Serial(device, 115200)
+                elif "HoldSpeed" in response.decode():
+                    ESP.close()
+                    self.EspHoldSpeed = serial.Serial(device, 115200)  
+                else:
+                    self.LogError(f"Could not identify NodeMCU on: {device}")
+                    self.Utils.StopRun()
+                    
+            except Exception as e:
+                self.LogError(f"An Error occured in Utility.StartNodemcus: {e}")
+                self.Utils.StopRun()
+    
+    
     #Start both NodeMCUs and wait for responses
     def StartNodemcus(self):
+        #Start both NodeMCUs
         for esp in [self.EspHoldDistance, self.EspHoldSpeed]:
             esp.write(f"START\n".encode())
             waitingForResponse = True

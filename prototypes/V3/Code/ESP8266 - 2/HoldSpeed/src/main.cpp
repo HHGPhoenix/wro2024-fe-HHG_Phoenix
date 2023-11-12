@@ -2,12 +2,12 @@
 #include <LM393SpeedSensor.h>
 
 // Motor Pins
-#define ENA 13
-#define IN1 14
+#define ENA 14
+#define IN1 15
 #define IN2 12
 
 // Speed Sensor Pin
-#define speedSensorSignal 15
+#define speedSensorSignal 13
 
 // Internal LED Pin
 #define InternalLed 2
@@ -65,6 +65,10 @@ void loop() {
         speedSensor.begin();
         turned = false;
         started = true;
+      }
+      // Identity response
+      else if (command == "IDENT") {
+        Serial.println("HoldSpeed");
       }
 
       delay(10);
