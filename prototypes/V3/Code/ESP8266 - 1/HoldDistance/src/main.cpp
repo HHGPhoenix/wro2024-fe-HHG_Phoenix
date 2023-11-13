@@ -51,6 +51,7 @@ void loop() {
         Serial.println("Received START command. Performing action...");
         servo.write(ServoMiddlePosition);
         digitalWrite(InternalLed, LOW);
+        firstCornerDetected = false;
         started = true;
       }
       // Identity response
@@ -145,7 +146,7 @@ void loop() {
           if (!firstCornerDetected && (distanceEdgeDetection > 0)) {
             if (distance1 > distanceEdgeDetection) {
               firstCornerDetected = true;
-              Serial.println("Drive direction counterclockwise");
+              Serial.println("Drive direction clockwise");
             }
             // read other sensor sometimes
             if (edgeDetectionCounter == 4) {
@@ -178,7 +179,7 @@ void loop() {
           if (!firstCornerDetected && (distanceEdgeDetection > 0)) {
             if (distance2 > distanceEdgeDetection) {
               firstCornerDetected = true;
-              Serial.println("Drive direction clockwise");
+              Serial.println("Drive direction counterclockwise");
             }
             // read other sensor sometimes
             if (edgeDetectionCounter == 4) {
