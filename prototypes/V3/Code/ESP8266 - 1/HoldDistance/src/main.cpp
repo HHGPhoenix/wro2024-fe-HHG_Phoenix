@@ -137,8 +137,8 @@ void loop() {
           //  limit correction to servo range
           if (correction > 70) {
             correction = 70;
-          } else if (correction < -60) {
-            correction = -60;
+          } else if (correction < -70) {
+            correction = -70;
           }
 
           servo.write(ServoMiddlePosition - correction); // Set servo position
@@ -170,8 +170,8 @@ void loop() {
           //  limit correction to servo range
           if (correction > 70) {
             correction = 70;
-          } else if (correction < -60) {
-            correction = -60;
+          } else if (correction < -70) {
+            correction = -70;
           }
           
           servo.write(ServoMiddlePosition + correction); // Set servo position

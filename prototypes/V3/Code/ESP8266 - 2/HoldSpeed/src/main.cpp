@@ -14,6 +14,9 @@
 
 // Variables
 int slots = 8;
+int kp = 5;
+int standing = 0;
+int lastspeed = 0;
 float desiredSpeed = 0;
 float Speed = 0;
 
@@ -29,7 +32,8 @@ LM393SpeedSensor speedSensor(speedSensorSignal);
 void holdSpeed() {
   float currentSpeed = speedSensor.rps;
   float error = desiredSpeed - currentSpeed / 10;
-  float output = desiredSpeed + error * 5;
+  float output = desiredSpeed + error * kp;
+
 
   // PWM limit
   if (output < 0) {
@@ -53,6 +57,7 @@ void setup() {
   pinMode(InternalLed, OUTPUT);
   digitalWrite(InternalLed, HIGH);
 }
+
 
 void loop() {
   // Wait for the "START" command
@@ -90,7 +95,7 @@ void loop() {
         started = false;
       } 
       // check for speed command
-      if (command.startsWith("SPEED")) {
+      else if (command.startsWith("SPEED")) {
         int numberStart = 5;
         int numberLength = command.length();
         String numberStr = command.substring(numberStart, numberLength);
@@ -105,6 +110,16 @@ void loop() {
 
         Serial.print("Received SPEED: ");
         Serial.println(desiredSpeed);
+      }
+      //check for KP command
+      else if (command.startsWith("KP")) {
+        int numberStart = 2;
+        int numberLength = command.length();
+        String numberStr = command.substring(numberStart, numberLength);
+        kp = numberStr.toInt();
+
+        Serial.print("Received KP: ");
+        Serial.println(kp);
       }
     }
 

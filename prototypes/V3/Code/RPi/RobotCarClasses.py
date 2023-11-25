@@ -74,7 +74,7 @@ class Utility:
         time.sleep(0.1)
         self.EspHoldSpeed.write(f"STOP\n".encode())
         
-       # self.StopNodemcus()
+        #self.StopNodemcus()
         
         #Wait a short time to make sure all threads are stopped
         self.Buzzer1.buzz(1000, 80, 0.5)
@@ -105,8 +105,10 @@ class Utility:
         p2.start()
         p3 = mp.Process(target=self.Farbsensor.start_measurement())
         p3.start()
-        p4 = mp.Process(target=self.Pixy.start_reading())
-        p4.start()
+        
+        if self.Pixy != None:
+            p4 = mp.Process(target=self.Pixy.start_reading())
+            p4.start()
 
         #Wait for StartButton to be pressed
         self.running = True
@@ -165,7 +167,7 @@ class Utility:
     def setupDataLog(self):
         try:
             #Clear DataLog
-            os.remove("DataLog.log")
+            #os.remove("DataLog.log")
                 
             #Create datalogger
             self.datalogger = logging.getLogger("DataLogger")
@@ -189,13 +191,11 @@ class Utility:
 
     #Log Sensor values
     def LogData(self):
-        while self.DataLoggerStop == 0:
-            try:
-                time.sleep(0.1)
-                self.datalogger.debug(f"Ultraschall1; {self.Ultraschall1.distance}; Ultraschall2; {self.Ultraschall2.distance}; Farbsensor; {self.Farbsensor.color_temperature}; Motor1; {self.Motor1.speed}; Servo1; {self.Servo1.percentage}; CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}; Voltage; {self.ADC.voltage}")
-            except Exception as e:
-                self.LogError(f"An Error occured in Utility.LogData: {e}")
-                self.Utils.StopRun()
+        try:
+            self.datalogger.debug(f"Farbsensor; {self.Farbsensor.color_temperature};  CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}; Voltage; {self.ADC.voltage}")
+        except Exception as e:
+            self.LogError(f"An Error occured in Utility.LogData: {e}")
+            self.Utils.StopRun()
         
     
     #Stop the DataLogger Process
@@ -341,8 +341,9 @@ class Utility:
         #Identify both NodeMCUs
         for device in usb_devices:
             try:
-                ESP = serial.Serial(device, 115200)
+                ESP = serial.Serial(device,baudrate=115200,timeout=1)
                 ESP.write(f"IDENT\n".encode())
+                time.sleep(0.1)
                 
                 #wait for response
                 Timeout = time.time() + 5
@@ -350,17 +351,20 @@ class Utility:
                 while not ESP.in_waiting and time.time() < Timeout:
                     time.sleep(0.01)
                 response = ESP.read(ESP.inWaiting())
+                print(response)
                 self.LogDebug(f"Received response from {device}")
                 
-                if "HoldDistance" in response.decode():
+                if "HoldDistance" in response.decode("utf-8"):
                     ESP.close()
-                    self.EspHoldDistance = serial.Serial(device, 115200)
-                elif "HoldSpeed" in response.decode():
+                    self.EspHoldDistance = serial.Serial(device,baudrate=115200,timeout=1)
+                elif "HoldSpeed" in response.decode("utf-8"):
                     ESP.close()
-                    self.EspHoldSpeed = serial.Serial(device, 115200)  
+                    self.EspHoldSpeed = serial.Serial(device,baudrate=115200,timeout=1)  
                 else:
                     self.LogError(f"Could not identify NodeMCU on: {device}")
                     self.Utils.StopRun()
+                
+                time.sleep(0.1)
                     
             except Exception as e:
                 self.LogError(f"An Error occured in Utility.StartNodemcus: {e}")
@@ -378,7 +382,7 @@ class Utility:
             while waitingForResponse:
                 try:
                     response = esp.read(esp.inWaiting())
-                    if "Received START command. Performing action..." in response.decode():
+                    if "Received START command. Performing action..." in response.decode("utf-8"):
                         waitingForResponse = False
                     elif time.time() > responseTimeout:
                         self.LogError("No response from NodeMCU")
@@ -389,7 +393,7 @@ class Utility:
                     self.LogError(f"An exception occurred in Utility.StartRun: {e}")
                     self.StopRun()
                     
-            time.sleep(0.01)
+            time.sleep(0.1)
                     
                     
     #Stop both NodeMCUs and wait for responses
@@ -403,7 +407,7 @@ class Utility:
             while waitingForResponse:
                 try:
                     response = esp.read(esp.inWaiting())
-                    if "Received STOP command. Performing action..." in response.decode():
+                    if "Received STOP command. Performing action..." in response.decode("utf-8"):
                         waitingForResponse = False
                     elif time.time() > responseTimeout:
                         self.LogError("No response from NodeMCU")
@@ -813,7 +817,7 @@ class ColorSensor(Utility):
 class Gyroscope(Utility):
     def __init__(self, Utils):
         try:
-            i2c = board.I2C()
+            i2c = busio.I2C(board.D1, board.D0)
             self.sensor = adafruit_mpu6050.MPU6050(i2c)
             self.sensor._gyro_range = 0
             self.Utils = Utils
@@ -830,8 +834,12 @@ class Gyroscope(Utility):
     #Read the gyroscope data and calculate the angle
     def get_angle(self):
         try:
+            offset_x = 0.29
+            offset_y = 0.0
+            offset_z = 0.0
             #Read gyroscope data
             gyro_data = self.sensor.gyro
+            gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
 
             # Get the current time
             current_time = time.time()
@@ -853,7 +861,7 @@ class Gyroscope(Utility):
             # Update the last time for the next iteration
             self.last_time = current_time
 
-            return self.angle * 210
+            return self.angle * 60
         
         except Exception as e:
             self.Utils.LogError(f"An Error occured in Gyroscope.get_angle: {e}")
