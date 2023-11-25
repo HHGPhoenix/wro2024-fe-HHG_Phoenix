@@ -40,6 +40,7 @@ Pixy.start_reading()
 
 Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Pixy)
 Utils.setupLog()
+Utils.setupDataLog()
 
 
 
@@ -66,42 +67,42 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
                 if Lane == 0 and Sensor != 1:
                     DISTANCE = 25
                     Sensor = 1
-                    print("Switched to Sensor 2")
+                    print("Switched to Sensor 1")
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S1\n".encode())
                     
                 elif Lane == 1 and Sensor != 1:
                     DISTANCE = 50
                     Sensor = 1
-                    print("Switched to Sensor 2")
+                    print("Switched to Sensor 1")
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S1\n".encode())
                     
                 elif Lane == 2 and Sensor != 2:
                     DISTANCE = 25
                     Sensor = 2
-                    print("Switched to Sensor 1")
+                    print("Switched to Sensor 2")
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S2\n".encode())
             else:
                 if Lane == 0 and Sensor != 2:
                     DISTANCE = 25
                     Sensor = 2
-                    print("Switched to Sensor 1")
+                    print("Switched to Sensor 2")
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S2\n".encode())
                     
                 elif Lane == 1 and Sensor != 2:
                     DISTANCE = 50
                     Sensor = 2  
-                    print("Switched to Sensor 1")
+                    print("Switched to Sensor 2")
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S2\n".encode())
                     
                 elif Lane == 2 and Sensor != 1:
                     DISTANCE = 25
                     Sensor = 1
-                    print("Switched to Sensor 2")
+                    print("Switched to Sensor 1")
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S1\n".encode())
                     
@@ -159,14 +160,16 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
               
             #check for direction
             if Utils.EspHoldDistance.in_waiting > 0:
-                response = Utils.EspHoldDistance.read(Utils.EspHoldDistance.in_waiting).decode("utf-8")
+                response = Utils.EspHoldDistance.read(Utils.EspHoldDistance.in_waiting).decode()
                 if "Drive direction counterclockwise" in response:
                     direction = 1
                 elif "Drive direction clockwise" in response:
                     direction = 0
                     
                 Utils.LogDebug(f"Response from EspHoldDistance: {response}")
-                
+            
+            Utils.LogData()    
+            
         except Exception as e:
             Utils.LogError(e)
             Utils.StopRun()
