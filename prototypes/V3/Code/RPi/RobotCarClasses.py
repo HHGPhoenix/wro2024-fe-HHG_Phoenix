@@ -376,6 +376,7 @@ class Utility:
         #Start both NodeMCUs
         for esp in [self.EspHoldDistance, self.EspHoldSpeed]:
             esp.write(f"START\n".encode())
+            time.sleep(0.1)
             waitingForResponse = True
             responseTimeout = time.time() + 5
 
@@ -853,7 +854,7 @@ class Gyroscope(Utility):
             else:
                 gyro_data = gyro_data[0]
                 
-            delta_angle = gyro_data * delta_time
+            delta_angle = gyro_data * delta_time * 60
 
             # Update the angle
             self.angle += delta_angle
@@ -861,7 +862,7 @@ class Gyroscope(Utility):
             # Update the last time for the next iteration
             self.last_time = current_time
 
-            return self.angle * 60
+            return self.angle
         
         except Exception as e:
             self.Utils.LogError(f"An Error occured in Gyroscope.get_angle: {e}")

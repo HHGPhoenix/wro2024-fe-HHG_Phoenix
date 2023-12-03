@@ -100,7 +100,6 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
                         rounds = rounds + 1
                         
                     oldAngle = newAngle
-                    Buzzer1.buzz(1000, 80, 0.1)
                     TIMEOUT = time.time() + LineWaitTime
             else:
                 newAngle = oldAngle + 90
