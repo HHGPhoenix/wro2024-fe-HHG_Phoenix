@@ -52,6 +52,7 @@ class Utility:
         self.file_path = "/tmp/StandbyScript.lock"
         self.Starttime = 0
         self.UltraschallThreadStop = 1
+        self.angle = 0
         
         
     #Cleanup after the run is finished or an error occured
@@ -178,6 +179,8 @@ class Utility:
             fh = logging.FileHandler("DataLog.log", 'w')
             fh.setLevel(logging.DEBUG)
             self.datalogger.addHandler(fh)
+            
+            self.oldmonotonic = time.monotonic()
 
             #Start Process to log data while the program is running
             self.DataLoggerStop = 0
@@ -192,7 +195,8 @@ class Utility:
     #Log Sensor values
     def LogData(self):
         try:
-            self.datalogger.debug(f"Farbsensor; {self.Farbsensor.color_temperature};  CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}; Voltage; {self.ADC.voltage}")
+            self.datalogger.debug(f"time; {time.time()}; Farbsensor; {self.Farbsensor.color_temperature}; Gyro; {self.angle}; T2; {time.monotonic()};")
+            oldmonotonic = time.monotonic()
         except Exception as e:
             self.LogError(f"An Error occured in Utility.LogData: {e}")
             self.Utils.StopRun()
@@ -351,7 +355,6 @@ class Utility:
                 while not ESP.in_waiting and time.time() < Timeout:
                     time.sleep(0.01)
                 response = ESP.read(ESP.inWaiting())
-                print(response)
                 self.LogDebug(f"Received response from {device}")
                 
                 if "HoldDistance" in response.decode("utf-8"):
@@ -847,6 +850,10 @@ class Gyroscope(Utility):
 
             # Calculate the time elapsed since the last measurement
             delta_time = current_time - self.last_time
+            
+            #bugfix for time-jumps
+            if delta_time >= 0.5:
+                delta_time = 0.003
 
             # Integrate the gyroscope readings to get the change in angle
             if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
