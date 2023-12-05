@@ -36,7 +36,7 @@ Buzzer1 = Buzzer(12, Utils)
 
 Gyro = Gyroscope(Utils)
 
-Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1)
+Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro)
 Utils.setupLog()
 Utils.setupDataLog()
 
@@ -89,11 +89,10 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
             
             
             #Count rounds with Gyro
-            angle = Gyro.get_angle()
-            Utils.angle = angle
+            Utils.angle = Gyro.angle
             if direction == 0:
                 newAngle = oldAngle -90
-                if angle < newAngle and time.time() > TIMEOUT:
+                if Gyro.angle < newAngle and time.time() > TIMEOUT:
                     corners = corners + 1
                     Utils.LogDebug(f"Corner: {corners}")
                     if corners == 4:
@@ -104,7 +103,7 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
                     TIMEOUT = time.time() + LineWaitTime
             else:
                 newAngle = oldAngle + 90
-                if angle > newAngle and time.time() > TIMEOUT:
+                if Gyro.angle > newAngle and time.time() > TIMEOUT:
                     corners = corners + 1
                     Utils.LogDebug(f"Corner: {corners}")
                     if corners == 4:

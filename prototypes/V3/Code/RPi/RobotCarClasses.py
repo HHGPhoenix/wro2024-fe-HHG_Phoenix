@@ -37,7 +37,7 @@ class CustomException(Exception):
 #A class that has some necessary tools for calculating, usw.
 class Utility:
     #Transfer data so it can be used in other classes
-    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Display=None, ADC=None, Buzzer1=None, Pixy=None):
+    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Display=None, ADC=None, Buzzer1=None, Gyro=None, Pixy=None):
         #self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.Funcs = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, Funcs
         self.Farbsensor = Farbsensor
         self.StartButton = StartButton
@@ -46,6 +46,7 @@ class Utility:
         self.Display = Display
         self.ADC = ADC
         self.Buzzer1 = Buzzer1
+        self.Gyro = Gyro
         self.StartTime = time.time()
         
         self.ActivSensor = 0
@@ -100,16 +101,20 @@ class Utility:
         self.InitNodemcus()
 
         #Start Processes
-        p1 = mp.Process(target=self.Display.start_update())
-        p1.start()
-        p2 = mp.Process(target=self.StopButton.start_StopButton())
-        p2.start()
-        p3 = mp.Process(target=self.Farbsensor.start_measurement())
-        p3.start()
-        
+        if self.Display != None:
+            p1 = mp.Process(target=self.Display.start_update())
+            p1.start()
+        if self.StopButton != None:
+            p2 = mp.Process(target=self.StopButton.start_StopButton())
+            p2.start()
+        if self.Farbsensor != None:
+            p3 = mp.Process(target=self.Farbsensor.start_measurement())
+            p3.start()
+        if self.Gyro != None:
+            p4 = mp.Process(target=self.Gyro.start_reading())
         if self.Pixy != None:
-            p4 = mp.Process(target=self.Pixy.start_reading())
-            p4.start()
+            p5 = mp.Process(target=self.Pixy.start_reading())
+            p5.start()
 
         #Wait for StartButton to be pressed
         self.running = True
@@ -128,6 +133,7 @@ class Utility:
                 if self.StartButton.state() == 1:
                     
                     self.StartNodemcus()
+                    p4.start()
                     
                     self.Starttime = time.time()
                     self.LogDebug(f"Run started: {time.time()}")
@@ -379,7 +385,7 @@ class Utility:
         #Start both NodeMCUs
         for esp in [self.EspHoldDistance, self.EspHoldSpeed]:
             esp.write(f"START\n".encode())
-            time.sleep(0.1)
+            time.sleep(0.2)
             waitingForResponse = True
             responseTimeout = time.time() + 5
 
@@ -397,7 +403,7 @@ class Utility:
                     self.LogError(f"An exception occurred in Utility.StartRun: {e}")
                     self.StopRun()
                     
-            time.sleep(0.1)
+            time.sleep(0.2)
                     
                     
     #Stop both NodeMCUs and wait for responses
@@ -827,7 +833,7 @@ class Gyroscope(Utility):
             self.Utils = Utils
 
             #Initialize variables for storing the angle and time
-            self.angle = 0.0  # Initial angle
+            self.angle = 0
             self.last_time = time.time()
             
         except Exception as e:
@@ -835,46 +841,57 @@ class Gyroscope(Utility):
             self.Utils.StopRun()
 
 
+    #Start a new thread for reading the sensor
+    def start_reading(self):
+        self.threadStop = 0
+        self.thread = threading.Thread(target=self.get_angle, daemon=True)
+        self.thread.start()
+
+
     #Read the gyroscope data and calculate the angle
     def get_angle(self):
-        try:
-            offset_x = 0.29
-            offset_y = 0.0
-            offset_z = 0.0
-            #Read gyroscope data
-            gyro_data = self.sensor.gyro
-            gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
+        while self.threadStop == 0:
+            try:
+                offset_x = 0.29
+                offset_y = 0.0
+                offset_z = 0.0
+                #Read gyroscope data
+                gyro_data = self.sensor.gyro
+                gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
 
-            # Get the current time
-            current_time = time.time()
+                # Get the current time
+                current_time = time.time()
 
-            # Calculate the time elapsed since the last measurement
-            delta_time = current_time - self.last_time
-            
-            #bugfix for time-jumps
-            if delta_time >= 0.5:
-                delta_time = 0.003
-
-            # Integrate the gyroscope readings to get the change in angle
-            if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
-                gyro_data = 0
-            else:
-                gyro_data = gyro_data[0]
+                # Calculate the time elapsed since the last measurement
+                delta_time = current_time - self.last_time
                 
-            delta_angle = gyro_data * delta_time * 60
+                #bugfix for time-jumps
+                if delta_time >= 0.5:
+                    delta_time = 0.003
 
-            # Update the angle
-            self.angle += delta_angle
+                # Integrate the gyroscope readings to get the change in angle
+                if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
+                    gyro_data = 0
+                else:
+                    gyro_data = gyro_data[0]
+                    
+                delta_angle = gyro_data * delta_time * 60
 
-            # Update the last time for the next iteration
-            self.last_time = current_time
+                # Update the angle
+                self.angle += delta_angle
 
-            return self.angle
+                # Update the last time for the next iteration
+                self.last_time = current_time
+                time.sleep(0.003)
         
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Gyroscope.get_angle: {e}")
-            self.Utils.StopRun()
+            except Exception as e:
+                self.Utils.LogError(f"An Error occured in Gyroscope.get_angle: {e}")
+                self.Utils.StopRun()
     
+    
+    #Stop the thread for reading the sensor
+    def stop_reading(self):
+        self.threadStop = 1
         
 
 #A class for reading a ADS1015 ADC        
