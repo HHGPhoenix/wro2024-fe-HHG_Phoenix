@@ -32,14 +32,12 @@ Buzzer1 = Buzzer(12, Utils)
 
 Gyro = Gyroscope(Utils)
 
-<<<<<<< Updated upstream
-Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1)
-=======
+
 ADC = AnalogDigitalConverter(Utils)
 Display = DisplayOled(ADC, Gyro, Utils)
 
 Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro)
->>>>>>> Stashed changes
+
 Utils.setupLog()
 Utils.setupDataLog()
 
@@ -53,7 +51,9 @@ Utils.setupDataLog()
 def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
     #Variables
     TIMEOUT = 0
+    TIMEOUT2 = 0
     corners = 0
+    corners2 = 0
     rounds = 0
     direction = 0
     Sensor = 0
@@ -67,35 +67,33 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
             #Choose distance and sensor to hold lane based on Pixy and direction
             if direction == 0:
                 if Sensor != 1:
-                    DISTANCE = 25
+                    DISTANCE = 50
                     Sensor = 1
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S1\n".encode())
             else:
                 if Sensor != 2:
-                    DISTANCE = 25
+                    DISTANCE = 50
                     Sensor = 2
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S2\n".encode())
              
-            """       
+                
             #Count rounds with ColorSensor
-            if Utils.Farbsensor.color_temperature >= colorTemperature - 200 and Utils.Farbsensor.color_temperature <= colorTemperature + 200 and time.time() > TIMEOUT:
-                corners = corners + 1
-                Utils.LogDebug(f"Corner: {corners}")
-                if corners == 4:
-                    corners = 0
-                    rounds = rounds + 1
+            if Utils.Farbsensor.color_temperature >= colorTemperature and time.time() > TIMEOUT2:
+                corners2 = corners2 + 1
+                Utils.LogDebug(f"Corner2: {corners2}")
+                if corners2 == 4:
+                    corners2 = 0
                     
-                TIMEOUT = time.time() + LineWaitTime
-            """ 
+                TIMEOUT2 = time.time() + LineWaitTime
+            
             
             #Count rounds with Gyro
-            angle = Gyro.get_angle()
-            print(angle)
+            Utils.angle = Gyro.angle
             if direction == 0:
                 newAngle = oldAngle -90
-                if angle < newAngle and time.time() > TIMEOUT:
+                if Gyro.angle < newAngle and time.time() > TIMEOUT:
                     corners = corners + 1
                     Utils.LogDebug(f"Corner: {corners}")
                     if corners == 4:
@@ -106,7 +104,7 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
                     TIMEOUT = time.time() + LineWaitTime
             else:
                 newAngle = oldAngle + 90
-                if angle > newAngle and time.time() > TIMEOUT:
+                if Gyro.angle > newAngle and time.time() > TIMEOUT:
                     corners = corners + 1
                     Utils.LogDebug(f"Corner: {corners}")
                     if corners == 4:
@@ -150,8 +148,8 @@ if __name__ == "__main__":
         time.sleep(0.1)
         Utils.EspHoldDistance.write(f"KP{KP}\n".encode())
         time.sleep(0.1)
-        Utils.EspHoldDistance.write(f"ED{100}\n".encode())
-        HoldDistance(Utils, colorTemperature=2000)
+        Utils.EspHoldDistance.write(f"ED{125}\n".encode())
+        HoldDistance(Utils, colorTemperature=4000)
     
     except Exception as e:
         Utils.LogError(e)

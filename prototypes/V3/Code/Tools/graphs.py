@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from download_graph import *
+from time import sleep
 
 
 # Initialize a dictionary to store the data
@@ -10,16 +11,16 @@ def download_graphs():
     username = "pi"
     password = "pi"
     remote_file_path = r"/home/pi/wro/testing/DataLog.log"
-    local_file_path = r"C:\Users\Felix\OneDrive - Helmholtz-Gymnasium\Desktop\Github\wro2024-fe-HHG_Phoenix\wro2024-fe-HHG_Phoenix\prototypes\V3\Code\DataLog.log"
+    local_file_path = r"C:\Users\Admin\Documents"
 
     # Call the function to copy the file
     copy_file_to_windows(raspberrypi_ip, username, password, remote_file_path, local_file_path)
 
 download_graphs()
 
-
+sleep(1)
 # Open the file and read the data
-with open(r"C:\Users\Felix\OneDrive - Helmholtz-Gymnasium\Desktop\Github\wro2024-fe-HHG_Phoenix\wro2024-fe-HHG_Phoenix\prototypes\V3\Code\DataLog.log", 'r') as f:
+with open(r"C:\Users\Admin\Documents\DataLog.log", 'r') as f:
     data = f.readlines()
 
 
