@@ -28,15 +28,16 @@ Farbsensor = ColorSensor(Utils)
 StartButton = Button(5, Utils)
 StopButton = Button(6, Utils)
 
-#Gyro = Gyroscope()
-ADC = AnalogDigitalConverter(Utils)
-Display = DisplayOled(ADC, Utils)
-
 Buzzer1 = Buzzer(12, Utils)
 
 Gyro = Gyroscope(Utils)
 
+
+ADC = AnalogDigitalConverter(Utils)
+Display = DisplayOled(ADC, Gyro, Utils)
+
 Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro)
+
 Utils.setupLog()
 Utils.setupDataLog()
 
