@@ -99,15 +99,6 @@ class Utility:
         self.InitNodemcus()
 
         #Start Processes
-<<<<<<< Updated upstream
-        p1 = mp.Process(target=self.Display.start_update())
-        p1.start()
-        p2 = mp.Process(target=self.StopButton.start_StopButton())
-        p2.start()
-        p3 = mp.Process(target=self.Farbsensor.start_measurement())
-        p3.start()
-        
-=======
         if self.Display != None:
             p1 = mp.Process(target=self.Display.start_update())
             p1.start()
@@ -117,7 +108,6 @@ class Utility:
         if self.Farbsensor != None:
             p3 = mp.Process(target=self.Farbsensor.start_measurement())
             p3.start()
->>>>>>> Stashed changes
         if self.Pixy != None:
             p4 = mp.Process(target=self.Pixy.start_reading())
             p4.start()
@@ -139,10 +129,7 @@ class Utility:
                 if self.StartButton.state() == 1:
                     
                     self.StartNodemcus()
-<<<<<<< Updated upstream
-=======
                     self.Gyro.angle = 0
->>>>>>> Stashed changes
                     
                     self.Starttime = time.time()
                     self.LogDebug(f"Run started: {time.time()}")
@@ -863,13 +850,10 @@ class Gyroscope(Utility):
 
             # Calculate the time elapsed since the last measurement
             delta_time = current_time - self.last_time
-<<<<<<< Updated upstream
-=======
             
             #bugfix for time-jumps
             if delta_time >= 0.5:
                 delta_time = 0.003
->>>>>>> Stashed changes
 
             # Integrate the gyroscope readings to get the change in angle
             if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
@@ -884,19 +868,10 @@ class Gyroscope(Utility):
 
             # Update the last time for the next iteration
             self.last_time = current_time
-<<<<<<< Updated upstream
-
-            return self.angle
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Gyroscope.get_angle: {e}")
-            self.Utils.StopRun()
-=======
     
         except Exception as e:
                 self.Utils.LogError(f"An Error occured in Gyroscope.get_angle: {e}")
                 self.Utils.StopRun()
->>>>>>> Stashed changes
     
         
 
