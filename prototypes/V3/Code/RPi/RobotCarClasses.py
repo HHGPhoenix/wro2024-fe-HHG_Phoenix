@@ -61,8 +61,8 @@ class Utility:
         
         
         #Stop all Threads if the class has been initialized
-        if self.Farbsensor != None:
-            self.Farbsensor.stop_measurement()
+        #if self.Farbsensor != None:
+        #    self.Farbsensor.stop_measurement()
         if self.Pixy != None:
             self.Pixy.stop_reading()
         if self.Display != None:
@@ -106,9 +106,11 @@ class Utility:
         if self.StopButton != None:
             p2 = mp.Process(target=self.StopButton.start_StopButton())
             p2.start()
+        """
         if self.Farbsensor != None:
             p3 = mp.Process(target=self.Farbsensor.start_measurement())
             p3.start()
+        """
         if self.Pixy != None:
             p4 = mp.Process(target=self.Pixy.start_reading())
             p4.start()
@@ -772,8 +774,8 @@ class ColorSensor(Utility):
             self.Utils = Utils
             
             #Colorsensor init
-            i2c = board.I2C()
-            self.sensor = adafruit_tcs34725.TCS34725(i2c)
+            #i2c = board.I2C()
+            #self.sensor = adafruit_tcs34725.TCS34725(i2c)
             
         except Exception as e:
             self.Utils.LogError(f"An Error occured in ColorSensor initialization: {e}")
@@ -1102,7 +1104,7 @@ class DisplayOled(Utility):
                         
                 self.Gyro.get_angle()
                 counter += 1
-                time.sleep(0.003)
+                time.sleep(0.005)
                     
         except Exception as e:
             self.Utils.LogError(f"An Error occured in DisplayOled.update: {e}")

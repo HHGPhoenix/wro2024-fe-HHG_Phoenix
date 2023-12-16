@@ -10,7 +10,7 @@ import RPi.GPIO as GPIO
 ##                                                      ##
 ##########################################################
 #Constants
-SPEED = 50
+SPEED = 30
 DISTANCETOWALL = 30
 KP = 3.5
 LINECOLORTEMPERATURE = 2000
@@ -69,15 +69,11 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
             #Choose distance and sensor to hold lane based on Pixy and direction
             if direction == 0:
                 if Sensor != 1:
-                    DISTANCE = 50
-                    Sensor = 1
-                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
+                    Sensor = 1   
                     Utils.EspHoldDistance.write(f"S1\n".encode())
             else:
                 if Sensor != 2:
-                    DISTANCE = 50
                     Sensor = 2
-                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S2\n".encode())
              
                 
@@ -121,8 +117,12 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
                 response = Utils.EspHoldDistance.read(Utils.EspHoldDistance.in_waiting).decode("utf-8")
                 if "Drive direction counterclockwise" in response:
                     direction = 1
+                    time.sleep(0.1)
+                    Utils.EspHoldDistance.write(f"D{25}\n".encode())
                 elif "Drive direction clockwise" in response:
                     direction = 0
+                    time.sleep(0.1)
+                    Utils.EspHoldDistance.write(f"D{25}\n".encode())
                     
                 Utils.LogDebug(f"Response from EspHoldDistance: {response}")
             
@@ -148,11 +148,15 @@ if __name__ == "__main__":
         print("Init started")
         Utils.StartRun()
         print("Init finished")
-        Utils.EspHoldSpeed.write(f"SPEED{SPEED}\n".encode())
+        Utils.EspHoldDistance.write(f"D{50}\n".encode())
         time.sleep(0.1)
         Utils.EspHoldDistance.write(f"KP{KP}\n".encode())
         time.sleep(0.1)
         Utils.EspHoldDistance.write(f"ED{ED}\n".encode())
+        time.sleep(0.1)
+        Utils.EspHoldSpeed.write(f"SPEED{1000}\n".encode())
+        time.sleep(0.4)
+        Utils.EspHoldSpeed.write(f"SPEED{SPEED}\n".encode())
         HoldDistance(Utils, colorTemperature=4000)
     
     except Exception as e:
