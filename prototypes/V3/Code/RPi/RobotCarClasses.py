@@ -37,7 +37,7 @@ class CustomException(Exception):
 #A class that has some necessary tools for calculating, usw.
 class Utility:
     #Transfer data so it can be used in other classes
-    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Display=None, ADC=None, Buzzer1=None, Pixy=None):
+    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Display=None, ADC=None, Buzzer1=None, Gyro=None, Pixy=None):
         #self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.Funcs = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, Funcs
         self.Farbsensor = Farbsensor
         self.StartButton = StartButton
@@ -47,6 +47,7 @@ class Utility:
         self.ADC = ADC
         self.Buzzer1 = Buzzer1
         self.StartTime = time.time()
+        self.Gyro = Gyro
         
         self.ActivSensor = 0
         self.file_path = "/tmp/StandbyScript.lock"
@@ -129,12 +130,13 @@ class Utility:
                 if self.StartButton.state() == 1:
                     
                     self.StartNodemcus()
-                    self.Gyro.angle = 0
                     
                     self.Starttime = time.time()
                     self.LogDebug(f"Run started: {time.time()}")
                     self.Display.write("Run started:", f"{time.time()}")  
                     self.Buzzer1.buzz(1000, 80, 0.1) 
+                    
+                    self.Gyro.angle = 0
 
                     self.waiting = False
                     

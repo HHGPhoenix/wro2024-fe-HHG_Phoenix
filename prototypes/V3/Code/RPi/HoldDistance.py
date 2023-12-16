@@ -14,6 +14,7 @@ SPEED = 50
 DISTANCETOWALL = 30
 KP = 3.5
 LINECOLORTEMPERATURE = 2000
+ED = 125 #Edge detection distance in cm
 
 
 ##########################################################
@@ -49,6 +50,7 @@ Utils.setupDataLog()
 ##                                                      ##
 ##########################################################
 def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
+    Utils.LogDebug("HoldDistance started")
     #Variables
     TIMEOUT = 0
     TIMEOUT2 = 0
@@ -143,12 +145,14 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
 if __name__ == "__main__":
     try: 
         GPIO.setmode(GPIO.BCM)
+        print("Init started")
         Utils.StartRun()
+        print("Init finished")
         Utils.EspHoldSpeed.write(f"SPEED{SPEED}\n".encode())
         time.sleep(0.1)
         Utils.EspHoldDistance.write(f"KP{KP}\n".encode())
         time.sleep(0.1)
-        Utils.EspHoldDistance.write(f"ED{125}\n".encode())
+        Utils.EspHoldDistance.write(f"ED{ED}\n".encode())
         HoldDistance(Utils, colorTemperature=4000)
     
     except Exception as e:
