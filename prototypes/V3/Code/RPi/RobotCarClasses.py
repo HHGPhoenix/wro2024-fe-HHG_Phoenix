@@ -64,6 +64,7 @@ class Utility:
         #if self.Farbsensor != None:
         #    self.Farbsensor.stop_measurement()
         if self.Pixy != None:
+            self.Pixy.LED(0)
             self.Pixy.stop_reading()
         if self.Display != None:
             self.Display.stop_update()
@@ -137,11 +138,11 @@ class Utility:
                     
                     self.EspHoldDistance.write(f"D{50}\n".encode())
                     time.sleep(0.1)
-                    self.EspHoldDistance.write(f"KP{3.5}\n".encode())
+                    self.EspHoldDistance.write(f"KP{3}\n".encode())
                     time.sleep(0.1)
                     self.EspHoldDistance.write(f"ED{125}\n".encode())
                     time.sleep(0.1)
-                    self.EspHoldSpeed.write(f"SPEED{50}\n".encode())
+                    self.EspHoldSpeed.write(f"SPEED{45}\n".encode())
                     
                     self.Starttime = time.time()
                     self.LogDebug(f"Run started: {time.time()}")
