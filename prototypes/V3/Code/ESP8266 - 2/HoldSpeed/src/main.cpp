@@ -67,6 +67,9 @@ void loop() {
       if (command == "START") {
         Serial.println("Received START command. Performing action...");
         digitalWrite(InternalLed, LOW);
+        motor.setSpeed(255);
+        motor.forward();
+        delay(100);
         speedSensor.begin();
         turned = false;
         started = true;

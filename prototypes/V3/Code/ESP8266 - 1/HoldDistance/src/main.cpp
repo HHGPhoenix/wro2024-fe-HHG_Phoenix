@@ -43,16 +43,38 @@ void setup() {
 }
 
 void loop() {
-  // Wait for the "START" command
+  // Wait for the "START" command 
   if (!started) {
     if (Serial.available() > 0) {
       String command = Serial.readStringUntil('\n');
       if (command == "START") {
-        Serial.println("Received START command. Performing action...");
-        servo.write(ServoMiddlePosition);
-        digitalWrite(InternalLed, LOW);
-        firstCornerDetected = false;
-        started = true;
+        Serial.println("Received START command. Performing action..."); // Feedback for Raspberry Pi
+        servo.write(ServoMiddlePosition); // Reset servo position
+        digitalWrite(InternalLed, LOW); // Turn on the internal LED
+
+        firstCornerDetected = false; // Reset corner detection
+
+        // Check for start in small section
+        distance1 = ultraschall1.read();
+        distance2 = ultraschall2.read();
+        // Check if both sensors read a valid value
+        if (distance1 > 0 && distance2 > 0) {
+          // Check if the difference between the two sensors is greater than 5 cm
+          if (abs(distance1 - distance2) > 5) {
+            // Determine the drive direction based on the small section
+            if (distance1 > distance2) {
+              firstCornerDetected = true;
+              delay(500);
+              Serial.println("Drive direction clockwise");
+            } else {
+              firstCornerDetected = true;
+              delay(500);
+              Serial.println("Drive direction counterclockwise");
+            }
+          }
+        }
+
+        started = true; // Start the main loop
       }
       // Identity response
       else if (command == "IDENT") {
@@ -63,6 +85,7 @@ void loop() {
     }
   }
 
+  // Main loop if started and not in manual mode
   if (started) {
     if (!manual) {
       // command checker
@@ -193,10 +216,12 @@ void loop() {
             }
           }
         }
+      } else {
+        delay(10);
       }
-      delay(10); // wait so the loop isn't too fast
     }
 
+  // Main loop if started and in manual mode
     else {
       // command checker
       if (Serial.available() > 0) {

@@ -3,20 +3,6 @@ from RobotCarClasses import *
 import RPi.GPIO as GPIO
 
 
-
-##########################################################
-##                                                      ##
-##                      Variables                       ##
-##                                                      ##
-##########################################################
-#Constants
-SPEED = 30
-DISTANCETOWALL = 30
-KP = 3.5
-LINECOLORTEMPERATURE = 2000
-ED = 125 #Edge detection distance in cm
-
-
 ##########################################################
 ##                                                      ##
 ##        Sensor / Class Initalization                  ##
@@ -35,12 +21,25 @@ Gyro = Gyroscope(Utils)
 
 
 ADC = AnalogDigitalConverter(Utils)
-Display = DisplayOled(ADC, Gyro, Utils)
+Display = DisplayOled(ADC, Gyro, Farbsensor, Utils)
 
 Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro)
 
 Utils.setupLog()
 Utils.setupDataLog()
+
+
+
+##########################################################
+##                                                      ##
+##                      Variables                       ##
+##                                                      ##
+##########################################################
+#Constants
+Utils.Speed = 50
+Utils.KP = 3.5
+LINECOLORTEMPERATURE = 2000
+Utils.ED = 125 #Edge detection distance in cm
 
 
 
@@ -83,6 +82,7 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
                 Utils.LogDebug(f"Corner2: {corners2}")
                 if corners2 == 4:
                     corners2 = 0
+                    rounds2 = rounds2 + 1
                     
                 TIMEOUT2 = time.time() + LineWaitTime
             
@@ -94,9 +94,11 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
                 if Gyro.angle < newAngle and time.time() > TIMEOUT:
                     corners = corners + 1
                     Utils.LogDebug(f"Corner: {corners}")
+                    Display.write(f"Corner: {corners}")
                     if corners == 4:
                         corners = 0
                         rounds = rounds + 1
+                        Display.write(f"Corner: {corners}", f"Round: {rounds}")
                         
                     oldAngle = newAngle
                     TIMEOUT = time.time() + LineWaitTime
@@ -148,15 +150,6 @@ if __name__ == "__main__":
         print("Init started")
         Utils.StartRun()
         print("Init finished")
-        Utils.EspHoldDistance.write(f"D{50}\n".encode())
-        time.sleep(0.1)
-        Utils.EspHoldDistance.write(f"KP{KP}\n".encode())
-        time.sleep(0.1)
-        Utils.EspHoldDistance.write(f"ED{ED}\n".encode())
-        time.sleep(0.1)
-        Utils.EspHoldSpeed.write(f"SPEED{1000}\n".encode())
-        time.sleep(0.4)
-        Utils.EspHoldSpeed.write(f"SPEED{SPEED}\n".encode())
         HoldDistance(Utils, colorTemperature=4000)
     
     except Exception as e:

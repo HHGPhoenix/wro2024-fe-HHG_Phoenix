@@ -130,8 +130,18 @@ class Utility:
             try:
                 time.sleep(0.1)
                 if self.StartButton.state() == 1:
-                    
+            
                     self.StartNodemcus()
+                    
+                    time.sleep(0.1)
+                    
+                    self.EspHoldDistance.write(f"D{50}\n".encode())
+                    time.sleep(0.1)
+                    self.EspHoldDistance.write(f"KP{3.5}\n".encode())
+                    time.sleep(0.1)
+                    self.EspHoldDistance.write(f"ED{125}\n".encode())
+                    time.sleep(0.1)
+                    self.EspHoldSpeed.write(f"SPEED{50}\n".encode())
                     
                     self.Starttime = time.time()
                     self.LogDebug(f"Run started: {time.time()}")
@@ -143,7 +153,7 @@ class Utility:
                     self.waiting = False
                     
             except:
-                self.Utils.StopRun()
+                self.StopRun()
     
     
     #Stop the run and calculate the time needed            
@@ -193,7 +203,7 @@ class Utility:
             
         except Exception as e:
             self.LogError(f"An Error occured in Utility.setupDataLog: {e}")
-            self.Utils.StopRun()
+            self.StopRun()
             
 
     #Log Sensor values
@@ -202,7 +212,7 @@ class Utility:
             self.datalogger.debug(f"Farbsensor; {self.Farbsensor.color_temperature};  CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}; Voltage; {self.ADC.voltage}")
         except Exception as e:
             self.LogError(f"An Error occured in Utility.LogData: {e}")
-            self.Utils.StopRun()
+            self.StopRun()
         
     
     #Stop the DataLogger Process
@@ -233,7 +243,7 @@ class Utility:
             self.logger.addHandler(fh)
         except Exception as e:
             self.LogError(f"An Error occured in Utility.setupLog: {e}")
-            self.Utils.StopRun()
+            self.StopRun()
         
         
     #Log debug messages
@@ -321,7 +331,7 @@ class Utility:
             
         except Exception as e:
             self.LogError(f"An Error occured in Utility.toggle_supersonic_sensor: {e}")
-            self.Utils.StopRun()
+            self.StopRun()
     
     
     #Init both NodeMCUs
@@ -339,11 +349,11 @@ class Utility:
             
         except Exception as e:
             self.LogError(f"An Error occured in Utility.StartNodemcus: {e}")
-            self.Utils.StopRun()
+            self.StopRun()
 
         if len(usb_devices) != 2:
             self.LogError(f"Could not find both NodeMCUs: {usb_devices}")
-            self.Utils.StopRun()
+            self.StopRun()
             
         #Identify both NodeMCUs
         for device in usb_devices:
@@ -369,13 +379,13 @@ class Utility:
                     self.EspHoldSpeed = serial.Serial(device,baudrate=115200,timeout=1)  
                 else:
                     self.LogError(f"Could not identify NodeMCU on: {device}")
-                    self.Utils.StopRun()
+                    self.StopRun()
                 
                 time.sleep(0.1)
                     
             except Exception as e:
                 self.LogError(f"An Error occured in Utility.StartNodemcus: {e}")
-                self.Utils.StopRun()
+                self.StopRun()
     
     
     #Start both NodeMCUs and wait for responses
@@ -774,8 +784,8 @@ class ColorSensor(Utility):
             self.Utils = Utils
             
             #Colorsensor init
-            #i2c = board.I2C()
-            #self.sensor = adafruit_tcs34725.TCS34725(i2c)
+            i2c = board.I2C()
+            self.sensor = adafruit_tcs34725.TCS34725(i2c)
             
         except Exception as e:
             self.Utils.LogError(f"An Error occured in ColorSensor initialization: {e}")
@@ -829,6 +839,8 @@ class Gyroscope(Utility):
             self.sensor = adafruit_mpu6050.MPU6050(i2c)
             self.sensor._gyro_range = 0
             self.Utils = Utils
+            
+            self.threadStop = 0
 
             #Initialize variables for storing the angle and time
             self.angle = 0.0  # Initial angle
@@ -841,39 +853,40 @@ class Gyroscope(Utility):
 
     #Read the gyroscope data and calculate the angle
     def get_angle(self):
-        try:
-            offset_x = 0.29
-            offset_y = 0.0
-            offset_z = 0.0
-            #Read gyroscope data
-            gyro_data = self.sensor.gyro
-            gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
+        while self.threadStop == 0:
+            try:
+                offset_x = 0.29
+                offset_y = 0.0
+                offset_z = 0.0
+                #Read gyroscope data
+                gyro_data = self.sensor.gyro
+                gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
 
-            # Get the current time
-            current_time = time.time()
+                # Get the current time
+                current_time = time.time()
 
-            # Calculate the time elapsed since the last measurement
-            delta_time = current_time - self.last_time
-            
-            #bugfix for time-jumps
-            if delta_time >= 0.5:
-                delta_time = 0.003
-
-            # Integrate the gyroscope readings to get the change in angle
-            if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
-                gyro_data = 0
-            else:
-                gyro_data = gyro_data[0]
+                # Calculate the time elapsed since the last measurement
+                delta_time = current_time - self.last_time
                 
-            delta_angle = gyro_data * delta_time * 60
+                #bugfix for time-jumps
+                if delta_time >= 0.5:
+                    delta_time = 0.003
 
-            # Update the angle
-            self.angle += delta_angle
+                # Integrate the gyroscope readings to get the change in angle
+                if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
+                    gyro_data = 0
+                else:
+                    gyro_data = gyro_data[0]
+                    
+                delta_angle = gyro_data * delta_time * 60
 
-            # Update the last time for the next iteration
-            self.last_time = current_time
-    
-        except Exception as e:
+                # Update the angle
+                self.angle += delta_angle
+
+                # Update the last time for the next iteration
+                self.last_time = current_time
+        
+            except Exception as e:
                 self.Utils.LogError(f"An Error occured in Gyroscope.get_angle: {e}")
                 self.Utils.StopRun()
     
@@ -1006,7 +1019,7 @@ class SpeedSensor(Utility):
         
 #A class for writing to a OLED Display
 class DisplayOled(Utility):
-    def __init__(self, ADC, Gyro, Utils):
+    def __init__(self, ADC, Gyro, Farbsensor, Utils):
         try:
             serial = i2c(port=0, address=0x3C)
             self.device = sh1106(serial)
@@ -1017,6 +1030,7 @@ class DisplayOled(Utility):
             self.ADC = ADC
             self.Utils = Utils
             self.Gyro = Gyro
+            self.ColorSensor = Farbsensor
             
             #Wake the screen by drawing an outline
             with canvas(self.device) as draw:
@@ -1039,7 +1053,7 @@ class DisplayOled(Utility):
        
     
     #Write lines in variables so they get written by the update function   
-    def write(self, first_line="", second_line="",reset=False, xCoord=0, yCoord=17):
+    def write(self, first_line="", second_line="", reset=False, xCoord=0, yCoord=17):
         try:
             if reset:
                 self.first_line = ""
@@ -1059,8 +1073,16 @@ class DisplayOled(Utility):
     def start_update(self):
         try:
             self.threadStop = 0
-            self.thread = threading.Thread(target=self.update, daemon=True)
-            self.thread.start()
+            self.thread1 = threading.Thread(target=self.update, daemon=True)
+            self.thread1.start()
+            
+            self.Gyro.threadStop = 0
+            self.thread2 = threading.Thread(target=self.Gyro.get_angle, daemon=True)
+            self.thread2.start()
+            
+            self.ColorSensor.threadStop = 0
+            self.thread3 = threading.Thread(target=self.ColorSensor.read, daemon=True)
+            self.thread3.start()
             
         except Exception as e:
             self.Utils.LogError(f"An Error occured in DisplayOled.start_update: {e}")
@@ -1069,27 +1091,23 @@ class DisplayOled(Utility):
     
     #Update the Display
     def update(self):
-        try:
-            counter = 0
-            while self.threadStop == 0:
-                if counter == 200:
-                    counter = 0
-                    
-                    #Get CPU temperature, CPU usage, RAM usage and Disk usage
-                    cpuTemp = CPUTemperature()
-                    self.cpu_usage = psutil.cpu_percent(interval=0)
-                    self.ram = psutil.virtual_memory()
-                    self.disk = psutil.disk_usage('/')
-                    
-                    #Format them to always have the same number of decimal points
-                    cpu_temp_formatted = self.convert_to_decimal_points(cpuTemp.temperature, 1)
-                    cpu_usage_formatted = self.convert_to_decimal_points(self.cpu_usage, 1)
-                    ram_usage_formatted = self.convert_to_decimal_points(self.ram.percent, 1)
-                    disk_usage_formatted = self.convert_to_decimal_points(self.disk.percent, 1)
-                    voltage_value_formatted = self.convert_to_decimal_points(self.ADC.read(), 2)
-                    
-                    #Draw all the data on the Display
-                    with canvas(self.device) as draw:
+        while self.threadStop == 0:
+            try:
+                #Get CPU temperature, CPU usage, RAM usage and Disk usage
+                cpuTemp = CPUTemperature()
+                self.cpu_usage = psutil.cpu_percent(interval=0)
+                self.ram = psutil.virtual_memory()
+                self.disk = psutil.disk_usage('/')
+                
+                #Format them to always have the same number of decimal points
+                cpu_temp_formatted = self.convert_to_decimal_points(cpuTemp.temperature, 1)
+                cpu_usage_formatted = self.convert_to_decimal_points(self.cpu_usage, 1)
+                ram_usage_formatted = self.convert_to_decimal_points(self.ram.percent, 1)
+                disk_usage_formatted = self.convert_to_decimal_points(self.disk.percent, 1)
+                voltage_value_formatted = self.convert_to_decimal_points(self.ADC.read(), 2)
+                
+                #Draw all the data on the Display
+                with canvas(self.device) as draw:
                         #top
                         draw.text((0, 0), f"{cpu_temp_formatted}°C", fill="white", align="left")
                         draw.text((40, 0), f"DISK:{(int(float(disk_usage_formatted)))}%", fill="white")
@@ -1102,19 +1120,19 @@ class DisplayOled(Utility):
                         #custom
                         draw.multiline_text((0, 15), f"{self.first_line}\n{self.second_line}", fill="white", align="center", anchor="ma")
                         
-                self.Gyro.get_angle()
-                counter += 1
-                time.sleep(0.005)
+                time.sleep(2)
                     
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.update: {e}")
-            self.Utils.StopRun()
+            except Exception as e:
+                self.Utils.LogError(f"An Error occured in DisplayOled.update: {e}")
+                self.Utils.StopRun()
          
     
     #Stop the thread for updating the Display      
     def stop_update(self):
         try:
             self.threadStop = 1
+            self.Gyro.threadStop = 1
+            self.ColorSensor.threadStop = 1
 
         except Exception as e:
             self.Utils.LogError(f"An Error occured in DisplayOled.stop_update: {e}")
