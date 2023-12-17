@@ -6,19 +6,6 @@ import RPi.GPIO as GPIO
 
 ##########################################################
 ##                                                      ##
-##                      Variables                       ##
-##                                                      ##
-##########################################################
-#Constants
-SPEED = 50
-DISTANCETOWALL = 30
-KP = 2.5
-LINECOLORTEMPERATURE = 2000
-NUMBERSLOTS = 8
-
-
-##########################################################
-##                                                      ##
 ##        Sensor / Class Initalization                  ##
 ##                                                      ##
 ##########################################################    
@@ -29,18 +16,33 @@ Farbsensor = ColorSensor(Utils)
 StartButton = Button(5, Utils)
 StopButton = Button(6, Utils)
 
-#Gyro = Gyroscope()
-ADC = AnalogDigitalConverter(Utils)
-Display = DisplayOled(ADC, Utils)
-
 Buzzer1 = Buzzer(12, Utils)
+
+Gyro = Gyroscope(Utils)
+
+
+ADC = AnalogDigitalConverter(Utils)
+Display = DisplayOled(ADC, Gyro, Farbsensor, Utils)
 
 Pixy = PixyCam(Utils)
 Pixy.start_reading()
 
-Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Pixy)
+Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro, Pixy)
+
 Utils.setupLog()
 Utils.setupDataLog()
+
+
+
+##########################################################
+##                                                      ##
+##                      Variables                       ##
+##                                                      ##
+##########################################################
+#Constants
+Utils.Speed = 50
+Utils.KP = 3.5
+Utils.ED = 125 #Edge detection distance in cm
 
 
 
@@ -49,7 +51,7 @@ Utils.setupDataLog()
 ##                     Functions                        ##
 ##                                                      ##
 ##########################################################
-def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0.01, Lane=1, SIZE=1, colorTemperature=1, LineWaitTime=1, Sensor=2):
+def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=2, WaitTime=0.01, Lane=1, SIZE=0, colorTemperature=1, LineWaitTime=1, Sensor=2):
     #Variables
     TIMEOUT = 0
     TIMEOUTPixy = 0
@@ -57,6 +59,8 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
     rounds = 0
     Sensor = 0
     direction = 0
+    oldAngle = 0
+    KPNormal = True
     
     #Hold Lane
     while Utils.running and rounds < 3:
@@ -71,9 +75,9 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S1\n".encode())
                     
-                elif Lane == 1 and Sensor != 1:
+                elif Lane == 1 and Sensor != 11:
                     DISTANCE = 50
-                    Sensor = 1
+                    Sensor = 11
                     print("Switched to Sensor 1")
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S1\n".encode())
@@ -92,9 +96,9 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S2\n".encode())
                     
-                elif Lane == 1 and Sensor != 2:
+                elif Lane == 1 and Sensor != 22:
                     DISTANCE = 50
-                    Sensor = 2  
+                    Sensor = 22
                     print("Switched to Sensor 2")
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S2\n".encode())
@@ -106,18 +110,39 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
                     Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
                     Utils.EspHoldDistance.write(f"S1\n".encode())
                     
-            #Count rounds with ColorSensor
-            if Utils.Farbsensor.color_temperature >= colorTemperature - 200 and Utils.Farbsensor.color_temperature <= colorTemperature + 200 and time.time() > TIMEOUT:
-                corners = corners + 1
-                Utils.LogDebug(f"Corner: {corners}")
-                if corners == 4:
-                    corners = 0
-                    rounds = rounds + 1
-                    
-                TIMEOUT = time.time() + LineWaitTime
+            #Count rounds with Gyro
+            Utils.angle = Gyro.angle
+            if direction == 0:
+                newAngle = oldAngle -90
+                if Gyro.angle < newAngle and time.time() > TIMEOUT:
+                    corners = corners + 1
+                    Utils.LogDebug(f"Corner: {corners}")
+                    Display.write(f"Corner: {corners}")
+                    if corners == 4:
+                        corners = 0
+                        rounds = rounds + 1
+                        Display.write(f"Corner: {corners}", f"Round: {rounds}")
+                        
+                    oldAngle = newAngle
+                    TIMEOUT = time.time() + LineWaitTime
+            else:
+                newAngle = oldAngle + 90
+                if Gyro.angle > newAngle and time.time() > TIMEOUT:
+                    corners = corners + 1
+                    Utils.LogDebug(f"Corner: {corners}")
+                    if corners == 4:
+                        corners = 0
+                        rounds = rounds + 1
+                        
+                    oldAngle = newAngle
+                    TIMEOUT = time.time() + LineWaitTime
                 
             #get Pixy objects and calculate new lane
             if time.time() > TIMEOUTPixy:
+                if KPNormal == False:
+                    Utils.EspHoldDistance.write(f"KP{3}\n".encode())
+                    KPNormal = True
+                time.sleep(0.1)
                 count = Utils.Pixy.count
                 if count > 0:
                     NextObject = -1
@@ -137,6 +162,11 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=1, WaitTime=0
                     
                     if NextObject > -1:
                         signature = Utils.Pixy.output[NextObject].m_signature
+                        
+                        Utils.EspHoldDistance.write(f"KP{2}\n".encode())
+                        KPNormal = False
+                        time.sleep(0.1)
+                        Utils.LogDebug(f"Signature: {signature}")
                         
                         #Green Block
                         if signature == 1:
@@ -188,11 +218,6 @@ if __name__ == "__main__":
     try: 
         GPIO.setmode(GPIO.BCM)
         Utils.StartRun()
-        Utils.EspHoldSpeed.write(f"SPEED{SPEED}\n".encode())
-        time.sleep(0.1)
-        Utils.EspHoldDistance.write(f"KP{3}\n".encode())
-        time.sleep(0.1)
-        Utils.EspHoldDistance.write(f"ED{100}\n".encode())
         Pixy.LED(1)
         HoldLane(Utils, SIZE=200, colorTemperature=2000)
     

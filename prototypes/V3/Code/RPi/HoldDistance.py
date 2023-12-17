@@ -56,6 +56,7 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
     corners = 0
     corners2 = 0
     rounds = 0
+    rounds2 = 0
     direction = 0
     Sensor = 0
     oldAngle = 0
