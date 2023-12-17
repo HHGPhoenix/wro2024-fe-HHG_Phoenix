@@ -60,9 +60,9 @@ void loop() {
         // Check if both sensors read a valid value
         if (distance1 > 0 && distance2 > 0) {
           // Check if the difference between the two sensors is greater than 5 cm
-          if (abs(distance1 - distance2) > 5) {
+          if (abs(distance1 - distance2) > 10) {
             // Determine the drive direction based on the small section
-            if (distance1 > distance2) {
+            if (distance1 < distance2) {
               firstCornerDetected = true;
               delay(500);
               Serial.println("Drive direction clockwise");
