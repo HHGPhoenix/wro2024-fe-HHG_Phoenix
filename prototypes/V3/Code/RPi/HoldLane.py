@@ -1,6 +1,7 @@
 import time
 from RobotCarClasses import *
 import RPi.GPIO as GPIO
+from threading import Thread
 
 
 
@@ -24,10 +25,10 @@ Gyro = Gyroscope(Utils)
 ADC = AnalogDigitalConverter(Utils)
 Display = DisplayOled(ADC, Gyro, Farbsensor, Utils)
 
-Pixy = PixyCam(Utils)
-Pixy.start_reading()
+Cam = Camera(video_stream=True)
+Cam.start_processing()
 
-Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro, Pixy)
+Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro)
 
 Utils.setupLog()
 Utils.setupDataLog()
@@ -137,6 +138,7 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=2, WaitTime=0
                     oldAngle = newAngle
                     TIMEOUT = time.time() + LineWaitTime
                 
+            """
             #get Pixy objects and calculate new lane
             if time.time() > TIMEOUTPixy:
                 if KPNormal == False:
@@ -187,7 +189,8 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=2, WaitTime=0
                 else:
                     Lane = 1
                     TIMEOUTPixy = time.time() + WaitTime
-              
+            """
+            
             #check for direction
             if Utils.EspHoldDistance.in_waiting > 0:
                 response = Utils.EspHoldDistance.read(Utils.EspHoldDistance.in_waiting).decode()
@@ -216,9 +219,29 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=2, WaitTime=0
 ##########################################################
 if __name__ == "__main__":
     try: 
+        #start flask server if needed
+        if Cam.video_stream:
+            app = Flask(__name__)
+            
+            @app.route('/')
+            def index():
+                """Video streaming home page."""
+                return render_template('index.html')
+
+
+            @app.route('/video_feed')
+            def video_feed():
+                """Video streaming route. Put this in the src attribute of an img tag."""
+                return Response(Cam.video_frames(),
+                                mimetype='multipart/x-mixed-replace; boundary=frame')
+
+            # Run the server in a separate thread
+            server_thread = Thread(target=app.run, kwargs={'host':'0.0.0.0', 'threaded':True})
+            server_thread.start()
+                
         GPIO.setmode(GPIO.BCM)
         Utils.StartRun()
-        Pixy.LED(1)
+        #Pixy.LED(1)
         HoldLane(Utils, SIZE=200, colorTemperature=2000)
     
     except Exception as e:
