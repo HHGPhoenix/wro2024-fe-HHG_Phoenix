@@ -138,58 +138,33 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=2, WaitTime=0
                     oldAngle = newAngle
                     TIMEOUT = time.time() + LineWaitTime
                 
-            """
+                
             #get Pixy objects and calculate new lane
             if time.time() > TIMEOUTPixy:
-                if KPNormal == False:
-                    Utils.EspHoldDistance.write(f"KP{3}\n".encode())
-                    KPNormal = True
-                time.sleep(0.1)
-                count = Utils.Pixy.count
-                if count > 0:
-                    NextObject = -1
-                    for x in range(count):
-                        yCoord = Utils.Pixy.output[x].m_y
+                block_array = Cam.block_array
+                if len(block_array) > 0:
+                    #Delete blocks not meeting requirements
+                    for block in block_array:
+                        #Calculate middle of block
+                        block.mx = block.x + block.width / 2
+                        block.my = block.y + block.height / 2
+                        block.size = block.w * block.h
                         
-                        if yCoord < YCutOffTop and yCoord > YCutOffBottom:
-                            
-                            size = Utils.Pixy.output[x].m_width * Utils.Pixy.output[x].m_height
-                            
-                            if size >= SIZE:
-                                NextObject = x
-                                break
-                            
+                        if block.my < YCutOffTop and block.my > YCutOffTop and block.size > SIZE:
+                            pass
                         else:
-                            NextObject = -1
+                            block_array.remove(block)
+                        
+                if len(block_array) > 0:
+                    #Sort blocks by size
+                    block_array.sort(key=lambda x: x.size, reverse=True)
                     
-                    if NextObject > -1:
-                        signature = Utils.Pixy.output[NextObject].m_signature
-                        
-                        Utils.EspHoldDistance.write(f"KP{2}\n".encode())
-                        KPNormal = False
-                        time.sleep(0.1)
-                        Utils.LogDebug(f"Signature: {signature}")
-                        
-                        #Green Block
-                        if signature == 1:
-                            Lane = 0
-                        #Red Block
-                        elif signature == 2:
-                            Lane = 2
-                        #No Block found
-                        else:
-                            Lane = 1
+                    nextBlock = block_array[0]
+                    if nextBlock.color == "red":
 
-                        TIMEOUTPixy = time.time() + BlockWaitTime
+                    elif nextBlock.color == "green":
                         
-                    else:
-                        Lane = 1
-                        TIMEOUTPixy = time.time() + WaitTime
-
-                else:
-                    Lane = 1
-                    TIMEOUTPixy = time.time() + WaitTime
-            """
+                        
             
             #check for direction
             if Utils.EspHoldDistance.in_waiting > 0:

@@ -110,14 +110,9 @@ class Utility:
         if self.StopButton != None:
             p2 = mp.Process(target=self.StopButton.start_StopButton())
             p2.start()
-        """
-        if self.Farbsensor != None:
-            p3 = mp.Process(target=self.Farbsensor.start_measurement())
-            p3.start()
-        """
         if self.Pixy != None:
-            p4 = mp.Process(target=self.Pixy.start_reading())
-            p4.start()
+            p3 = mp.Process(target=self.Pixy.start_reading())
+            p3.start()
 
         #Wait for StartButton to be pressed
         self.running = True
@@ -196,7 +191,7 @@ class Utility:
 
             
             #Create file handler and set level to debug
-            fh = logging.FileHandler("DataLog.log", 'w')
+            fh = logging.FileHandler("/tmp/DataLog.log", 'w')
             fh.setLevel(logging.DEBUG)
             self.datalogger.addHandler(fh)
 
@@ -1242,7 +1237,7 @@ class Camera():
         
         return None, None
         
-
+        
     def process_blocks(self):
         while True:
             block_array, self.frame = self.get_coordinates()
@@ -1251,11 +1246,13 @@ class Camera():
                 # Print the block array
                 for block in block_array:
                     print(block)
+     
                     
     def start_processing(self):
         thread = threading.Thread(target=self.process_blocks)
         thread.daemon = False
         thread.start()
+      
         
     def video_frames(self):
         if self.video_stream:

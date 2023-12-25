@@ -19,7 +19,6 @@ void LM393SpeedSensor::begin() {
 
 void LM393SpeedSensor::reset() {
     instance->rps = 0;
-
 }
 
 void LM393SpeedSensor::getRPM() {
@@ -27,7 +26,7 @@ void LM393SpeedSensor::getRPM() {
     float delayTime = currentTime - prevTime;
 
     if (delayTime >= 0) {
-        instance->rps = (8 / delayTime * 1000);
+        instance->rps = (14 / delayTime * 1000);
         prevTime = currentTime;
     }
 }

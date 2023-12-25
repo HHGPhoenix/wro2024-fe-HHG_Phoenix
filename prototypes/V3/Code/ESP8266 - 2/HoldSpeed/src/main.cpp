@@ -13,12 +13,14 @@
 #define InternalLed 2
 
 // Variables
-int slots = 8;
+int slots = 14;
 int kp = 5;
 int standing = 0;
 int lastspeed = 0;
 float desiredSpeed = 0;
 float Speed = 0;
+float previousError = 0;
+float kd = 0.5;
 
 bool started = false;
 bool turned = false;
@@ -32,23 +34,30 @@ LM393SpeedSensor speedSensor(speedSensorSignal);
 void holdSpeed() {
   float currentSpeed = speedSensor.rps;
   float error = desiredSpeed - currentSpeed / 10;
-  float output = desiredSpeed + error * kp;
-
+  float derivative = error - previousError;
+  float output = desiredSpeed + error * kp + derivative * kd;
+  // 255 = 50 + (35 - 0 / 10) * 10
+  Serial.print("Current Speed: " + String(currentSpeed));
+  Serial.print(" | Error: " + String(error));
+  Serial.print(" | Output: " + String(output));
+  Serial.println(" | Desired Speed: " + String(desiredSpeed));
 
   // PWM limit
   if (output < 0) {
     output = 0;
   } else if (output > 255) {
     output = 255;
-  }  
+  }
 
   // Turn the motor
-  if (forward) {
+  if (output > 0) {
     motor.forward();
   } else {
     motor.backward();
   }
-  motor.setSpeed(output);
+  motor.setSpeed(abs(output));
+
+  previousError = error;
 }
 
 
@@ -109,7 +118,7 @@ void loop() {
           forward = true;
         }
 
-        desiredSpeed = abs(Speed);
+        desiredSpeed = Speed;
 
         Serial.print("Received SPEED: ");
         Serial.println(desiredSpeed);
@@ -123,6 +132,16 @@ void loop() {
 
         Serial.print("Received KP: ");
         Serial.println(kp);
+      }
+      //check for KD command
+      else if (command.startsWith("KD")) {
+        int numberStart = 2;
+        int numberLength = command.length();
+        String numberStr = command.substring(numberStart, numberLength);
+        kd = numberStr.toInt();
+
+        Serial.print("Received KD: ");
+        Serial.println(kd);
       }
     }
 
