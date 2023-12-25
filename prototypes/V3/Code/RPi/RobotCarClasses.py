@@ -110,14 +110,9 @@ class Utility:
         if self.StopButton != None:
             p2 = mp.Process(target=self.StopButton.start_StopButton())
             p2.start()
-        """
-        if self.Farbsensor != None:
-            p3 = mp.Process(target=self.Farbsensor.start_measurement())
-            p3.start()
-        """
         if self.Pixy != None:
-            p4 = mp.Process(target=self.Pixy.start_reading())
-            p4.start()
+            p3 = mp.Process(target=self.Pixy.start_reading())
+            p3.start()
 
         #Wait for StartButton to be pressed
         self.running = True
@@ -196,7 +191,7 @@ class Utility:
 
             
             #Create file handler and set level to debug
-            fh = logging.FileHandler("DataLog.log", 'w')
+            fh = logging.FileHandler("/tmp/DataLog.log", 'w')
             fh.setLevel(logging.DEBUG)
             self.datalogger.addHandler(fh)
 
@@ -1196,6 +1191,7 @@ class Camera():
         self.kernel = np.ones((5, 5), np.uint8)
 
         
+    #Get the coordinates of the blocks in the camera stream
     def get_coordinates(self):
         rval, frame = self.cap.read()
         if rval:  # Only process the frame if it was read correctly
@@ -1220,6 +1216,8 @@ class Camera():
             # Find contours in the red mask
             contours_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             
+            cv2.circle(frame, (320, 480), 10, (255, 0, 0), -1)
+            
             block_array = []
 
             # Process each green contour
@@ -1228,7 +1226,8 @@ class Camera():
                 if w > 50 and h > 50:  # Only consider boxes larger than 50x50
                     cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
                     cv2.putText(frame, 'Green Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
-                    block_array.append({'color': 'green', 'x': x, 'y': y, 'w': w, 'h': h})
+                    block_array.append({'color': 'green', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
+                    cv2.line(frame, (320, 480), (int(x+w/2), int(y+h/2)), (0, 255, 0), 2)
 
             # Process each red contour
             for contour in contours_red:
@@ -1236,27 +1235,28 @@ class Camera():
                 if w > 50 and h > 50:  # Only consider boxes larger than 50x50
                     cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 255), 2)
                     cv2.putText(frame, 'Red Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
-                    block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h})
+                    block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
+                    cv2.line(frame, (320, 480), (int(x+w/2), int(y+h/2)), (0, 0, 255), 2)
                     
             return block_array, frame
         
         return None, None
         
-
+        
+    #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
     def process_blocks(self):
         while True:
-            block_array, self.frame = self.get_coordinates()
-            
-            if block_array is not None:
-                # Print the block array
-                for block in block_array:
-                    print(block)
-                    
+            self.block_array, self.frame = self.get_coordinates()
+     
+          
+    #Start a new thread for processing the camera stream          
     def start_processing(self):
         thread = threading.Thread(target=self.process_blocks)
         thread.daemon = False
         thread.start()
+      
         
+    #Generate the frames for the webstream
     def video_frames(self):
         if self.video_stream:
             while True:
@@ -1268,4 +1268,3 @@ class Camera():
                     else:
                         yield (b'--frame\r\n'
                                 b'Content-Type: image/jpeg\r\n\r\n' + b'\r\n')
-                        
