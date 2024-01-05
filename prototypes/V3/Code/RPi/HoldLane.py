@@ -1,7 +1,7 @@
 import time
 from RobotCarClasses import *
-import RPi.GPIO as GPIO
-
+from threading import Thread
+import math
 
 
 ##########################################################
@@ -11,7 +11,8 @@ import RPi.GPIO as GPIO
 ##########################################################    
 Utils = Utility()
 
-Farbsensor = ColorSensor(Utils)
+#Farbsensor = ColorSensor(Utils)
+Farbsensor = None
 
 StartButton = Button(5, Utils)
 StopButton = Button(6, Utils)
@@ -22,12 +23,12 @@ Gyro = Gyroscope(Utils)
 
 
 ADC = AnalogDigitalConverter(Utils)
-Display = DisplayOled(ADC, Gyro, Farbsensor, Utils)
+Display = DisplayOled(ADC, Gyro, Utils=Utils)
 
-Pixy = PixyCam(Utils)
-Pixy.start_reading()
+Cam = Camera(video_stream=True)
+Cam.start_processing()
 
-Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro, Pixy)
+Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro)
 
 Utils.setupLog()
 Utils.setupDataLog()
@@ -51,64 +52,24 @@ Utils.ED = 125 #Edge detection distance in cm
 ##                     Functions                        ##
 ##                                                      ##
 ##########################################################
-def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=2, WaitTime=0.01, Lane=1, SIZE=0, colorTemperature=1, LineWaitTime=1, Sensor=2):
+def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Sensor=2):
     #Variables
     TIMEOUT = 0
-    TIMEOUTPixy = 0
+    TIMEOUTBlock = 0
     corners = 0
     rounds = 0
     Sensor = 0
     direction = 0
     oldAngle = 0
-    KPNormal = True
+    BlockKP = 0.05
+    old_desired_distance_wall = 0
+    
+    coordinates_self = (320, 480) #x, y
     
     #Hold Lane
     while Utils.running and rounds < 3:
         try:
             time.sleep(0.001)
-            #Choose distance and sensor to hold lane based on Pixy and direction
-            if direction == 0:
-                if Lane == 0 and Sensor != 1:
-                    DISTANCE = 25
-                    Sensor = 1
-                    print("Switched to Sensor 1")
-                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
-                    Utils.EspHoldDistance.write(f"S1\n".encode())
-                    
-                elif Lane == 1 and Sensor != 11:
-                    DISTANCE = 50
-                    Sensor = 11
-                    print("Switched to Sensor 1")
-                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
-                    Utils.EspHoldDistance.write(f"S1\n".encode())
-                    
-                elif Lane == 2 and Sensor != 2:
-                    DISTANCE = 25
-                    Sensor = 2
-                    print("Switched to Sensor 2")
-                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
-                    Utils.EspHoldDistance.write(f"S2\n".encode())
-            else:
-                if Lane == 0 and Sensor != 2:
-                    DISTANCE = 25
-                    Sensor = 2
-                    print("Switched to Sensor 2")
-                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
-                    Utils.EspHoldDistance.write(f"S2\n".encode())
-                    
-                elif Lane == 1 and Sensor != 22:
-                    DISTANCE = 50
-                    Sensor = 22
-                    print("Switched to Sensor 2")
-                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
-                    Utils.EspHoldDistance.write(f"S2\n".encode())
-                    
-                elif Lane == 2 and Sensor != 1:
-                    DISTANCE = 25
-                    Sensor = 1
-                    print("Switched to Sensor 1")
-                    Utils.EspHoldDistance.write(f"D{DISTANCE}\n".encode())
-                    Utils.EspHoldDistance.write(f"S1\n".encode())
                     
             #Count rounds with Gyro
             Utils.angle = Gyro.angle
@@ -137,57 +98,74 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=2, WaitTime=0
                     oldAngle = newAngle
                     TIMEOUT = time.time() + LineWaitTime
                 
-            #get Pixy objects and calculate new lane
-            if time.time() > TIMEOUTPixy:
-                if KPNormal == False:
-                    Utils.EspHoldDistance.write(f"KP{3}\n".encode())
-                    KPNormal = True
-                time.sleep(0.1)
-                count = Utils.Pixy.count
-                if count > 0:
-                    NextObject = -1
-                    for x in range(count):
-                        yCoord = Utils.Pixy.output[x].m_y
-                        
-                        if yCoord < YCutOffTop and yCoord > YCutOffBottom:
-                            
-                            size = Utils.Pixy.output[x].m_width * Utils.Pixy.output[x].m_height
-                            
-                            if size >= SIZE:
-                                NextObject = x
-                                break
-                            
+                
+            #get objects and calculate new distance
+            if time.time() > TIMEOUTBlock:
+                block_array = Cam.block_array
+                if len(block_array) > 0:
+                    #Delete blocks not meeting requirements
+                    for block in block_array:
+                        if block['my'] < YCutOffTop and block['my'] > YCutOffBottom and block["size"] > SIZE:
+                            pass
                         else:
-                            NextObject = -1
+                            block_array.remove(block)
+                        
+                if len(block_array) > 0:
+                    #Sort blocks by size
                     
-                    if NextObject > -1:
-                        signature = Utils.Pixy.output[NextObject].m_signature
+                    block_array.sort(key=lambda x: x['size'], reverse=True)
+                    
+                    nextBlock = block_array[0]
+                    
+                    nextBlock['distancex'] = nextBlock['mx'] - coordinates_self[0]
+                    nextBlock['distancey'] = nextBlock['my'] - coordinates_self[1]
+                    nextBlock['distance'] = math.sqrt(nextBlock['distancex']**2 + nextBlock['distancey']**2)
+                    if nextBlock['distancex'] < 0:
+                        nextBlock['distance'] = nextBlock['distance'] * -1
+                    
+                    if nextBlock['color'] == "red":
+                        desired_distance_to_block = -1000      
+                    elif nextBlock['color'] == "green":
+                        desired_distance_to_block = 1000
                         
-                        Utils.EspHoldDistance.write(f"KP{2}\n".encode())
-                        KPNormal = False
-                        time.sleep(0.1)
-                        Utils.LogDebug(f"Signature: {signature}")
+                    error = desired_distance_to_block - nextBlock['distance']
+                    desired_distance_wall = 50 - error * BlockKP
+                    
+                    if desired_distance_wall < 5:
+                        desired_distance_wall = 5  
+                    elif desired_distance_wall > 95:
+                        desired_distance_wall = 95
                         
-                        #Green Block
-                        if signature == 1:
-                            Lane = 0
-                        #Red Block
-                        elif signature == 2:
-                            Lane = 2
-                        #No Block found
-                        else:
-                            Lane = 1
+                        print(desired_distance_wall)
 
-                        TIMEOUTPixy = time.time() + BlockWaitTime
+                    if desired_distance_wall > 50:
+                        desired_distance_wall = (desired_distance_wall - 100) * -1
+                        print(desired_distance_wall)
+                            
+                        #Send ESPHoldDistance new Distance
+                        if desired_distance_wall != old_desired_distance_wall:
+                            Utils.EspHoldDistance.write(f"D{desired_distance_wall}\n".encode())
+                            print(f"New Distance {desired_distance_wall}")
+                            old_desired_distance_wall = desired_distance_wall
                         
+                        #Send ESPHoldDistance new Sensor
+                        if Sensor != 2:
+                            Sensor = 2
+                            Utils.EspHoldDistance.write(f"S1\n".encode())
+                            print("Switched to Sensor 1")
+                            
                     else:
-                        Lane = 1
-                        TIMEOUTPixy = time.time() + WaitTime
-
-                else:
-                    Lane = 1
-                    TIMEOUTPixy = time.time() + WaitTime
-              
+                        if desired_distance_wall != old_desired_distance_wall:
+                            Utils.EspHoldDistance.write(f"D{desired_distance_wall}\n".encode())
+                            print(f"New Distance {desired_distance_wall}")
+                            old_desired_distance_wall = desired_distance_wall
+                        
+                        if Sensor != 1:
+                            Sensor = 1
+                            Utils.EspHoldDistance.write(f"S2\n".encode())
+                            print("Switched to Sensor 2")
+                        
+                        
             #check for direction
             if Utils.EspHoldDistance.in_waiting > 0:
                 response = Utils.EspHoldDistance.read(Utils.EspHoldDistance.in_waiting).decode()
@@ -216,10 +194,26 @@ def HoldLane(Utils, YCutOffTop=200, YCutOffBottom=0, BlockWaitTime=2, WaitTime=0
 ##########################################################
 if __name__ == "__main__":
     try: 
-        GPIO.setmode(GPIO.BCM)
+        #start flask server if needed
+        if Cam.video_stream:
+            app = Flask(__name__)
+            
+            @app.route('/')
+            def index():
+                return render_template('index.html')
+
+
+            @app.route('/video_feed')
+            def video_feed():
+                return Response(Cam.video_frames(),
+                                mimetype='multipart/x-mixed-replace; boundary=frame')
+
+            # Run the server in a separate thread
+            server_thread = Thread(target=app.run, kwargs={'host':'0.0.0.0', 'threaded':True})
+            server_thread.start()
+                
         Utils.StartRun()
-        Pixy.LED(1)
-        HoldLane(Utils, SIZE=200, colorTemperature=2000)
+        HoldLane(Utils)
     
     except Exception as e:
         Utils.LogError(e)

@@ -1,9 +1,6 @@
-import RPi.GPIO as GPIO
+import gpiod
 import time
 import threading
-from ctypes import *
-from pixy import *
-import pixy
 import board, adafruit_tcs34725, adafruit_mpu6050
 import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
@@ -18,7 +15,25 @@ import multiprocessing as mp
 import logging
 import serial
 import subprocess
+from flask import Flask, render_template, Response
+import cv2
+import numpy as np
+from picamera2 import Picamera2
+from libcamera import controls
 
+
+
+##########################################################
+##                                                      ##
+##                   GPIO init                          ##
+##                                                      ##
+##########################################################
+
+global chip, all_lines
+
+chip = gpiod.Chip('gpiochip4')
+
+all_lines = []
 
 
 ##########################################################
@@ -81,8 +96,10 @@ class Utility:
         #Wait a short time to make sure all threads are stopped
         self.Buzzer1.buzz(1000, 80, 0.5)
         
-        #GPIO cleanup and Program exit
-        GPIO.cleanup()
+        #Clear all used lines
+        for line in all_lines:
+            line.release()
+        
         self.running = False
         
         time.sleep(0.1)
@@ -107,14 +124,9 @@ class Utility:
         if self.StopButton != None:
             p2 = mp.Process(target=self.StopButton.start_StopButton())
             p2.start()
-        """
-        if self.Farbsensor != None:
-            p3 = mp.Process(target=self.Farbsensor.start_measurement())
-            p3.start()
-        """
         if self.Pixy != None:
-            p4 = mp.Process(target=self.Pixy.start_reading())
-            p4.start()
+            p3 = mp.Process(target=self.Pixy.start_reading())
+            p3.start()
 
         #Wait for StartButton to be pressed
         self.running = True
@@ -193,7 +205,7 @@ class Utility:
 
             
             #Create file handler and set level to debug
-            fh = logging.FileHandler("DataLog.log", 'w')
+            fh = logging.FileHandler("/tmp/DataLog.log", 'w')
             fh.setLevel(logging.DEBUG)
             self.datalogger.addHandler(fh)
 
@@ -210,7 +222,7 @@ class Utility:
     #Log Sensor values
     def LogData(self):
         try:
-            self.datalogger.debug(f"Farbsensor; {self.Farbsensor.color_temperature};  CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}; Voltage; {self.ADC.voltage}")
+            self.datalogger.debug(f"Farbsensor; {0};  CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}; Voltage; {self.ADC.voltage}")
         except Exception as e:
             self.LogError(f"An Error occured in Utility.LogData: {e}")
             self.StopRun()
@@ -438,85 +450,595 @@ class Utility:
                     self.StopRun()
         
         time.sleep(0.1)
-        
     
-#Class for the drive Motor
-class Motor(Utility):
-    def __init__(self, frequency, fpin, rpin, spin, Utils):
+        
+        
+#A class for reading a Button; A Button that instantly stops the program if pressed            
+class Button(Utility):
+    def __init__(self, SignalPin, Utils):
         try:
-            #Setup Variables
-            self.frequency, self.fpin, self.rpin, self.spin, self.speed = frequency, fpin, rpin, spin, 0
+            #Variables
+            self.SignalPin = SignalPin
             self.Utils = Utils
+            
             #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(fpin, GPIO.OUT)
-            GPIO.setup(rpin, GPIO.OUT)
-            GPIO.setup(spin, GPIO.OUT)
+            self.button_line = chip.get_line(SignalPin)
+            self.button_line.request(consumer='Button', type=gpiod.LINE_REQ_DIR_IN, flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP)
             
-            self.pwm = GPIO.PWM(self.spin, self.frequency)
-            self.MotorSpeed = 0
+            all_lines.append(self.button_line)
             
         except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor initialization: {e}")
-            self.Utils.StopRun()
-
-
-    #Set the direction and speed of the Motor
-    def drive(self, direction="f", speed=0):
-        try:
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.fpin, GPIO.OUT)
-            GPIO.setup(self.rpin, GPIO.OUT)
-
-            self.speed = speed
-            
-            #Set direction
-            if direction == 'f':
-                GPIO.output(self.fpin, 1)
-                GPIO.output(self.rpin, 0)
-            elif direction == 'r':
-                GPIO.output(self.fpin, 0)
-                GPIO.output(self.rpin, 1)
-            else:
-                self.Utils.LogError(f"No valid direction specified: {direction}")
-                raise CustomException(f"No valid direction specified: {direction}")
-
-            #Set speed
-            self.pwm.ChangeDutyCycle(speed)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor.drive: {e}")
-            self.Utils.StopRun()
-
-       
-    #Start the Motor with the last known speed        
-    def start(self):
-        try:
-            self.pwm.start(self.speed)  
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor.start: {e}")
-            self.Utils.StopRun()
-       
-       
-    #Stop the Motor        
-    def stop(self):
-        try:
-            GPIO.setmode(GPIO.BCM)
-            GPIO.output(self.fpin, 0) 
-            GPIO.output(self.rpin, 0)
-            self.pwm.stop()
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor.stop: {e}")
+            self.Utils.LogError(f"An Error occured in Button initialization: {e}")
             self.Utils.StopRun()
         
     
-    #Set a motor speed that gets controlled by the Speed Sensor, if it was started   
-    def setMotorSpeed(self, Speed):
-        self.drive("f", 100)
-        time.sleep(0.01)
-        self.MotorSpeed = Speed
+    #Read the state of the Button -- 1 if pressed, 0 if not    
+    def state(self):
+        try:    
+            #Read button state
+            if self.button_line.get_value() == 0:
+                return 1
+            elif self.button_line.get_value() == 1:
+                return 0
         
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Button.state: {e}")
+            self.Utils.StopRun()
+      
+    
+    #Start the Thread for reading the StopButton    
+    def start_StopButton(self):
+        try:
+            self.threadStop = 0
+            self.thread = threading.Thread(target=self.read_StopButton, daemon=True)
+            self.thread.start()
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Button.start_StopButton: {e}")
+            self.Utils.StopRun()
+        
+    
+    #Function that kills the program if the StopButton is pressed    
+    def read_StopButton(self):
+        #Stop program if stopbutton is pressed
+        while self.threadStop == 0:
+            StartTime = time.time()
+            time.sleep(0.1)
+            if self.state() == 1:
+                self.Utils.LogError("StopButton pressed")
+                self.Utils.StopRun()
+            StopTime = time.time()
+          
+    #Stop the Thread for reading the StopButton      
+    def stop_StopButton(self):
+        try:
+            self.threadStop = 1
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Button.stop_StopButton: {e}")
+            self.Utils.StopRun()
+     
+     
+        
+#A class for reading a TCS34725 ColorSensor         
+class ColorSensor(Utility):
+    def __init__(self, Utils):
+        try:
+            #Variable init
+            self.color_rgb, self.color_temperature, self.lux = 0, 0, 0
+            self.Utils = Utils
+            
+            #Colorsensor init
+            i2c = board.I2C()
+            self.sensor = adafruit_tcs34725.TCS34725(i2c)
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in ColorSensor initialization: {e}")
+            self.Utils.StopRun()
+            
+    
+    #Start a new thread for reading the sensor        
+    def start_measurement(self):
+        try:
+            self.sensor.active = True
+            self.threadStop = 0
+            self.thread = threading.Thread(target=self.read, daemon=True)
+            self.thread.start()
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in ColorSensor.start_measurement: {e}")
+            self.Utils.StopRun()
+        
+        
+    #Read the sensor data    
+    def read(self):
+        try:
+            #Write sensor data to variables
+            while self.threadStop == 0:
+                self.color_temperature = self.sensor.color_temperature
+                #self.color_rgb = self.sensor.color_rgb_bytes
+                #self.lux = self.sensor.lux
+                
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in ColorSensor.read: {e}")
+            self.Utils.StopRun()
+        
+    
+    #Stop the thread for reading the sensor   
+    def stop_measurement(self):
+        try:
+            self.sensor.active = False
+            self.threadStop = 1
+        
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in ColorSensor.stop_measurement: {e}")
+            self.Utils.StopRun()
+        
+        
+
+#A class for reading a MPU6050 Gyroscope
+class Gyroscope(Utility):
+    def __init__(self, Utils):
+        try:
+            i2c = busio.I2C(board.D1, board.D0)
+            self.sensor = adafruit_mpu6050.MPU6050(i2c)
+            self.sensor._gyro_range = 0
+            self.Utils = Utils
+            
+            self.threadStop = 0
+
+            #Initialize variables for storing the angle and time
+            self.angle = 0.0  # Initial angle
+            self.last_time = time.time()
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Gyroscope initialization: {e}")
+            self.Utils.StopRun()
+
+
+    #Read the gyroscope data and calculate the angle
+    def get_angle(self):
+        while self.threadStop == 0:
+            try:
+                offset_x = 0.29
+                offset_y = 0.0
+                offset_z = 0.0
+                #Read gyroscope data
+                gyro_data = self.sensor.gyro
+                gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
+
+                # Get the current time
+                current_time = time.time()
+
+                # Calculate the time elapsed since the last measurement
+                delta_time = current_time - self.last_time
+                
+                #bugfix for time-jumps
+                if delta_time >= 0.5:
+                    delta_time = 0.003
+
+                # Integrate the gyroscope readings to get the change in angle
+                if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
+                    gyro_data = 0
+                else:
+                    gyro_data = gyro_data[0]
+                    
+                delta_angle = gyro_data * delta_time * 60
+
+                # Update the angle
+                self.angle += delta_angle
+
+                # Update the last time for the next iteration
+                self.last_time = current_time
+        
+            except Exception as e:
+                self.Utils.LogError(f"An Error occured in Gyroscope.get_angle: {e}")
+                self.Utils.StopRun()
+    
+        
+
+#A class for reading a ADS1015 ADC        
+class AnalogDigitalConverter(Utility):
+    def __init__(self, Utils, channel=2):
+        try:
+            #Variables
+            self.channel = channel
+            self.voltage = 12
+            
+            #ADC init
+            i2c = busio.I2C(board.D1, board.D0)
+            self.ads = ADS.ADS1015(i2c)
+            self.ads.active = True
+            self.Utils = Utils
+            
+            #Channel init
+            if channel == 0:
+                self.chan = AnalogIn(self.ads, ADS.P0)
+            elif channel == 1:
+                self.chan = AnalogIn(self.ads, ADS.P1)
+            elif channel == 2:
+                self.chan = AnalogIn(self.ads, ADS.P2)
+            elif channel == 3:
+                self.chan = AnalogIn(self.ads, ADS.P3)
+            else:
+                raise CustomException(f"No valid ADC channel specified: {channel}")
+        
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in AnalogDigitalConverter initialization: {e}")
+            self.Utils.StopRun()
+       
+    
+    #Read the voltage from the ADC    
+    def read(self):
+        self.voltage = self.chan.voltage * 4.395
+        return self.chan.voltage * 4.395
+
+
+    
+#A class for writing to a OLED Display
+class DisplayOled(Utility):
+    def __init__(self, ADC=None, Gyro=None, Farbsensor=None, Utils=None):
+        try:
+            serial = i2c(port=0, address=0x3C)
+            self.device = sh1106(serial)
+            
+            #Variable init
+            self.first_line = ""
+            self.second_line = ""
+            self.ADC = ADC
+            self.Utils = Utils
+            self.Gyro = Gyro
+            self.ColorSensor = Farbsensor
+            
+            #Wake the screen by drawing an outline
+            with canvas(self.device) as draw:
+                draw.rectangle(self.device.bounding_box, outline="white", fill="black")
+        
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in DisplayOled initialization: {e}")
+            self.Utils.StopRun()
+        
+       
+    #Clear the Display 
+    def clear(self):
+        try:
+            with canvas(self.device) as draw:
+                draw.rectangle(self.device.bounding_box, outline="white", fill="black")
+                
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in DisplayOled.clear: {e}")
+            self.Utils.StopRun()
+       
+    
+    #Write lines in variables so they get written by the update function   
+    def write(self, first_line="", second_line="", reset=False, xCoord=0, yCoord=17):
+        try:
+            if reset:
+                self.first_line = ""
+                self.second_line = ""
+            
+            if first_line != "":
+                self.first_line = first_line
+            if second_line != "":
+                self.second_line = second_line
+        
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in DisplayOled.write: {e}")
+            self.Utils.StopRun()
+        
+
+    #Start a new thread for updating the Display
+    def start_update(self):
+        try:
+            self.threadStop = 0
+            self.thread1 = threading.Thread(target=self.update, daemon=True)
+            self.thread1.start()
+            
+            if self.Gyro != None:
+                self.Gyro.threadStop = 0
+                self.thread2 = threading.Thread(target=self.Gyro.get_angle, daemon=True)
+                self.thread2.start()
+            
+            if self.ColorSensor != None:
+                self.ColorSensor.threadStop = 0
+                self.thread3 = threading.Thread(target=self.ColorSensor.read, daemon=True)
+                self.thread3.start()
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in DisplayOled.start_update: {e}")
+            self.Utils.StopRun()
+
+    
+    #Update the Display
+    def update(self):
+        while self.threadStop == 0:
+            try:
+                #Get CPU temperature, CPU usage, RAM usage and Disk usage
+                cpuTemp = CPUTemperature()
+                self.cpu_usage = psutil.cpu_percent(interval=0)
+                self.ram = psutil.virtual_memory()
+                self.disk = psutil.disk_usage('/')
+                
+                #Format them to always have the same number of decimal points
+                cpu_temp_formatted = self.convert_to_decimal_points(cpuTemp.temperature, 1)
+                cpu_usage_formatted = self.convert_to_decimal_points(self.cpu_usage, 1)
+                ram_usage_formatted = self.convert_to_decimal_points(self.ram.percent, 1)
+                disk_usage_formatted = self.convert_to_decimal_points(self.disk.percent, 1)
+                voltage_value_formatted = self.convert_to_decimal_points(self.ADC.read(), 2)
+                
+                #Draw all the data on the Display
+                with canvas(self.device) as draw:
+                        #top
+                        draw.text((0, 0), f"{cpu_temp_formatted}°C", fill="white", align="left")
+                        draw.text((40, 0), f"DISK:{(int(float(disk_usage_formatted)))}%", fill="white")
+                        draw.text((92, 0), f"{voltage_value_formatted}V", fill="white")
+                        
+                        #bottom
+                        draw.text((0, 50), f"CPU:{cpu_usage_formatted}%", fill="white")
+                        draw.text((75, 50), f"RAM:{ram_usage_formatted}%", fill="white")
+                        
+                        #custom
+                        draw.multiline_text((0, 15), f"{self.first_line}\n{self.second_line}", fill="white", align="center", anchor="ma")
+                        
+                time.sleep(2)
+                    
+            except Exception as e:
+                self.Utils.LogError(f"An Error occured in DisplayOled.update: {e}")
+                self.Utils.StopRun()
+         
+    
+    #Stop the thread for updating the Display      
+    def stop_update(self):
+        try:
+            self.threadStop = 1
+            
+            if self.Gyro != None:
+                self.Gyro.threadStop = 1
+                
+            if self.ColorSensor != None:
+                self.ColorSensor.threadStop = 1
+
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in DisplayOled.stop_update: {e}")
+            self.Utils.StopRun()
+
+
+
+#A class for making sounds with a Buzzer
+class Buzzer(Utility):
+    def __init__(self, SignalPin, Utils):
+        try:
+            self.Utils = Utils
+            self.SignalPin = chip.get_line(SignalPin)
+            self.SignalPin.request(consumer='buzzer', type=gpiod.LINE_REQ_DIR_OUT)
+            
+            all_lines.append(self.SignalPin)
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Buzzer initialization: {e}")
+            self.Utils.StopRun()
+            
+    def buzz(self, frequency, volume, duration):
+        try:
+            # Check if the volume value is greater than the frequency
+            if volume > frequency:
+                volume = frequency
+
+            period = 1.0 / frequency  # Calculate the period of the frequency
+            on_time = period * volume / 100  # Calculate the time the signal should be on
+            off_time = period - on_time  # Calculate the time the signal should be off
+
+            end_time = time.time() + duration
+            while time.time() < end_time:
+                self.SignalPin.set_value(1)
+                time.sleep(on_time)
+                self.SignalPin.set_value(0)
+                time.sleep(off_time)
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Buzzer.buzz: {e}")
+            self.Utils.StopRun()
+
+
+
+#A class for detecting red and green blocks in the camera stream           
+class Camera():
+    def __init__(self, video_stream=False, video_source=0):
+        self.frame = None
+        self.frame_lock = threading.Lock()
+        
+        self.video_stream = video_stream
+        
+        self.picam2 = Picamera2()
+
+        config = self.picam2.create_still_configuration(main={"size": (1280, 720)}, raw={"size": (1280, 720)}, controls={"FrameRate": 34})
+        self.picam2.configure(config)
+
+        self.picam2.start()
+        self.picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
+        
+        # Define the color ranges for green and red
+        self.lower_green = np.array([35, 60, 35])
+        self.upper_green = np.array([85, 255, 255])
+
+        self.lower_red1 = np.array([0, 200, 100])
+        self.upper_red1 = np.array([10, 255, 180])
+
+        self.lower_red2 = np.array([160, 200, 100])
+        self.upper_red2 = np.array([180, 255, 180])
+
+        self.kernel = np.ones((5, 5), np.uint8)
+
+        
+    #Get the coordinates of the blocks in the camera stream
+    def get_coordinates(self):
+        frame = self.picam2.capture_array()
+        
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # Convert the image from BGR to HSV
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        # Create a mask of pixels within the green color range
+        mask_green = cv2.inRange(hsv, self.lower_green, self.upper_green)
+
+        # Create a mask of pixels within the red color range
+        mask_red1 = cv2.inRange(hsv, self.lower_red1, self.upper_red1)
+        mask_red2 = cv2.inRange(hsv, self.lower_red2, self.upper_red2)
+        mask_red = cv2.bitwise_or(mask_red1, mask_red2)
+
+        # Dilate the masks to merge nearby areas
+        mask_green = cv2.dilate(mask_green, self.kernel, iterations=1)
+        mask_red = cv2.dilate(mask_red, self.kernel, iterations=1)
+
+        # Find contours in the green mask
+        contours_green, _ = cv2.findContours(mask_green, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Find contours in the red mask
+        contours_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        cv2.circle(frame, (640, 720), 10, (255, 0, 0), -1)
+        
+        block_array = []
+
+        # Process each green contour
+        for contour in contours_green:
+            x, y, w, h = cv2.boundingRect(contour)
+            if w > 20 and h > 50:  # Only consider boxes larger than 50x50
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                cv2.putText(frame, 'Green Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
+                block_array.append({'color': 'green', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
+                cv2.line(frame, (640, 720), (int(x+w/2), int(y+h/2)), (0, 255, 0), 2)
+
+        # Process each red contour
+        for contour in contours_red:
+            x, y, w, h = cv2.boundingRect(contour)
+            if w > 20 and h > 50:  # Only consider boxes larger than 50x50
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 255), 2)
+                cv2.putText(frame, 'Red Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
+                block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
+                cv2.line(frame, (640, 720), (int(x+w/2), int(y+h/2)), (0, 0, 255), 2)
+                
+        return block_array, frame
+        
+        
+    #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
+    def process_blocks(self):
+        while True:
+            self.block_array, self.frame = self.get_coordinates()
+     
+          
+    #Start a new thread for processing the camera stream          
+    def start_processing(self):
+        thread = threading.Thread(target=self.process_blocks)
+        thread.daemon = False
+        thread.start()
+      
+        
+    #Generate the frames for the webstream
+    def video_frames(self):
+        if self.video_stream:
+            while True:
+                with self.frame_lock:
+                    if self.frame is not None:
+                        (flag, encodedImage) = cv2.imencode(".jpg", self.frame)
+                        yield (b'--frame\r\n'
+                                b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
+                    else:
+                        yield (b'--frame\r\n'
+                                b'Content-Type: image/jpeg\r\n\r\n' + b'\r\n')
+
+
+   
+##########################################################
+##                                                      ##
+##                 Old-Classes                          ##
+##                                                      ##
+##########################################################
+
+#A class for reading a LM393 speed sensor
+class SpeedSensor(Utility):
+    def __init__(self, SignalPin, NumberSlots, Utils, P=1):
+        try:
+            #Variables
+            self.SignalPin = SignalPin
+            self.speed = 0
+            self.NumSlots = NumberSlots
+            self.Utils = Utils
+            self.P = P
+            
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(SignalPin, GPIO.IN)
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in SpeedSensor initialization: {e}")
+            self.Utils.StopRun()
+            
+    
+    #Start a new thread for measuring the sensor
+    def start_measurement(self):
+        try:
+            GPIO.setmode(GPIO.BCM)
+            self.threadStop = 0
+            self.thread = threading.Thread(target=self.hold_speed, daemon=True, args=(self.Utils, self.NumSlots,))
+            self.thread.start()
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in SpeedSensor.start_measurement: {e}")
+            self.Utils.StopRun()
+            
+    
+    #Measure the speed with the sensor
+    def hold_speed(self, Utils, NumSlots):
+        try:
+            GPIO.setmode(GPIO.BCM)
+            self.Utils = Utils
+            PulseTime = time.time()
+            lastPulseTime = 0
+            GPIO.setup(self.SignalPin, GPIO.IN)
+            
+            while self.threadStop == 0:
+                try:
+                    if self.Utils.Motor1.MotorSpeed != 0:
+                        GPIO.wait_for_edge(self.SignalPin, GPIO.FALLING)
+                            
+                        #GPIO setup
+                        #GPIO.setmode(GPIO.BCM)
+                        
+                        #Measure speed
+                        GPIO.wait_for_edge(self.SignalPin, GPIO.RISING)
+                        PulseTime = time.time()
+                            
+                        self.speed = (60 * 1000) / (NumSlots * (PulseTime - lastPulseTime)) / 100000 * 1.5
+                        lastPulseTime = PulseTime
+                        
+                        Error = self.speed - self.Utils.Motor1.MotorSpeed
+                        Correction = self.P * Error * -1
+                        
+                        if Correction > 100:
+                            Correction = 100
+                        elif Correction < 0:
+                            Correction = 0
+                            
+                        self.Utils.Motor1.drive('f', Correction)
+                        
+                except Exception as e:
+                    self.Utils.LogError(f"An Error occured in SpeedSensor.hold_speed: {e}")
+                    self.Utils.StopRun()
+                
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in SpeedSensor.hold_speed: {e}")
+            self.Utils.StopRun()
+        
+      
+    #Stop the thread for measuring the sensor  
+    def stop_measurement(self):
+        try:
+            self.threadStop = 1
+        
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in SpeedSensor.stop_measurement: {e}")
+            self.Utils.StopRun()
+
 
 
 #Class for reading a SuperSonicSensor
@@ -622,8 +1144,125 @@ class SuperSonicSensor(Utility):
         except Exception as e:
             self.Utils.LogError(f"An Error occured in SuperSonicSensor.stop_measurement: {e}")
             self.Utils.StopRun()
+
+
+
+#A class for reading the PixyCam ############################ WIP - may be abandoned #########################################            
+class PixyCam(Utility):
+    def __init__(self, Utils):
+        self.count, self.output = 0, ()
+        self.Utils = Utils
+        pixy.init()
+        pixy.change_prog ("color_connected_components");        
         
         
+    def start_reading(self):
+        self.threadStop = 0
+        self.thread = threading.Thread(target=self.read, daemon=True)
+        self.thread.start()
+       
+        
+    def read(self):
+        self.output = BlockArray(100)
+            
+        while self.threadStop == 0:
+            time.sleep(0.01)
+            self.count = pixy.ccc_get_blocks(100, self.output)
+       
+            
+    def stop_reading(self):
+        self.threadStop = 1
+      
+        
+    def LED(self, state):
+        if state == 1:
+            set_lamp(1, 1)
+        elif state == 0:
+            set_lamp(0, 0)
+        else:
+            self.Utils.LogError(f"no valid state specified: {state}")
+            raise CustomException(f"no valid state specified: {state}")
+      
+ 
+      
+#Class for the drive Motor
+class Motor(Utility):
+    def __init__(self, frequency, fpin, rpin, spin, Utils):
+        try:
+            #Setup Variables
+            self.frequency, self.fpin, self.rpin, self.spin, self.speed = frequency, fpin, rpin, spin, 0
+            self.Utils = Utils
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(fpin, GPIO.OUT)
+            GPIO.setup(rpin, GPIO.OUT)
+            GPIO.setup(spin, GPIO.OUT)
+            
+            self.pwm = GPIO.PWM(self.spin, self.frequency)
+            self.MotorSpeed = 0
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Motor initialization: {e}")
+            self.Utils.StopRun()
+
+
+    #Set the direction and speed of the Motor
+    def drive(self, direction="f", speed=0):
+        try:
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(self.fpin, GPIO.OUT)
+            GPIO.setup(self.rpin, GPIO.OUT)
+
+            self.speed = speed
+            
+            #Set direction
+            if direction == 'f':
+                GPIO.output(self.fpin, 1)
+                GPIO.output(self.rpin, 0)
+            elif direction == 'r':
+                GPIO.output(self.fpin, 0)
+                GPIO.output(self.rpin, 1)
+            else:
+                self.Utils.LogError(f"No valid direction specified: {direction}")
+                raise CustomException(f"No valid direction specified: {direction}")
+
+            #Set speed
+            self.pwm.ChangeDutyCycle(speed)
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Motor.drive: {e}")
+            self.Utils.StopRun()
+
+       
+    #Start the Motor with the last known speed        
+    def start(self):
+        try:
+            self.pwm.start(self.speed)  
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Motor.start: {e}")
+            self.Utils.StopRun()
+       
+       
+    #Stop the Motor        
+    def stop(self):
+        try:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.output(self.fpin, 0) 
+            GPIO.output(self.rpin, 0)
+            self.pwm.stop()
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Motor.stop: {e}")
+            self.Utils.StopRun()
+        
+    
+    #Set a motor speed that gets controlled by the Speed Sensor, if it was started   
+    def setMotorSpeed(self, Speed):
+        self.drive("f", 100)
+        time.sleep(0.01)
+        self.MotorSpeed = Speed
+        
+           
 
 #A class for controlling the Servo that is used for steering        
 class Servo(Utility):
@@ -663,506 +1302,4 @@ class Servo(Utility):
             
         except Exception as e:
             self.Utils.LogError(f"An Error occured in Servo.steer: {e}")
-            self.Utils.StopRun()
-            
-         
-
-#A class for reading the PixyCam ############################ WIP #########################################            
-class PixyCam(Utility):
-    def __init__(self, Utils):
-        self.count, self.output = 0, ()
-        self.Utils = Utils
-        pixy.init()
-        pixy.change_prog ("color_connected_components");        
-        
-        
-    def start_reading(self):
-        self.threadStop = 0
-        self.thread = threading.Thread(target=self.read, daemon=True)
-        self.thread.start()
-       
-        
-    def read(self):
-        self.output = BlockArray(100)
-            
-        while self.threadStop == 0:
-            time.sleep(0.01)
-            self.count = pixy.ccc_get_blocks(100, self.output)
-       
-            
-    def stop_reading(self):
-        self.threadStop = 1
-      
-        
-    def LED(self, state):
-        if state == 1:
-            set_lamp(1, 1)
-        elif state == 0:
-            set_lamp(0, 0)
-        else:
-            self.Utils.LogError(f"no valid state specified: {state}")
-            raise CustomException(f"no valid state specified: {state}")
-            
-       
-
-#A class for reading a Button; A Button that instantly stops the program if pressed            
-class Button(Utility):
-    def __init__(self, SignalPin, Utils):
-        try:
-            #Variables
-            self.SignalPin = SignalPin
-            self.Utils = Utils
-            
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Button initialization: {e}")
-            self.Utils.StopRun()
-        
-    
-    #Read the state of the Button -- 1 if pressed, 0 if not    
-    def state(self):
-        try:
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-            
-            #Read button state
-            if GPIO.input(self.SignalPin) == 0:
-                return 1
-            elif GPIO.input(self.SignalPin) == 1:
-                return 0
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Button.state: {e}")
-            self.Utils.StopRun()
-      
-    
-    #Start the Thread for reading the StopButton    
-    def start_StopButton(self):
-        try:
-            self.threadStop = 0
-            self.thread = threading.Thread(target=self.read_StopButton, daemon=True)
-            self.thread.start()
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Button.start_StopButton: {e}")
-            self.Utils.StopRun()
-        
-    
-    #Function that kills the program if the StopButton is pressed    
-    def read_StopButton(self):
-        #GPIO setup
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        
-        #Stop program if stopbutton is pressed
-        while self.threadStop == 0:
-            StartTime = time.time()
-            time.sleep(0.1)
-            if self.state() == 1:
-                self.Utils.LogError("StopButton pressed")
-                self.Utils.StopRun()
-            StopTime = time.time()
-          
-    #Stop the Thread for reading the StopButton      
-    def stop_StopButton(self):
-        try:
-            self.threadStop = 1
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Button.stop_StopButton: {e}")
-            self.Utils.StopRun()
-     
-     
-        
-#A class for reading a TCS34725 ColorSensor         
-class ColorSensor(Utility):
-    def __init__(self, Utils):
-        try:
-            #Variable init
-            self.color_rgb, self.color_temperature, self.lux = 0, 0, 0
-            self.Utils = Utils
-            
-            #Colorsensor init
-            i2c = board.I2C()
-            self.sensor = adafruit_tcs34725.TCS34725(i2c)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in ColorSensor initialization: {e}")
-            self.Utils.StopRun()
-            
-    
-    #Start a new thread for reading the sensor        
-    def start_measurement(self):
-        try:
-            self.sensor.active = True
-            self.threadStop = 0
-            self.thread = threading.Thread(target=self.read, daemon=True)
-            self.thread.start()
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in ColorSensor.start_measurement: {e}")
-            self.Utils.StopRun()
-        
-        
-    #Read the sensor data    
-    def read(self):
-        try:
-            #Write sensor data to variables
-            while self.threadStop == 0:
-                self.color_temperature = self.sensor.color_temperature
-                #self.color_rgb = self.sensor.color_rgb_bytes
-                #self.lux = self.sensor.lux
-                
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in ColorSensor.read: {e}")
-            self.Utils.StopRun()
-        
-    
-    #Stop the thread for reading the sensor   
-    def stop_measurement(self):
-        try:
-            self.sensor.active = False
-            self.threadStop = 1
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in ColorSensor.stop_measurement: {e}")
-            self.Utils.StopRun()
-        
-        
-
-#A class for reading a MPU6050 Gyroscope ############################ WIP #########################################  
-class Gyroscope(Utility):
-    def __init__(self, Utils):
-        try:
-            i2c = busio.I2C(board.D1, board.D0)
-            self.sensor = adafruit_mpu6050.MPU6050(i2c)
-            self.sensor._gyro_range = 0
-            self.Utils = Utils
-            
-            self.threadStop = 0
-
-            #Initialize variables for storing the angle and time
-            self.angle = 0.0  # Initial angle
-            self.last_time = time.time()
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Gyroscope initialization: {e}")
-            self.Utils.StopRun()
-
-
-    #Read the gyroscope data and calculate the angle
-    def get_angle(self):
-        while self.threadStop == 0:
-            try:
-                offset_x = 0.29
-                offset_y = 0.0
-                offset_z = 0.0
-                #Read gyroscope data
-                gyro_data = self.sensor.gyro
-                gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
-
-                # Get the current time
-                current_time = time.time()
-
-                # Calculate the time elapsed since the last measurement
-                delta_time = current_time - self.last_time
-                
-                #bugfix for time-jumps
-                if delta_time >= 0.5:
-                    delta_time = 0.003
-
-                # Integrate the gyroscope readings to get the change in angle
-                if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
-                    gyro_data = 0
-                else:
-                    gyro_data = gyro_data[0]
-                    
-                delta_angle = gyro_data * delta_time * 60
-
-                # Update the angle
-                self.angle += delta_angle
-
-                # Update the last time for the next iteration
-                self.last_time = current_time
-        
-            except Exception as e:
-                self.Utils.LogError(f"An Error occured in Gyroscope.get_angle: {e}")
-                self.Utils.StopRun()
-    
-        
-
-#A class for reading a ADS1015 ADC        
-class AnalogDigitalConverter(Utility):
-    def __init__(self, Utils, channel=2):
-        try:
-            #Variables
-            self.channel = channel
-            self.voltage = 12
-            
-            #ADC init
-            i2c = busio.I2C(board.D1, board.D0)
-            self.ads = ADS.ADS1015(i2c)
-            self.ads.active = True
-            self.Utils = Utils
-            
-            #Channel init
-            if channel == 0:
-                self.chan = AnalogIn(self.ads, ADS.P0)
-            elif channel == 1:
-                self.chan = AnalogIn(self.ads, ADS.P1)
-            elif channel == 2:
-                self.chan = AnalogIn(self.ads, ADS.P2)
-            elif channel == 3:
-                self.chan = AnalogIn(self.ads, ADS.P3)
-            else:
-                raise CustomException(f"No valid ADC channel specified: {channel}")
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in AnalogDigitalConverter initialization: {e}")
-            self.Utils.StopRun()
-       
-    
-    #Read the voltage from the ADC    
-    def read(self):
-        self.voltage = self.chan.voltage * 4.395
-        return self.chan.voltage * 4.395
-
-
-
-#A class for reading a LM393 speed sensor
-class SpeedSensor(Utility):
-    def __init__(self, SignalPin, NumberSlots, Utils, P=1):
-        try:
-            #Variables
-            self.SignalPin = SignalPin
-            self.speed = 0
-            self.NumSlots = NumberSlots
-            self.Utils = Utils
-            self.P = P
-            
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(SignalPin, GPIO.IN)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SpeedSensor initialization: {e}")
-            self.Utils.StopRun()
-            
-    
-    #Start a new thread for measuring the sensor
-    def start_measurement(self):
-        try:
-            GPIO.setmode(GPIO.BCM)
-            self.threadStop = 0
-            self.thread = threading.Thread(target=self.hold_speed, daemon=True, args=(self.Utils, self.NumSlots,))
-            self.thread.start()
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SpeedSensor.start_measurement: {e}")
-            self.Utils.StopRun()
-            
-    
-    #Measure the speed with the sensor
-    def hold_speed(self, Utils, NumSlots):
-        try:
-            GPIO.setmode(GPIO.BCM)
-            self.Utils = Utils
-            PulseTime = time.time()
-            lastPulseTime = 0
-            GPIO.setup(self.SignalPin, GPIO.IN)
-            
-            while self.threadStop == 0:
-                try:
-                    if self.Utils.Motor1.MotorSpeed != 0:
-                        GPIO.wait_for_edge(self.SignalPin, GPIO.FALLING)
-                            
-                        #GPIO setup
-                        #GPIO.setmode(GPIO.BCM)
-                        
-                        #Measure speed
-                        GPIO.wait_for_edge(self.SignalPin, GPIO.RISING)
-                        PulseTime = time.time()
-                            
-                        self.speed = (60 * 1000) / (NumSlots * (PulseTime - lastPulseTime)) / 100000 * 1.5
-                        lastPulseTime = PulseTime
-                        
-                        Error = self.speed - self.Utils.Motor1.MotorSpeed
-                        Correction = self.P * Error * -1
-                        
-                        if Correction > 100:
-                            Correction = 100
-                        elif Correction < 0:
-                            Correction = 0
-                            
-                        self.Utils.Motor1.drive('f', Correction)
-                        
-                except Exception as e:
-                    self.Utils.LogError(f"An Error occured in SpeedSensor.hold_speed: {e}")
-                    self.Utils.StopRun()
-                
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SpeedSensor.hold_speed: {e}")
-            self.Utils.StopRun()
-        
-      
-    #Stop the thread for measuring the sensor  
-    def stop_measurement(self):
-        try:
-            self.threadStop = 1
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SpeedSensor.stop_measurement: {e}")
-            self.Utils.StopRun()
-        
-        
-        
-#A class for writing to a OLED Display
-class DisplayOled(Utility):
-    def __init__(self, ADC, Gyro, Farbsensor, Utils):
-        try:
-            serial = i2c(port=0, address=0x3C)
-            self.device = sh1106(serial)
-            
-            #Variable init
-            self.first_line = ""
-            self.second_line = ""
-            self.ADC = ADC
-            self.Utils = Utils
-            self.Gyro = Gyro
-            self.ColorSensor = Farbsensor
-            
-            #Wake the screen by drawing an outline
-            with canvas(self.device) as draw:
-                draw.rectangle(self.device.bounding_box, outline="white", fill="black")
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled initialization: {e}")
-            self.Utils.StopRun()
-        
-       
-    #Clear the Display 
-    def clear(self):
-        try:
-            with canvas(self.device) as draw:
-                draw.rectangle(self.device.bounding_box, outline="white", fill="black")
-                
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.clear: {e}")
-            self.Utils.StopRun()
-       
-    
-    #Write lines in variables so they get written by the update function   
-    def write(self, first_line="", second_line="", reset=False, xCoord=0, yCoord=17):
-        try:
-            if reset:
-                self.first_line = ""
-                self.second_line = ""
-            
-            if first_line != "":
-                self.first_line = first_line
-            if second_line != "":
-                self.second_line = second_line
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.write: {e}")
-            self.Utils.StopRun()
-        
-
-    #Start a new thread for updating the Display
-    def start_update(self):
-        try:
-            self.threadStop = 0
-            self.thread1 = threading.Thread(target=self.update, daemon=True)
-            self.thread1.start()
-            
-            self.Gyro.threadStop = 0
-            self.thread2 = threading.Thread(target=self.Gyro.get_angle, daemon=True)
-            self.thread2.start()
-            
-            self.ColorSensor.threadStop = 0
-            self.thread3 = threading.Thread(target=self.ColorSensor.read, daemon=True)
-            self.thread3.start()
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.start_update: {e}")
-            self.Utils.StopRun()
-
-    
-    #Update the Display
-    def update(self):
-        while self.threadStop == 0:
-            try:
-                #Get CPU temperature, CPU usage, RAM usage and Disk usage
-                cpuTemp = CPUTemperature()
-                self.cpu_usage = psutil.cpu_percent(interval=0)
-                self.ram = psutil.virtual_memory()
-                self.disk = psutil.disk_usage('/')
-                
-                #Format them to always have the same number of decimal points
-                cpu_temp_formatted = self.convert_to_decimal_points(cpuTemp.temperature, 1)
-                cpu_usage_formatted = self.convert_to_decimal_points(self.cpu_usage, 1)
-                ram_usage_formatted = self.convert_to_decimal_points(self.ram.percent, 1)
-                disk_usage_formatted = self.convert_to_decimal_points(self.disk.percent, 1)
-                voltage_value_formatted = self.convert_to_decimal_points(self.ADC.read(), 2)
-                
-                #Draw all the data on the Display
-                with canvas(self.device) as draw:
-                        #top
-                        draw.text((0, 0), f"{cpu_temp_formatted}°C", fill="white", align="left")
-                        draw.text((40, 0), f"DISK:{(int(float(disk_usage_formatted)))}%", fill="white")
-                        draw.text((92, 0), f"{voltage_value_formatted}V", fill="white")
-                        
-                        #bottom
-                        draw.text((0, 50), f"CPU:{cpu_usage_formatted}%", fill="white")
-                        draw.text((75, 50), f"RAM:{ram_usage_formatted}%", fill="white")
-                        
-                        #custom
-                        draw.multiline_text((0, 15), f"{self.first_line}\n{self.second_line}", fill="white", align="center", anchor="ma")
-                        
-                time.sleep(2)
-                    
-            except Exception as e:
-                self.Utils.LogError(f"An Error occured in DisplayOled.update: {e}")
-                self.Utils.StopRun()
-         
-    
-    #Stop the thread for updating the Display      
-    def stop_update(self):
-        try:
-            self.threadStop = 1
-            self.Gyro.threadStop = 1
-            self.ColorSensor.threadStop = 1
-
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.stop_update: {e}")
-            self.Utils.StopRun()
-
-
-
-#A class for making sounds with a Buzzer
-class Buzzer(Utility):
-    def __init__(self, SignalPin, Utils):
-        try:
-            self.SignalPin = SignalPin
-            self.Utils = Utils
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Buzzer initialization: {e}")
-            self.Utils.StopRun()
-            
-    def buzz(self, frequency, volume, duration):
-        try:
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.SignalPin, GPIO.OUT)
-            pwm = GPIO.PWM(self.SignalPin, frequency)
-            pwm.start(volume)
-            time.sleep(duration)
-            pwm.stop()
-            time.sleep(0.01)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Buzzer.buzz: {e}")
             self.Utils.StopRun()

@@ -9,8 +9,8 @@ if not cap.isOpened():
     print("Error opening video stream or file")
 
 # Define the lower and upper boundaries for the green color in the HSV color space
-lower_green = np.array([35, 100, 100])
-upper_green = np.array([85, 255, 255])
+lower_green = np.array([60, 35, 45])
+upper_green = np.array([80, 255, 150])
 
 # Define the lower and upper boundaries for the red color in the HSV color space
 lower_red1 = np.array([0, 100, 100])
@@ -65,9 +65,7 @@ while True:
                 cv2.putText(frame, 'Red Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
                 block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h})
 
-        # Print the block array
-        for block in block_array:
-            print(block)
+        print(block_array)
 
         # Display the resulting frame
         cv2.imshow('Frame', frame)
