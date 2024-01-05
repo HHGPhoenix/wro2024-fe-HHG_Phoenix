@@ -452,7 +452,272 @@ class Utility:
         time.sleep(0.1)
     
         
+    
+#Class for the drive Motor
+class Motor(Utility):
+    def __init__(self, frequency, fpin, rpin, spin, Utils):
+        try:
+            #Setup Variables
+            self.frequency, self.fpin, self.rpin, self.spin, self.speed = frequency, fpin, rpin, spin, 0
+            self.Utils = Utils
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(fpin, GPIO.OUT)
+            GPIO.setup(rpin, GPIO.OUT)
+            GPIO.setup(spin, GPIO.OUT)
+            
+            self.pwm = GPIO.PWM(self.spin, self.frequency)
+            self.MotorSpeed = 0
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Motor initialization: {e}")
+            self.Utils.StopRun()
+
+
+    #Set the direction and speed of the Motor
+    def drive(self, direction="f", speed=0):
+        try:
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(self.fpin, GPIO.OUT)
+            GPIO.setup(self.rpin, GPIO.OUT)
+
+            self.speed = speed
+            
+            #Set direction
+            if direction == 'f':
+                GPIO.output(self.fpin, 1)
+                GPIO.output(self.rpin, 0)
+            elif direction == 'r':
+                GPIO.output(self.fpin, 0)
+                GPIO.output(self.rpin, 1)
+            else:
+                self.Utils.LogError(f"No valid direction specified: {direction}")
+                raise CustomException(f"No valid direction specified: {direction}")
+
+            #Set speed
+            self.pwm.ChangeDutyCycle(speed)
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Motor.drive: {e}")
+            self.Utils.StopRun()
+
+       
+    #Start the Motor with the last known speed        
+    def start(self):
+        try:
+            self.pwm.start(self.speed)  
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Motor.start: {e}")
+            self.Utils.StopRun()
+       
+       
+    #Stop the Motor        
+    def stop(self):
+        try:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.output(self.fpin, 0) 
+            GPIO.output(self.rpin, 0)
+            self.pwm.stop()
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Motor.stop: {e}")
+            self.Utils.StopRun()
         
+    
+    #Set a motor speed that gets controlled by the Speed Sensor, if it was started   
+    def setMotorSpeed(self, Speed):
+        self.drive("f", 100)
+        time.sleep(0.01)
+        self.MotorSpeed = Speed
+        
+
+
+#Class for reading a SuperSonicSensor
+class SuperSonicSensor(Utility):
+    def __init__(self, TrigPin, EchoPin, ID, Utils, smoothing_window_size=7):
+        try:
+            #Variable init
+            self.EchoPin, self.TrigPin, self.distance, self.smoothing_window_size, self.sDistance = EchoPin, TrigPin, 0, smoothing_window_size, 0
+            self.ID = ID
+            self.ThreadStop = 0
+            self.Utils = Utils
+            #Moving Average init
+            self.values = [0] * self.smoothing_window_size
+            self.index = 0
+            
+            
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(TrigPin, GPIO.OUT)
+            GPIO.setup(EchoPin, GPIO.IN)
+            
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in SuperSonicSensor initialization: {e}")
+            self.Utils.StopRun()
+        
+    
+    #Start a new thread for measuring the sensor   
+    def start_measurement(self):
+        try:
+            #GPIO.remove_event_detect(self.EchoPin)
+            self.Utils.UltraschallThreadStop = 0
+            self.thread = threading.Thread(target=self.measure_distance, daemon=True, name=f"Ultraschall{self.ID}", args=(self.Utils,))
+            self.thread.start()
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in SuperSonicSensor.start_measurement: {e}")
+            self.Utils.StopRun()
+    
+    
+    #measure the distance with the sensor
+    def measure_distance(self, Utils):
+        GPIO.remove_event_detect(self.EchoPin)
+        GPIO.add_event_detect(self.EchoPin, GPIO.RISING)
+        #Variables
+        MAXTIME = 40
+        StartTime = 0
+        StopTime = 0
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.TrigPin, GPIO.OUT)
+        GPIO.setup(self.EchoPin, GPIO.IN)
+        
+        while Utils.UltraschallThreadStop == 0:
+            try:
+                StartTime2 = time.time()
+                #GPIO setup
+                #Trigger
+                GPIO.output(self.TrigPin, 0)
+                time.sleep(0.03)
+                
+                GPIO.output(self.TrigPin, 1)
+                time.sleep(0.00001)
+                GPIO.output(self.TrigPin, 0)
+
+                #Get times
+                time.sleep(0.010)
+                TIMEOUT = time.time() + MAXTIME
+                while not GPIO.event_detected(self.EchoPin) and StopTime < TIMEOUT:
+                    StartTime = time.time()
+
+                TIMEOUT = time.time() + MAXTIME
+                while GPIO.input(self.EchoPin) == 1 and StopTime < TIMEOUT:
+                    StopTime = time.time()
+               
+
+                #Calculate distance
+                delay = StopTime - StartTime
+                distance = (delay * 34030) / 2
+                
+                if distance < 0:
+                    self.distance = 0
+                elif distance > 500:
+                    self.distance = 500
+                else:
+                    self.distance = distance
+                
+                self.values[self.index] = self.distance
+                self.index = (self.index + 1) % self.smoothing_window_size
+                self.sDistance = sum(self.values) / self.smoothing_window_size
+                StopTime2 = time.time()
+            
+            except Exception as e:
+                self.Utils.LogError(f"An Error occured in SuperSonicSensor.measure_distance: {e}")
+                self.threadStop = 1
+                self.Utils.StopRun()
+       
+    
+    #Stop the thread for measuring the sensor
+    def stop_measurement(self):
+        try:
+            self.Utils.UltraschallThreadStop = 1
+        
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in SuperSonicSensor.stop_measurement: {e}")
+            self.Utils.StopRun()
+        
+        
+
+#A class for controlling the Servo that is used for steering        
+class Servo(Utility):
+    def __init__(self, SignalPin, frequency, Utils):
+        try:
+            #Variable init
+            self.SignalPin, self.frequency = SignalPin, frequency
+            self.Utils = Utils
+            self.percentage = 0
+            
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(self.SignalPin, GPIO.OUT)
+            
+            #Start steering at 0
+
+            self.pwm = GPIO.PWM(SignalPin, frequency)
+            self.pwm.start(6.6)
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Servo initialization: {e}")
+            self.Utils.StopRun()
+
+        
+    #Calculate the DutyCycle from a steering percentage and steer the Servo    
+    def steer(self, percentage):
+        try:    
+            self.percentage = percentage
+            
+            #Calculate DutyCycle and set it
+            try:
+                DutyCycle = 3e-5 * self.percentage**2 + 0.018 * self.percentage + 6.57
+                self.pwm.ChangeDutyCycle(DutyCycle)
+            except:
+                self.Utils.LogError(f"No valid steering percentage specified: {percentage}")
+                raise CustomException(f"No valid steering percentage specified: {percentage}")
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Servo.steer: {e}")
+            self.Utils.StopRun()
+            
+         
+
+#A class for reading the PixyCam ############################ WIP - may be abandoned #########################################            
+class PixyCam(Utility):
+    def __init__(self, Utils):
+        self.count, self.output = 0, ()
+        self.Utils = Utils
+        pixy.init()
+        pixy.change_prog ("color_connected_components");        
+        
+        
+    def start_reading(self):
+        self.threadStop = 0
+        self.thread = threading.Thread(target=self.read, daemon=True)
+        self.thread.start()
+       
+        
+    def read(self):
+        self.output = BlockArray(100)
+            
+        while self.threadStop == 0:
+            time.sleep(0.01)
+            self.count = pixy.ccc_get_blocks(100, self.output)
+       
+            
+    def stop_reading(self):
+        self.threadStop = 1
+      
+        
+    def LED(self, state):
+        if state == 1:
+            set_lamp(1, 1)
+        elif state == 0:
+            set_lamp(0, 0)
+        else:
+            self.Utils.LogError(f"no valid state specified: {state}")
+            raise CustomException(f"no valid state specified: {state}")
+            
+       
+
 #A class for reading a Button; A Button that instantly stops the program if pressed            
 class Button(Utility):
     def __init__(self, SignalPin, Utils):
@@ -1303,3 +1568,106 @@ class Servo(Utility):
         except Exception as e:
             self.Utils.LogError(f"An Error occured in Servo.steer: {e}")
             self.Utils.StopRun()
+ 
+ 
+ 
+#A class for detecting red and green blocks in the camera stream           
+class Camera():
+    def __init__(self, video_stream=False, video_source=0):
+        self.frame = None
+        self.frame_lock = threading.Lock()
+        
+        self.video_stream = video_stream
+        
+        self.cap = cv2.VideoCapture(video_source)
+        
+        # Define the color ranges for green and red
+        self.lower_green = np.array([35, 100, 100])
+        self.upper_green = np.array([85, 255, 255])
+
+        self.lower_red1 = np.array([0, 100, 100])
+        self.upper_red1 = np.array([10, 255, 255])
+
+        self.lower_red2 = np.array([160, 100, 100])
+        self.upper_red2 = np.array([180, 255, 255])
+
+        self.kernel = np.ones((5, 5), np.uint8)
+
+        
+    #Get the coordinates of the blocks in the camera stream
+    def get_coordinates(self):
+        rval, frame = self.cap.read()
+        if rval:  # Only process the frame if it was read correctly
+            # Convert the image from BGR to HSV
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+            # Create a mask of pixels within the green color range
+            mask_green = cv2.inRange(hsv, self.lower_green, self.upper_green)
+
+            # Create a mask of pixels within the red color range
+            mask_red1 = cv2.inRange(hsv, self.lower_red1, self.upper_red1)
+            mask_red2 = cv2.inRange(hsv, self.lower_red2, self.upper_red2)
+            mask_red = cv2.bitwise_or(mask_red1, mask_red2)
+
+            # Dilate the masks to merge nearby areas
+            mask_green = cv2.dilate(mask_green, self.kernel, iterations=1)
+            mask_red = cv2.dilate(mask_red, self.kernel, iterations=1)
+
+            # Find contours in the green mask
+            contours_green, _ = cv2.findContours(mask_green, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            # Find contours in the red mask
+            contours_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            cv2.circle(frame, (320, 480), 10, (255, 0, 0), -1)
+            
+            block_array = []
+
+            # Process each green contour
+            for contour in contours_green:
+                x, y, w, h = cv2.boundingRect(contour)
+                if w > 50 and h > 50:  # Only consider boxes larger than 50x50
+                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                    cv2.putText(frame, 'Green Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
+                    block_array.append({'color': 'green', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
+                    cv2.line(frame, (320, 480), (int(x+w/2), int(y+h/2)), (0, 255, 0), 2)
+
+            # Process each red contour
+            for contour in contours_red:
+                x, y, w, h = cv2.boundingRect(contour)
+                if w > 50 and h > 50:  # Only consider boxes larger than 50x50
+                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 255), 2)
+                    cv2.putText(frame, 'Red Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
+                    block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
+                    cv2.line(frame, (320, 480), (int(x+w/2), int(y+h/2)), (0, 0, 255), 2)
+                    
+            return block_array, frame
+        
+        return None, None
+        
+        
+    #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
+    def process_blocks(self):
+        while True:
+            self.block_array, self.frame = self.get_coordinates()
+     
+          
+    #Start a new thread for processing the camera stream          
+    def start_processing(self):
+        thread = threading.Thread(target=self.process_blocks)
+        thread.daemon = False
+        thread.start()
+      
+        
+    #Generate the frames for the webstream
+    def video_frames(self):
+        if self.video_stream:
+            while True:
+                with self.frame_lock:
+                    if self.frame is not None:
+                        (flag, encodedImage) = cv2.imencode(".jpg", self.frame)
+                        yield (b'--frame\r\n'
+                                b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
+                    else:
+                        yield (b'--frame\r\n'
+                                b'Content-Type: image/jpeg\r\n\r\n' + b'\r\n')

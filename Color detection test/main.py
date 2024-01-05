@@ -1,12 +1,11 @@
+from flask import Flask, render_template, Response
 import cv2
 import numpy as np
 
-# Open the camera
-cap = cv2.VideoCapture(1)
+app = Flask(__name__)
 
-# Check if the camera opened successfully
-if not cap.isOpened():
-    print("Error opening video stream or file")
+# Open the video camera. Make sure the correct camera index is used. It might be 0 or 1.
+cap = cv2.VideoCapture(0)
 
 # Define the lower and upper boundaries for the green color in the HSV color space
 lower_green = np.array([60, 35, 45])
@@ -18,29 +17,30 @@ upper_red1 = np.array([10, 255, 255])
 lower_red2 = np.array([160, 100, 100])
 upper_red2 = np.array([180, 255, 255])
 
-kernel = np.ones((5, 5), np.uint8)
+@app.route('/')
+def index():
+    """Video streaming home page."""
+    return render_template('index.html')
 
-while True:
-    # Read one frame from the camera
-    ret, frame = cap.read()
+def gen():
+    """Video streaming generator function."""
+    while True:
+        ret, frame = cap.read()
 
-    if ret:
-        # Convert the image from BGR to HSV
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        if ret:
+            # Convert the image from BGR to HSV
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-        # Create a mask of pixels within the green color range
-        mask_green = cv2.inRange(hsv, lower_green, upper_green)
+            # Create a mask of pixels within the green color range
+            mask_green = cv2.inRange(hsv, lower_green, upper_green)
 
-        # Create a mask of pixels within the red color range
-        mask_red1 = cv2.inRange(hsv, lower_red1, upper_red1)
-        mask_red2 = cv2.inRange(hsv, lower_red2, upper_red2)
-        mask_red = cv2.bitwise_or(mask_red1, mask_red2)
+            # Create a mask of pixels within the red color range
+            mask_red1 = cv2.inRange(hsv, lower_red1, upper_red1)
+            mask_red2 = cv2.inRange(hsv, lower_red2, upper_red2)
+            mask_red = cv2.bitwise_or(mask_red1, mask_red2)
 
-        # Dilate the masks to merge nearby areas
-        mask_green = cv2.dilate(mask_green, kernel, iterations=2)
-        mask_red = cv2.dilate(mask_red, kernel, iterations=2)
-
-        # Find contours in the green mask
+            # Here you can add code to process the masks if needed
+             # Find contours in the green mask
         contours_green, _ = cv2.findContours(mask_green, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # Find contours in the red mask
@@ -65,7 +65,7 @@ while True:
                 cv2.putText(frame, 'Red Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
                 block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h})
 
-        print(block_array)
+            print(block)
 
         # Display the resulting frame
         cv2.imshow('Frame', frame)
