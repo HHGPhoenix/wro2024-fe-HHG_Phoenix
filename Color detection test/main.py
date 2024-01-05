@@ -7,9 +7,11 @@ app = Flask(__name__)
 # Open the video camera. Make sure the correct camera index is used. It might be 0 or 1.
 cap = cv2.VideoCapture(0)
 
-# Define the color boundaries
-lower_green = np.array([35, 100, 100])
-upper_green = np.array([85, 255, 255])
+# Define the lower and upper boundaries for the green color in the HSV color space
+lower_green = np.array([60, 35, 45])
+upper_green = np.array([80, 255, 150])
+
+# Define the lower and upper boundaries for the red color in the HSV color space
 lower_red1 = np.array([0, 100, 100])
 upper_red1 = np.array([10, 255, 255])
 lower_red2 = np.array([160, 100, 100])
@@ -63,20 +65,17 @@ def gen():
                 cv2.putText(frame, 'Red Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
                 block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h})
 
-        # Print the block array
-        for block in block_array:
             print(block)
 
-            # Encode the frame for streaming
-            (flag, encodedImage) = cv2.imencode(".jpg", frame)
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
+        # Display the resulting frame
+        cv2.imshow('Frame', frame)
 
-@app.route('/video_feed')
-def video_feed():
-    """Video streaming route. Put this in the src attribute of an img tag."""
-    return Response(gen(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+        # Break the loop on 'q' key press
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', threaded=True)
+# Release the camera
+cap.release()
+
+# Close all OpenCV windows
+cv2.destroyAllWindows()
