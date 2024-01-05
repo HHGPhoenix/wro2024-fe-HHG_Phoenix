@@ -1,6 +1,5 @@
 import time
 from RobotCarClasses import *
-import RPi.GPIO as GPIO
 from threading import Thread
 import math
 
@@ -12,7 +11,8 @@ import math
 ##########################################################    
 Utils = Utility()
 
-Farbsensor = ColorSensor(Utils)
+#Farbsensor = ColorSensor(Utils)
+Farbsensor = None
 
 StartButton = Button(5, Utils)
 StopButton = Button(6, Utils)
@@ -23,7 +23,7 @@ Gyro = Gyroscope(Utils)
 
 
 ADC = AnalogDigitalConverter(Utils)
-Display = DisplayOled(ADC, Gyro, Farbsensor, Utils)
+Display = DisplayOled(ADC, Gyro, Utils=Utils)
 
 Cam = Camera(video_stream=True)
 Cam.start_processing()
@@ -200,13 +200,11 @@ if __name__ == "__main__":
             
             @app.route('/')
             def index():
-                """Video streaming home page."""
                 return render_template('index.html')
 
 
             @app.route('/video_feed')
             def video_feed():
-                """Video streaming route. Put this in the src attribute of an img tag."""
                 return Response(Cam.video_frames(),
                                 mimetype='multipart/x-mixed-replace; boundary=frame')
 
@@ -214,7 +212,6 @@ if __name__ == "__main__":
             server_thread = Thread(target=app.run, kwargs={'host':'0.0.0.0', 'threaded':True})
             server_thread.start()
                 
-        GPIO.setmode(GPIO.BCM)
         Utils.StartRun()
         HoldLane(Utils)
     

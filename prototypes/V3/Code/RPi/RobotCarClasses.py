@@ -1,9 +1,6 @@
-import RPi.GPIO as GPIO
+import gpiod
 import time
 import threading
-from ctypes import *
-from pixy import *
-import pixy
 import board, adafruit_tcs34725, adafruit_mpu6050
 import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
@@ -21,7 +18,22 @@ import subprocess
 from flask import Flask, render_template, Response
 import cv2
 import numpy as np
+from picamera2 import Picamera2
+from libcamera import controls
 
+
+
+##########################################################
+##                                                      ##
+##                   GPIO init                          ##
+##                                                      ##
+##########################################################
+
+global chip, all_lines
+
+chip = gpiod.Chip('gpiochip4')
+
+all_lines = []
 
 
 ##########################################################
@@ -84,8 +96,10 @@ class Utility:
         #Wait a short time to make sure all threads are stopped
         self.Buzzer1.buzz(1000, 80, 0.5)
         
-        #GPIO cleanup and Program exit
-        GPIO.cleanup()
+        #Clear all used lines
+        for line in all_lines:
+            line.release()
+        
         self.running = False
         
         time.sleep(0.1)
@@ -208,7 +222,7 @@ class Utility:
     #Log Sensor values
     def LogData(self):
         try:
-            self.datalogger.debug(f"Farbsensor; {self.Farbsensor.color_temperature};  CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}; Voltage; {self.ADC.voltage}")
+            self.datalogger.debug(f"Farbsensor; {0};  CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}; Voltage; {self.ADC.voltage}")
         except Exception as e:
             self.LogError(f"An Error occured in Utility.LogData: {e}")
             self.StopRun()
@@ -438,272 +452,7 @@ class Utility:
         time.sleep(0.1)
     
         
-    
-#Class for the drive Motor
-class Motor(Utility):
-    def __init__(self, frequency, fpin, rpin, spin, Utils):
-        try:
-            #Setup Variables
-            self.frequency, self.fpin, self.rpin, self.spin, self.speed = frequency, fpin, rpin, spin, 0
-            self.Utils = Utils
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(fpin, GPIO.OUT)
-            GPIO.setup(rpin, GPIO.OUT)
-            GPIO.setup(spin, GPIO.OUT)
-            
-            self.pwm = GPIO.PWM(self.spin, self.frequency)
-            self.MotorSpeed = 0
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor initialization: {e}")
-            self.Utils.StopRun()
-
-
-    #Set the direction and speed of the Motor
-    def drive(self, direction="f", speed=0):
-        try:
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.fpin, GPIO.OUT)
-            GPIO.setup(self.rpin, GPIO.OUT)
-
-            self.speed = speed
-            
-            #Set direction
-            if direction == 'f':
-                GPIO.output(self.fpin, 1)
-                GPIO.output(self.rpin, 0)
-            elif direction == 'r':
-                GPIO.output(self.fpin, 0)
-                GPIO.output(self.rpin, 1)
-            else:
-                self.Utils.LogError(f"No valid direction specified: {direction}")
-                raise CustomException(f"No valid direction specified: {direction}")
-
-            #Set speed
-            self.pwm.ChangeDutyCycle(speed)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor.drive: {e}")
-            self.Utils.StopRun()
-
-       
-    #Start the Motor with the last known speed        
-    def start(self):
-        try:
-            self.pwm.start(self.speed)  
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor.start: {e}")
-            self.Utils.StopRun()
-       
-       
-    #Stop the Motor        
-    def stop(self):
-        try:
-            GPIO.setmode(GPIO.BCM)
-            GPIO.output(self.fpin, 0) 
-            GPIO.output(self.rpin, 0)
-            self.pwm.stop()
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor.stop: {e}")
-            self.Utils.StopRun()
         
-    
-    #Set a motor speed that gets controlled by the Speed Sensor, if it was started   
-    def setMotorSpeed(self, Speed):
-        self.drive("f", 100)
-        time.sleep(0.01)
-        self.MotorSpeed = Speed
-        
-
-
-#Class for reading a SuperSonicSensor
-class SuperSonicSensor(Utility):
-    def __init__(self, TrigPin, EchoPin, ID, Utils, smoothing_window_size=7):
-        try:
-            #Variable init
-            self.EchoPin, self.TrigPin, self.distance, self.smoothing_window_size, self.sDistance = EchoPin, TrigPin, 0, smoothing_window_size, 0
-            self.ID = ID
-            self.ThreadStop = 0
-            self.Utils = Utils
-            #Moving Average init
-            self.values = [0] * self.smoothing_window_size
-            self.index = 0
-            
-            
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(TrigPin, GPIO.OUT)
-            GPIO.setup(EchoPin, GPIO.IN)
-            
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SuperSonicSensor initialization: {e}")
-            self.Utils.StopRun()
-        
-    
-    #Start a new thread for measuring the sensor   
-    def start_measurement(self):
-        try:
-            #GPIO.remove_event_detect(self.EchoPin)
-            self.Utils.UltraschallThreadStop = 0
-            self.thread = threading.Thread(target=self.measure_distance, daemon=True, name=f"Ultraschall{self.ID}", args=(self.Utils,))
-            self.thread.start()
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SuperSonicSensor.start_measurement: {e}")
-            self.Utils.StopRun()
-    
-    
-    #measure the distance with the sensor
-    def measure_distance(self, Utils):
-        GPIO.remove_event_detect(self.EchoPin)
-        GPIO.add_event_detect(self.EchoPin, GPIO.RISING)
-        #Variables
-        MAXTIME = 40
-        StartTime = 0
-        StopTime = 0
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.TrigPin, GPIO.OUT)
-        GPIO.setup(self.EchoPin, GPIO.IN)
-        
-        while Utils.UltraschallThreadStop == 0:
-            try:
-                StartTime2 = time.time()
-                #GPIO setup
-                #Trigger
-                GPIO.output(self.TrigPin, 0)
-                time.sleep(0.03)
-                
-                GPIO.output(self.TrigPin, 1)
-                time.sleep(0.00001)
-                GPIO.output(self.TrigPin, 0)
-
-                #Get times
-                time.sleep(0.010)
-                TIMEOUT = time.time() + MAXTIME
-                while not GPIO.event_detected(self.EchoPin) and StopTime < TIMEOUT:
-                    StartTime = time.time()
-
-                TIMEOUT = time.time() + MAXTIME
-                while GPIO.input(self.EchoPin) == 1 and StopTime < TIMEOUT:
-                    StopTime = time.time()
-               
-
-                #Calculate distance
-                delay = StopTime - StartTime
-                distance = (delay * 34030) / 2
-                
-                if distance < 0:
-                    self.distance = 0
-                elif distance > 500:
-                    self.distance = 500
-                else:
-                    self.distance = distance
-                
-                self.values[self.index] = self.distance
-                self.index = (self.index + 1) % self.smoothing_window_size
-                self.sDistance = sum(self.values) / self.smoothing_window_size
-                StopTime2 = time.time()
-            
-            except Exception as e:
-                self.Utils.LogError(f"An Error occured in SuperSonicSensor.measure_distance: {e}")
-                self.threadStop = 1
-                self.Utils.StopRun()
-       
-    
-    #Stop the thread for measuring the sensor
-    def stop_measurement(self):
-        try:
-            self.Utils.UltraschallThreadStop = 1
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SuperSonicSensor.stop_measurement: {e}")
-            self.Utils.StopRun()
-        
-        
-
-#A class for controlling the Servo that is used for steering        
-class Servo(Utility):
-    def __init__(self, SignalPin, frequency, Utils):
-        try:
-            #Variable init
-            self.SignalPin, self.frequency = SignalPin, frequency
-            self.Utils = Utils
-            self.percentage = 0
-            
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.SignalPin, GPIO.OUT)
-            
-            #Start steering at 0
-
-            self.pwm = GPIO.PWM(SignalPin, frequency)
-            self.pwm.start(6.6)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Servo initialization: {e}")
-            self.Utils.StopRun()
-
-        
-    #Calculate the DutyCycle from a steering percentage and steer the Servo    
-    def steer(self, percentage):
-        try:    
-            self.percentage = percentage
-            
-            #Calculate DutyCycle and set it
-            try:
-                DutyCycle = 3e-5 * self.percentage**2 + 0.018 * self.percentage + 6.57
-                self.pwm.ChangeDutyCycle(DutyCycle)
-            except:
-                self.Utils.LogError(f"No valid steering percentage specified: {percentage}")
-                raise CustomException(f"No valid steering percentage specified: {percentage}")
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Servo.steer: {e}")
-            self.Utils.StopRun()
-            
-         
-
-#A class for reading the PixyCam ############################ WIP - may be abandoned #########################################            
-class PixyCam(Utility):
-    def __init__(self, Utils):
-        self.count, self.output = 0, ()
-        self.Utils = Utils
-        pixy.init()
-        pixy.change_prog ("color_connected_components");        
-        
-        
-    def start_reading(self):
-        self.threadStop = 0
-        self.thread = threading.Thread(target=self.read, daemon=True)
-        self.thread.start()
-       
-        
-    def read(self):
-        self.output = BlockArray(100)
-            
-        while self.threadStop == 0:
-            time.sleep(0.01)
-            self.count = pixy.ccc_get_blocks(100, self.output)
-       
-            
-    def stop_reading(self):
-        self.threadStop = 1
-      
-        
-    def LED(self, state):
-        if state == 1:
-            set_lamp(1, 1)
-        elif state == 0:
-            set_lamp(0, 0)
-        else:
-            self.Utils.LogError(f"no valid state specified: {state}")
-            raise CustomException(f"no valid state specified: {state}")
-            
-       
-
 #A class for reading a Button; A Button that instantly stops the program if pressed            
 class Button(Utility):
     def __init__(self, SignalPin, Utils):
@@ -713,8 +462,10 @@ class Button(Utility):
             self.Utils = Utils
             
             #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+            self.button_line = chip.get_line(SignalPin)
+            self.button_line.request(consumer='Button', type=gpiod.LINE_REQ_DIR_IN, flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP)
+            
+            all_lines.append(self.button_line)
             
         except Exception as e:
             self.Utils.LogError(f"An Error occured in Button initialization: {e}")
@@ -723,15 +474,11 @@ class Button(Utility):
     
     #Read the state of the Button -- 1 if pressed, 0 if not    
     def state(self):
-        try:
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-            
+        try:    
             #Read button state
-            if GPIO.input(self.SignalPin) == 0:
+            if self.button_line.get_value() == 0:
                 return 1
-            elif GPIO.input(self.SignalPin) == 1:
+            elif self.button_line.get_value() == 1:
                 return 0
         
         except Exception as e:
@@ -752,10 +499,6 @@ class Button(Utility):
     
     #Function that kills the program if the StopButton is pressed    
     def read_StopButton(self):
-        #GPIO setup
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.SignalPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        
         #Stop program if stopbutton is pressed
         while self.threadStop == 0:
             StartTime = time.time()
@@ -929,6 +672,287 @@ class AnalogDigitalConverter(Utility):
         return self.chan.voltage * 4.395
 
 
+    
+#A class for writing to a OLED Display
+class DisplayOled(Utility):
+    def __init__(self, ADC=None, Gyro=None, Farbsensor=None, Utils=None):
+        try:
+            serial = i2c(port=0, address=0x3C)
+            self.device = sh1106(serial)
+            
+            #Variable init
+            self.first_line = ""
+            self.second_line = ""
+            self.ADC = ADC
+            self.Utils = Utils
+            self.Gyro = Gyro
+            self.ColorSensor = Farbsensor
+            
+            #Wake the screen by drawing an outline
+            with canvas(self.device) as draw:
+                draw.rectangle(self.device.bounding_box, outline="white", fill="black")
+        
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in DisplayOled initialization: {e}")
+            self.Utils.StopRun()
+        
+       
+    #Clear the Display 
+    def clear(self):
+        try:
+            with canvas(self.device) as draw:
+                draw.rectangle(self.device.bounding_box, outline="white", fill="black")
+                
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in DisplayOled.clear: {e}")
+            self.Utils.StopRun()
+       
+    
+    #Write lines in variables so they get written by the update function   
+    def write(self, first_line="", second_line="", reset=False, xCoord=0, yCoord=17):
+        try:
+            if reset:
+                self.first_line = ""
+                self.second_line = ""
+            
+            if first_line != "":
+                self.first_line = first_line
+            if second_line != "":
+                self.second_line = second_line
+        
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in DisplayOled.write: {e}")
+            self.Utils.StopRun()
+        
+
+    #Start a new thread for updating the Display
+    def start_update(self):
+        try:
+            self.threadStop = 0
+            self.thread1 = threading.Thread(target=self.update, daemon=True)
+            self.thread1.start()
+            
+            if self.Gyro != None:
+                self.Gyro.threadStop = 0
+                self.thread2 = threading.Thread(target=self.Gyro.get_angle, daemon=True)
+                self.thread2.start()
+            
+            if self.ColorSensor != None:
+                self.ColorSensor.threadStop = 0
+                self.thread3 = threading.Thread(target=self.ColorSensor.read, daemon=True)
+                self.thread3.start()
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in DisplayOled.start_update: {e}")
+            self.Utils.StopRun()
+
+    
+    #Update the Display
+    def update(self):
+        while self.threadStop == 0:
+            try:
+                #Get CPU temperature, CPU usage, RAM usage and Disk usage
+                cpuTemp = CPUTemperature()
+                self.cpu_usage = psutil.cpu_percent(interval=0)
+                self.ram = psutil.virtual_memory()
+                self.disk = psutil.disk_usage('/')
+                
+                #Format them to always have the same number of decimal points
+                cpu_temp_formatted = self.convert_to_decimal_points(cpuTemp.temperature, 1)
+                cpu_usage_formatted = self.convert_to_decimal_points(self.cpu_usage, 1)
+                ram_usage_formatted = self.convert_to_decimal_points(self.ram.percent, 1)
+                disk_usage_formatted = self.convert_to_decimal_points(self.disk.percent, 1)
+                voltage_value_formatted = self.convert_to_decimal_points(self.ADC.read(), 2)
+                
+                #Draw all the data on the Display
+                with canvas(self.device) as draw:
+                        #top
+                        draw.text((0, 0), f"{cpu_temp_formatted}°C", fill="white", align="left")
+                        draw.text((40, 0), f"DISK:{(int(float(disk_usage_formatted)))}%", fill="white")
+                        draw.text((92, 0), f"{voltage_value_formatted}V", fill="white")
+                        
+                        #bottom
+                        draw.text((0, 50), f"CPU:{cpu_usage_formatted}%", fill="white")
+                        draw.text((75, 50), f"RAM:{ram_usage_formatted}%", fill="white")
+                        
+                        #custom
+                        draw.multiline_text((0, 15), f"{self.first_line}\n{self.second_line}", fill="white", align="center", anchor="ma")
+                        
+                time.sleep(2)
+                    
+            except Exception as e:
+                self.Utils.LogError(f"An Error occured in DisplayOled.update: {e}")
+                self.Utils.StopRun()
+         
+    
+    #Stop the thread for updating the Display      
+    def stop_update(self):
+        try:
+            self.threadStop = 1
+            
+            if self.Gyro != None:
+                self.Gyro.threadStop = 1
+                
+            if self.ColorSensor != None:
+                self.ColorSensor.threadStop = 1
+
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in DisplayOled.stop_update: {e}")
+            self.Utils.StopRun()
+
+
+
+#A class for making sounds with a Buzzer
+class Buzzer(Utility):
+    def __init__(self, SignalPin, Utils):
+        try:
+            self.Utils = Utils
+            self.SignalPin = chip.get_line(SignalPin)
+            self.SignalPin.request(consumer='buzzer', type=gpiod.LINE_REQ_DIR_OUT)
+            
+            all_lines.append(self.SignalPin)
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Buzzer initialization: {e}")
+            self.Utils.StopRun()
+            
+    def buzz(self, frequency, volume, duration):
+        try:
+            # Check if the volume value is greater than the frequency
+            if volume > frequency:
+                volume = frequency
+
+            period = 1.0 / frequency  # Calculate the period of the frequency
+            on_time = period * volume / 100  # Calculate the time the signal should be on
+            off_time = period - on_time  # Calculate the time the signal should be off
+
+            end_time = time.time() + duration
+            while time.time() < end_time:
+                self.SignalPin.set_value(1)
+                time.sleep(on_time)
+                self.SignalPin.set_value(0)
+                time.sleep(off_time)
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Buzzer.buzz: {e}")
+            self.Utils.StopRun()
+
+
+
+#A class for detecting red and green blocks in the camera stream           
+class Camera():
+    def __init__(self, video_stream=False, video_source=0):
+        self.frame = None
+        self.frame_lock = threading.Lock()
+        
+        self.video_stream = video_stream
+        
+        self.picam2 = Picamera2()
+
+        config = self.picam2.create_still_configuration(main={"size": (1280, 720)}, raw={"size": (1280, 720)}, controls={"FrameRate": 60})
+        self.picam2.configure(config)
+
+        self.picam2.start()
+        self.picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
+        
+        # Define the color ranges for green and red
+        self.lower_green = np.array([35, 60, 35])
+        self.upper_green = np.array([85, 255, 255])
+
+        self.lower_red1 = np.array([0, 100, 100])
+        self.upper_red1 = np.array([10, 255, 255])
+
+        self.lower_red2 = np.array([160, 100, 100])
+        self.upper_red2 = np.array([180, 255, 255])
+
+        self.kernel = np.ones((5, 5), np.uint8)
+
+        
+    #Get the coordinates of the blocks in the camera stream
+    def get_coordinates(self):
+        frame = self.picam2.capture_array()
+        
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # Convert the image from BGR to HSV
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        # Create a mask of pixels within the green color range
+        mask_green = cv2.inRange(hsv, self.lower_green, self.upper_green)
+
+        # Create a mask of pixels within the red color range
+        mask_red1 = cv2.inRange(hsv, self.lower_red1, self.upper_red1)
+        mask_red2 = cv2.inRange(hsv, self.lower_red2, self.upper_red2)
+        mask_red = cv2.bitwise_or(mask_red1, mask_red2)
+
+        # Dilate the masks to merge nearby areas
+        mask_green = cv2.dilate(mask_green, self.kernel, iterations=1)
+        mask_red = cv2.dilate(mask_red, self.kernel, iterations=1)
+
+        # Find contours in the green mask
+        contours_green, _ = cv2.findContours(mask_green, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Find contours in the red mask
+        contours_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        cv2.circle(frame, (640, 720), 10, (255, 0, 0), -1)
+        
+        block_array = []
+
+        # Process each green contour
+        for contour in contours_green:
+            x, y, w, h = cv2.boundingRect(contour)
+            if w > 50 and h > 50:  # Only consider boxes larger than 50x50
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                cv2.putText(frame, 'Green Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
+                block_array.append({'color': 'green', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
+                cv2.line(frame, (640, 720), (int(x+w/2), int(y+h/2)), (0, 255, 0), 2)
+
+        # Process each red contour
+        for contour in contours_red:
+            x, y, w, h = cv2.boundingRect(contour)
+            if w > 50 and h > 50:  # Only consider boxes larger than 50x50
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 255), 2)
+                cv2.putText(frame, 'Red Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
+                block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
+                cv2.line(frame, (640, 720), (int(x+w/2), int(y+h/2)), (0, 0, 255), 2)
+                
+        return block_array, frame
+        
+        
+    #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
+    def process_blocks(self):
+        while True:
+            self.block_array, self.frame = self.get_coordinates()
+     
+          
+    #Start a new thread for processing the camera stream          
+    def start_processing(self):
+        thread = threading.Thread(target=self.process_blocks)
+        thread.daemon = False
+        thread.start()
+      
+        
+    #Generate the frames for the webstream
+    def video_frames(self):
+        if self.video_stream:
+            while True:
+                with self.frame_lock:
+                    if self.frame is not None:
+                        (flag, encodedImage) = cv2.imencode(".jpg", self.frame)
+                        yield (b'--frame\r\n'
+                                b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
+                    else:
+                        yield (b'--frame\r\n'
+                                b'Content-Type: image/jpeg\r\n\r\n' + b'\r\n')
+
+
+   
+##########################################################
+##                                                      ##
+##                 Old-Classes                          ##
+##                                                      ##
+##########################################################
 
 #A class for reading a LM393 speed sensor
 class SpeedSensor(Utility):
@@ -1014,257 +1038,268 @@ class SpeedSensor(Utility):
         except Exception as e:
             self.Utils.LogError(f"An Error occured in SpeedSensor.stop_measurement: {e}")
             self.Utils.StopRun()
-        
-        
-        
-#A class for writing to a OLED Display
-class DisplayOled(Utility):
-    def __init__(self, ADC, Gyro, Farbsensor, Utils):
+
+
+
+#Class for reading a SuperSonicSensor
+class SuperSonicSensor(Utility):
+    def __init__(self, TrigPin, EchoPin, ID, Utils, smoothing_window_size=7):
         try:
-            serial = i2c(port=0, address=0x3C)
-            self.device = sh1106(serial)
-            
             #Variable init
-            self.first_line = ""
-            self.second_line = ""
-            self.ADC = ADC
+            self.EchoPin, self.TrigPin, self.distance, self.smoothing_window_size, self.sDistance = EchoPin, TrigPin, 0, smoothing_window_size, 0
+            self.ID = ID
+            self.ThreadStop = 0
             self.Utils = Utils
-            self.Gyro = Gyro
-            self.ColorSensor = Farbsensor
+            #Moving Average init
+            self.values = [0] * self.smoothing_window_size
+            self.index = 0
             
-            #Wake the screen by drawing an outline
-            with canvas(self.device) as draw:
-                draw.rectangle(self.device.bounding_box, outline="white", fill="black")
-        
+            
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(TrigPin, GPIO.OUT)
+            GPIO.setup(EchoPin, GPIO.IN)
+            
+            
         except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled initialization: {e}")
+            self.Utils.LogError(f"An Error occured in SuperSonicSensor initialization: {e}")
             self.Utils.StopRun()
         
-       
-    #Clear the Display 
-    def clear(self):
-        try:
-            with canvas(self.device) as draw:
-                draw.rectangle(self.device.bounding_box, outline="white", fill="black")
-                
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.clear: {e}")
-            self.Utils.StopRun()
-       
     
-    #Write lines in variables so they get written by the update function   
-    def write(self, first_line="", second_line="", reset=False, xCoord=0, yCoord=17):
+    #Start a new thread for measuring the sensor   
+    def start_measurement(self):
         try:
-            if reset:
-                self.first_line = ""
-                self.second_line = ""
-            
-            if first_line != "":
-                self.first_line = first_line
-            if second_line != "":
-                self.second_line = second_line
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.write: {e}")
-            self.Utils.StopRun()
-        
-
-    #Start a new thread for updating the Display
-    def start_update(self):
-        try:
-            self.threadStop = 0
-            self.thread1 = threading.Thread(target=self.update, daemon=True)
-            self.thread1.start()
-            
-            self.Gyro.threadStop = 0
-            self.thread2 = threading.Thread(target=self.Gyro.get_angle, daemon=True)
-            self.thread2.start()
-            
-            self.ColorSensor.threadStop = 0
-            self.thread3 = threading.Thread(target=self.ColorSensor.read, daemon=True)
-            self.thread3.start()
+            #GPIO.remove_event_detect(self.EchoPin)
+            self.Utils.UltraschallThreadStop = 0
+            self.thread = threading.Thread(target=self.measure_distance, daemon=True, name=f"Ultraschall{self.ID}", args=(self.Utils,))
+            self.thread.start()
             
         except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.start_update: {e}")
+            self.Utils.LogError(f"An Error occured in SuperSonicSensor.start_measurement: {e}")
             self.Utils.StopRun()
-
     
-    #Update the Display
-    def update(self):
-        while self.threadStop == 0:
+    
+    #measure the distance with the sensor
+    def measure_distance(self, Utils):
+        GPIO.remove_event_detect(self.EchoPin)
+        GPIO.add_event_detect(self.EchoPin, GPIO.RISING)
+        #Variables
+        MAXTIME = 40
+        StartTime = 0
+        StopTime = 0
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.TrigPin, GPIO.OUT)
+        GPIO.setup(self.EchoPin, GPIO.IN)
+        
+        while Utils.UltraschallThreadStop == 0:
             try:
-                #Get CPU temperature, CPU usage, RAM usage and Disk usage
-                cpuTemp = CPUTemperature()
-                self.cpu_usage = psutil.cpu_percent(interval=0)
-                self.ram = psutil.virtual_memory()
-                self.disk = psutil.disk_usage('/')
+                StartTime2 = time.time()
+                #GPIO setup
+                #Trigger
+                GPIO.output(self.TrigPin, 0)
+                time.sleep(0.03)
                 
-                #Format them to always have the same number of decimal points
-                cpu_temp_formatted = self.convert_to_decimal_points(cpuTemp.temperature, 1)
-                cpu_usage_formatted = self.convert_to_decimal_points(self.cpu_usage, 1)
-                ram_usage_formatted = self.convert_to_decimal_points(self.ram.percent, 1)
-                disk_usage_formatted = self.convert_to_decimal_points(self.disk.percent, 1)
-                voltage_value_formatted = self.convert_to_decimal_points(self.ADC.read(), 2)
+                GPIO.output(self.TrigPin, 1)
+                time.sleep(0.00001)
+                GPIO.output(self.TrigPin, 0)
+
+                #Get times
+                time.sleep(0.010)
+                TIMEOUT = time.time() + MAXTIME
+                while not GPIO.event_detected(self.EchoPin) and StopTime < TIMEOUT:
+                    StartTime = time.time()
+
+                TIMEOUT = time.time() + MAXTIME
+                while GPIO.input(self.EchoPin) == 1 and StopTime < TIMEOUT:
+                    StopTime = time.time()
+               
+
+                #Calculate distance
+                delay = StopTime - StartTime
+                distance = (delay * 34030) / 2
                 
-                #Draw all the data on the Display
-                with canvas(self.device) as draw:
-                        #top
-                        draw.text((0, 0), f"{cpu_temp_formatted}°C", fill="white", align="left")
-                        draw.text((40, 0), f"DISK:{(int(float(disk_usage_formatted)))}%", fill="white")
-                        draw.text((92, 0), f"{voltage_value_formatted}V", fill="white")
-                        
-                        #bottom
-                        draw.text((0, 50), f"CPU:{cpu_usage_formatted}%", fill="white")
-                        draw.text((75, 50), f"RAM:{ram_usage_formatted}%", fill="white")
-                        
-                        #custom
-                        draw.multiline_text((0, 15), f"{self.first_line}\n{self.second_line}", fill="white", align="center", anchor="ma")
-                        
-                time.sleep(2)
-                    
+                if distance < 0:
+                    self.distance = 0
+                elif distance > 500:
+                    self.distance = 500
+                else:
+                    self.distance = distance
+                
+                self.values[self.index] = self.distance
+                self.index = (self.index + 1) % self.smoothing_window_size
+                self.sDistance = sum(self.values) / self.smoothing_window_size
+                StopTime2 = time.time()
+            
             except Exception as e:
-                self.Utils.LogError(f"An Error occured in DisplayOled.update: {e}")
+                self.Utils.LogError(f"An Error occured in SuperSonicSensor.measure_distance: {e}")
+                self.threadStop = 1
                 self.Utils.StopRun()
-         
+       
     
-    #Stop the thread for updating the Display      
-    def stop_update(self):
+    #Stop the thread for measuring the sensor
+    def stop_measurement(self):
         try:
-            self.threadStop = 1
-            self.Gyro.threadStop = 1
-            self.ColorSensor.threadStop = 1
-
+            self.Utils.UltraschallThreadStop = 1
+        
         except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.stop_update: {e}")
+            self.Utils.LogError(f"An Error occured in SuperSonicSensor.stop_measurement: {e}")
             self.Utils.StopRun()
 
 
 
-#A class for making sounds with a Buzzer
-class Buzzer(Utility):
-    def __init__(self, SignalPin, Utils):
+#A class for reading the PixyCam ############################ WIP - may be abandoned #########################################            
+class PixyCam(Utility):
+    def __init__(self, Utils):
+        self.count, self.output = 0, ()
+        self.Utils = Utils
+        pixy.init()
+        pixy.change_prog ("color_connected_components");        
+        
+        
+    def start_reading(self):
+        self.threadStop = 0
+        self.thread = threading.Thread(target=self.read, daemon=True)
+        self.thread.start()
+       
+        
+    def read(self):
+        self.output = BlockArray(100)
+            
+        while self.threadStop == 0:
+            time.sleep(0.01)
+            self.count = pixy.ccc_get_blocks(100, self.output)
+       
+            
+    def stop_reading(self):
+        self.threadStop = 1
+      
+        
+    def LED(self, state):
+        if state == 1:
+            set_lamp(1, 1)
+        elif state == 0:
+            set_lamp(0, 0)
+        else:
+            self.Utils.LogError(f"no valid state specified: {state}")
+            raise CustomException(f"no valid state specified: {state}")
+      
+ 
+      
+#Class for the drive Motor
+class Motor(Utility):
+    def __init__(self, frequency, fpin, rpin, spin, Utils):
         try:
-            self.SignalPin = SignalPin
+            #Setup Variables
+            self.frequency, self.fpin, self.rpin, self.spin, self.speed = frequency, fpin, rpin, spin, 0
             self.Utils = Utils
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(fpin, GPIO.OUT)
+            GPIO.setup(rpin, GPIO.OUT)
+            GPIO.setup(spin, GPIO.OUT)
+            
+            self.pwm = GPIO.PWM(self.spin, self.frequency)
+            self.MotorSpeed = 0
             
         except Exception as e:
-            self.Utils.LogError(f"An Error occured in Buzzer initialization: {e}")
+            self.Utils.LogError(f"An Error occured in Motor initialization: {e}")
             self.Utils.StopRun()
-            
-    def buzz(self, frequency, volume, duration):
+
+
+    #Set the direction and speed of the Motor
+    def drive(self, direction="f", speed=0):
         try:
             #GPIO setup
             GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.SignalPin, GPIO.OUT)
-            pwm = GPIO.PWM(self.SignalPin, frequency)
-            pwm.start(volume)
-            time.sleep(duration)
-            pwm.stop()
-            time.sleep(0.01)
+            GPIO.setup(self.fpin, GPIO.OUT)
+            GPIO.setup(self.rpin, GPIO.OUT)
+
+            self.speed = speed
+            
+            #Set direction
+            if direction == 'f':
+                GPIO.output(self.fpin, 1)
+                GPIO.output(self.rpin, 0)
+            elif direction == 'r':
+                GPIO.output(self.fpin, 0)
+                GPIO.output(self.rpin, 1)
+            else:
+                self.Utils.LogError(f"No valid direction specified: {direction}")
+                raise CustomException(f"No valid direction specified: {direction}")
+
+            #Set speed
+            self.pwm.ChangeDutyCycle(speed)
             
         except Exception as e:
-            self.Utils.LogError(f"An Error occured in Buzzer.buzz: {e}")
+            self.Utils.LogError(f"An Error occured in Motor.drive: {e}")
             self.Utils.StopRun()
- 
- 
- 
-#A class for detecting red and green blocks in the camera stream           
-class Camera():
-    def __init__(self, video_stream=False, video_source=0):
-        self.frame = None
-        self.frame_lock = threading.Lock()
+
+       
+    #Start the Motor with the last known speed        
+    def start(self):
+        try:
+            self.pwm.start(self.speed)  
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Motor.start: {e}")
+            self.Utils.StopRun()
+       
+       
+    #Stop the Motor        
+    def stop(self):
+        try:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.output(self.fpin, 0) 
+            GPIO.output(self.rpin, 0)
+            self.pwm.stop()
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Motor.stop: {e}")
+            self.Utils.StopRun()
         
-        self.video_stream = video_stream
+    
+    #Set a motor speed that gets controlled by the Speed Sensor, if it was started   
+    def setMotorSpeed(self, Speed):
+        self.drive("f", 100)
+        time.sleep(0.01)
+        self.MotorSpeed = Speed
         
-        self.cap = cv2.VideoCapture(video_source)
-        
-        # Define the color ranges for green and red
-        self.lower_green = np.array([35, 100, 100])
-        self.upper_green = np.array([85, 255, 255])
+           
 
-        self.lower_red1 = np.array([0, 100, 100])
-        self.upper_red1 = np.array([10, 255, 255])
-
-        self.lower_red2 = np.array([160, 100, 100])
-        self.upper_red2 = np.array([180, 255, 255])
-
-        self.kernel = np.ones((5, 5), np.uint8)
-
-        
-    #Get the coordinates of the blocks in the camera stream
-    def get_coordinates(self):
-        rval, frame = self.cap.read()
-        if rval:  # Only process the frame if it was read correctly
-            # Convert the image from BGR to HSV
-            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-
-            # Create a mask of pixels within the green color range
-            mask_green = cv2.inRange(hsv, self.lower_green, self.upper_green)
-
-            # Create a mask of pixels within the red color range
-            mask_red1 = cv2.inRange(hsv, self.lower_red1, self.upper_red1)
-            mask_red2 = cv2.inRange(hsv, self.lower_red2, self.upper_red2)
-            mask_red = cv2.bitwise_or(mask_red1, mask_red2)
-
-            # Dilate the masks to merge nearby areas
-            mask_green = cv2.dilate(mask_green, self.kernel, iterations=1)
-            mask_red = cv2.dilate(mask_red, self.kernel, iterations=1)
-
-            # Find contours in the green mask
-            contours_green, _ = cv2.findContours(mask_green, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            # Find contours in the red mask
-            contours_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+#A class for controlling the Servo that is used for steering        
+class Servo(Utility):
+    def __init__(self, SignalPin, frequency, Utils):
+        try:
+            #Variable init
+            self.SignalPin, self.frequency = SignalPin, frequency
+            self.Utils = Utils
+            self.percentage = 0
             
-            cv2.circle(frame, (320, 480), 10, (255, 0, 0), -1)
+            #GPIO setup
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(self.SignalPin, GPIO.OUT)
             
-            block_array = []
+            #Start steering at 0
 
-            # Process each green contour
-            for contour in contours_green:
-                x, y, w, h = cv2.boundingRect(contour)
-                if w > 50 and h > 50:  # Only consider boxes larger than 50x50
-                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                    cv2.putText(frame, 'Green Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
-                    block_array.append({'color': 'green', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
-                    cv2.line(frame, (320, 480), (int(x+w/2), int(y+h/2)), (0, 255, 0), 2)
+            self.pwm = GPIO.PWM(SignalPin, frequency)
+            self.pwm.start(6.6)
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Servo initialization: {e}")
+            self.Utils.StopRun()
 
-            # Process each red contour
-            for contour in contours_red:
-                x, y, w, h = cv2.boundingRect(contour)
-                if w > 50 and h > 50:  # Only consider boxes larger than 50x50
-                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 255), 2)
-                    cv2.putText(frame, 'Red Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
-                    block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
-                    cv2.line(frame, (320, 480), (int(x+w/2), int(y+h/2)), (0, 0, 255), 2)
-                    
-            return block_array, frame
         
-        return None, None
-        
-        
-    #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
-    def process_blocks(self):
-        while True:
-            self.block_array, self.frame = self.get_coordinates()
-     
-          
-    #Start a new thread for processing the camera stream          
-    def start_processing(self):
-        thread = threading.Thread(target=self.process_blocks)
-        thread.daemon = False
-        thread.start()
-      
-        
-    #Generate the frames for the webstream
-    def video_frames(self):
-        if self.video_stream:
-            while True:
-                with self.frame_lock:
-                    if self.frame is not None:
-                        (flag, encodedImage) = cv2.imencode(".jpg", self.frame)
-                        yield (b'--frame\r\n'
-                                b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
-                    else:
-                        yield (b'--frame\r\n'
-                                b'Content-Type: image/jpeg\r\n\r\n' + b'\r\n')
+    #Calculate the DutyCycle from a steering percentage and steer the Servo    
+    def steer(self, percentage):
+        try:    
+            self.percentage = percentage
+            
+            #Calculate DutyCycle and set it
+            try:
+                DutyCycle = 3e-5 * self.percentage**2 + 0.018 * self.percentage + 6.57
+                self.pwm.ChangeDutyCycle(DutyCycle)
+            except:
+                self.Utils.LogError(f"No valid steering percentage specified: {percentage}")
+                raise CustomException(f"No valid steering percentage specified: {percentage}")
+            
+        except Exception as e:
+            self.Utils.LogError(f"An Error occured in Servo.steer: {e}")
+            self.Utils.StopRun()
