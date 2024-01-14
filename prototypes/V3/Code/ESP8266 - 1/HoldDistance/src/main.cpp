@@ -36,7 +36,7 @@ Ultrasonic ultraschall2(TrigPin2, EchoPin2, 100000); // Trigger Pin, Echo Pin
 Servo servo;
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(1500000); // Start serial communication
   pinMode(InternalLed, OUTPUT);
   digitalWrite(InternalLed, HIGH);
   servo.attach(ServoPin);
@@ -105,7 +105,7 @@ void loop() {
           int numberLength = command.length();
           String numberStr = command.substring(numberStart, numberLength);
           desiredDistance = numberStr.toInt();
-          Serial.print("Received desired distance: ");
+          Serial.print("RD: ");
           Serial.println(desiredDistance);
         }
         // check for sensor switch
@@ -121,7 +121,7 @@ void loop() {
             activeSensor = 1;
           }
 
-          Serial.print("Received active sensor: ");
+          Serial.print("RS: ");
           Serial.println(activeSensor);
         }
         // check for KP change

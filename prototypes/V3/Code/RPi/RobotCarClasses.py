@@ -140,33 +140,30 @@ class Utility:
         self.Buzzer1.buzz(1000, 80, 0.1)
         
         while self.running and self.waiting:
-            try:
+            time.sleep(0.1)
+            if self.StartButton.state() == 1:
+        
+                self.StartNodemcus()
+                
                 time.sleep(0.1)
-                if self.StartButton.state() == 1:
-            
-                    self.StartNodemcus()
-                    
-                    time.sleep(0.1)
-                    
-                    self.EspHoldDistance.write(f"D{50}\n".encode())
-                    time.sleep(0.1)
-                    self.EspHoldDistance.write(f"KP{3}\n".encode())
-                    time.sleep(0.1)
-                    self.EspHoldDistance.write(f"ED{125}\n".encode())
-                    time.sleep(0.1)
-                    self.EspHoldSpeed.write(f"SPEED{45}\n".encode())
-                    
-                    self.Starttime = time.time()
-                    self.LogDebug(f"Run started: {time.time()}")
-                    self.Display.write("Run started:", f"{time.time()}")  
-                    self.Buzzer1.buzz(1000, 80, 0.1) 
-                    
-                    self.Gyro.angle = 0
+                
+                self.EspHoldDistance.write(f"D{50}\n".encode())
+                time.sleep(0.1)
+                self.EspHoldDistance.write(f"KP{3}\n".encode())
+                time.sleep(0.1)
+                self.EspHoldDistance.write(f"ED{125}\n".encode())
+                time.sleep(0.1)
+                self.EspHoldSpeed.write(f"SPEED{45}\n".encode())
+                
+                self.Starttime = time.time()
+                self.LogDebug(f"Run started: {time.time()}")
+                self.Display.write("Run started:", f"{time.time()}")  
+                self.Buzzer1.buzz(1000, 80, 0.1) 
+                
+                self.Gyro.angle = 0
 
-                    self.waiting = False
-                    
-            except:
-                self.StopRun()
+                self.waiting = False
+                
     
     
     #Stop the run and calculate the time needed            
@@ -195,38 +192,29 @@ class Utility:
     
     #Setup datalogging
     def setupDataLog(self):
-        try:
-            #Clear DataLog
-            #os.remove("DataLog.log")
-                
-            #Create datalogger
-            self.datalogger = logging.getLogger("DataLogger")
-            self.datalogger.setLevel(logging.DEBUG)
-
+        #Clear DataLog
+        #os.remove("DataLog.log")
             
-            #Create file handler and set level to debug
-            fh = logging.FileHandler("/tmp/DataLog.log", 'w')
-            fh.setLevel(logging.DEBUG)
-            self.datalogger.addHandler(fh)
+        #Create datalogger
+        self.datalogger = logging.getLogger("DataLogger")
+        self.datalogger.setLevel(logging.DEBUG)
 
-            #Start Process to log data while the program is running
-            self.DataLoggerStop = 0
-            PDataLogger = mp.Process(target=self.LogData)
-            PDataLogger.start()
-            
-        except Exception as e:
-            self.LogError(f"An Error occured in Utility.setupDataLog: {e}")
-            self.StopRun()
+        
+        #Create file handler and set level to debug
+        fh = logging.FileHandler("/tmp/DataLog.log", 'w')
+        fh.setLevel(logging.DEBUG)
+        self.datalogger.addHandler(fh)
+
+        #Start Process to log data while the program is running
+        self.DataLoggerStop = 0
+        PDataLogger = mp.Process(target=self.LogData)
+        PDataLogger.start()
             
 
     #Log Sensor values
     def LogData(self):
-        try:
-            self.datalogger.debug(f"Farbsensor; {0};  CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}; Voltage; {self.ADC.voltage}")
-        except Exception as e:
-            self.LogError(f"An Error occured in Utility.LogData: {e}")
-            self.StopRun()
-        
+        self.datalogger.debug(f"Farbsensor; {0};  CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}; Voltage; {self.ADC.voltage}")
+    
     
     #Stop the DataLogger Process
     def StopDataLog(self):
@@ -235,28 +223,24 @@ class Utility:
         
     #Setup logging
     def setupLog(self, name='Log', filename='Debug.log'):
-        try:
-            #Create logger
-            self.logger = logging.getLogger(name)
-            self.logger.setLevel(logging.DEBUG)
-            
-            #Create console handler and set level to debug
-            ch = logging.StreamHandler()
-            ch.setLevel(logging.DEBUG)
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            
-            #Create file handler and set level to debug
-            fh = logging.FileHandler(filename, 'w')
-            fh.setLevel(logging.DEBUG)
-            fh.setFormatter(formatter)
-            ch.setFormatter(formatter)
-            
-            #Add handlers to logger
-            self.logger.addHandler(ch)
-            self.logger.addHandler(fh)
-        except Exception as e:
-            self.LogError(f"An Error occured in Utility.setupLog: {e}")
-            self.StopRun()
+        #Create logger
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.DEBUG)
+        
+        #Create console handler and set level to debug
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        
+        #Create file handler and set level to debug
+        fh = logging.FileHandler(filename, 'w')
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(formatter)
+        ch.setFormatter(formatter)
+        
+        #Add handlers to logger
+        self.logger.addHandler(ch)
+        self.logger.addHandler(fh)
         
         
     #Log debug messages
@@ -278,13 +262,9 @@ class Utility:
     
     #Convert a number to a specified number of decimal points
     def convert_to_decimal_points(self, number, decimal_points):
-        try:
-            number = float(number)
-            formatted_string = f"{number:.{decimal_points}f}"
-            return formatted_string
-        except Exception as e:
-            self.LogError(f"Could not convert number to {decimal_points} decimal points: {e}")
-            # Handle the error or return an appropriate value if needed
+        number = float(number)
+        formatted_string = f"{number:.{decimal_points}f}"
+        return formatted_string
 
 
     #Convert a number to a specified number of digits
@@ -315,54 +295,17 @@ class Utility:
         return final_number
 
 
-    #Start a new thread for reading the sensor    
-    def toggle_supersonic_sensor(self, ID):
-        try: 
-            #Turn off both sensors
-            if ID == 0:
-                self.UltraschallThreadStop = 1
-                
-            #Toggle to sensor left
-            if ID == 1:
-                self.UltraschallThreadStop = 1
-                   
-                time.sleep(0.1)     
-                p_Ultra1 = mp.Process(target=self.Ultraschall1.start_measurement())
-                p_Ultra1.start()
-                
-                return
-            
-            #Toggle to sensor right
-            if ID == 2:
-                self.UltraschallThreadStop = 1
-                   
-                time.sleep(0.1)
-                p_Ultra2 = mp.Process(target=self.Ultraschall2.start_measurement())
-                p_Ultra2.start()
-
-                return
-            
-        except Exception as e:
-            self.LogError(f"An Error occured in Utility.toggle_supersonic_sensor: {e}")
-            self.StopRun()
-    
-    
     #Init both NodeMCUs
     def InitNodemcus(self):
         usb_devices = []
-        try:
-            # Run the 'ls /dev/tty*' command using a shell and capture the output
-            result = subprocess.run('ls /dev/tty*', shell=True, stdout=subprocess.PIPE, text=True, check=True)
-            
-            # Split the output into lines and print each line
-            devices = result.stdout.split('\n')
-            for device in devices:
-                if "/dev/ttyUSB" in device:
-                    usb_devices.append(device)
-            
-        except Exception as e:
-            self.LogError(f"An Error occured in Utility.StartNodemcus: {e}")
-            self.StopRun()
+        # Run the 'ls /dev/tty*' command using a shell and capture the output
+        result = subprocess.run('ls /dev/tty*', shell=True, stdout=subprocess.PIPE, text=True, check=True)
+        
+        # Split the output into lines and print each line
+        devices = result.stdout.split('\n')
+        for device in devices:
+            if "/dev/ttyUSB" in device:
+                usb_devices.append(device)
 
         if len(usb_devices) != 2:
             self.LogError(f"Could not find both NodeMCUs: {usb_devices}")
@@ -370,35 +313,30 @@ class Utility:
             
         #Identify both NodeMCUs
         for device in usb_devices:
-            try:
-                ESP = serial.Serial(device,baudrate=115200,timeout=1)
-                ESP.write(f"IDENT\n".encode())
-                time.sleep(0.1)
-                
-                #wait for response
-                Timeout = time.time() + 5
-                self.LogDebug(f"Waiting for response from {device} ...")
-                while not ESP.in_waiting and time.time() < Timeout:
-                    time.sleep(0.01)
-                response = ESP.read(ESP.inWaiting())
-                print(response)
-                self.LogDebug(f"Received response from {device}")
-                
-                if "HoldDistance" in response.decode("utf-8"):
-                    ESP.close()
-                    self.EspHoldDistance = serial.Serial(device,baudrate=115200,timeout=1)
-                elif "HoldSpeed" in response.decode("utf-8"):
-                    ESP.close()
-                    self.EspHoldSpeed = serial.Serial(device,baudrate=115200,timeout=1)  
-                else:
-                    self.LogError(f"Could not identify NodeMCU on: {device}")
-                    self.StopRun()
-                
-                time.sleep(0.1)
-                    
-            except Exception as e:
-                self.LogError(f"An Error occured in Utility.StartNodemcus: {e}")
+            ESP = serial.Serial(device,baudrate=1500000,timeout=1)
+            ESP.write(f"IDENT\n".encode())
+            time.sleep(0.1)
+            
+            #wait for response
+            Timeout = time.time() + 5
+            self.LogDebug(f"Waiting for response from {device} ...")
+            while not ESP.in_waiting and time.time() < Timeout:
+                time.sleep(0.01)
+            response = ESP.read(ESP.inWaiting())
+            print(response)
+            self.LogDebug(f"Received response from {device}")
+            
+            if "HoldD" in response.decode("utf-8"):
+                ESP.close()
+                self.EspHoldDistance = serial.Serial(device,baudrate=1500000,timeout=1)
+            elif "HoldS" in response.decode("utf-8"):
+                ESP.close()
+                self.EspHoldSpeed = serial.Serial(device,baudrate=1500000,timeout=1)  
+            else:
+                self.LogError(f"Could not identify NodeMCU on: {device}")
                 self.StopRun()
+            
+            time.sleep(0.1)
     
     
     #Start both NodeMCUs and wait for responses
@@ -411,19 +349,15 @@ class Utility:
             responseTimeout = time.time() + 5
 
             while waitingForResponse:
-                try:
-                    response = esp.read(esp.inWaiting())
-                    if "Received START command. Performing action..." in response.decode("utf-8"):
-                        waitingForResponse = False
-                    elif time.time() > responseTimeout:
-                        self.LogError("No response from NodeMCU")
-                        self.StopRun()
-                    else:
-                        time.sleep(0.01)
-                except Exception as e:
-                    self.LogError(f"An exception occurred in Utility.StartRun: {e}")
+                response = esp.read(esp.inWaiting())
+                if "Received START command. Performing action..." in response.decode("utf-8"):
+                    waitingForResponse = False
+                elif time.time() > responseTimeout:
+                    self.LogError("No response from NodeMCU")
                     self.StopRun()
-                    
+                else:
+                    time.sleep(0.01)
+
             time.sleep(0.1)
                     
                     
@@ -436,18 +370,14 @@ class Utility:
             responseTimeout = time.time() + 5
 
             while waitingForResponse:
-                try:
-                    response = esp.read(esp.inWaiting())
-                    if "Received STOP command. Performing action..." in response.decode("utf-8"):
-                        waitingForResponse = False
-                    elif time.time() > responseTimeout:
-                        self.LogError("No response from NodeMCU")
-                        self.StopRun()
-                    else:
-                        time.sleep(0.01)
-                except Exception as e:
-                    self.LogError(f"An exception occurred in Utility.StartRun: {e}")
+                response = esp.read(esp.inWaiting())
+                if "Received STOP command. Performing action..." in response.decode("utf-8"):
+                    waitingForResponse = False
+                elif time.time() > responseTimeout:
+                    self.LogError("No response from NodeMCU")
                     self.StopRun()
+                else:
+                    time.sleep(0.01)
         
         time.sleep(0.1)
     
@@ -456,46 +386,32 @@ class Utility:
 #A class for reading a Button; A Button that instantly stops the program if pressed            
 class Button(Utility):
     def __init__(self, SignalPin, Utils):
-        try:
-            #Variables
-            self.SignalPin = SignalPin
-            self.Utils = Utils
-            
-            #GPIO setup
-            self.button_line = chip.get_line(SignalPin)
-            self.button_line.request(consumer='Button', type=gpiod.LINE_REQ_DIR_IN, flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP)
-            
-            all_lines.append(self.button_line)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Button initialization: {e}")
-            self.Utils.StopRun()
+        #Variables
+        self.SignalPin = SignalPin
+        self.Utils = Utils
+        
+        #GPIO setup
+        self.button_line = chip.get_line(SignalPin)
+        self.button_line.request(consumer='Button', type=gpiod.LINE_REQ_DIR_IN, flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP)
+        
+        all_lines.append(self.button_line)
         
     
     #Read the state of the Button -- 1 if pressed, 0 if not    
-    def state(self):
-        try:    
-            #Read button state
-            if self.button_line.get_value() == 0:
-                return 1
-            elif self.button_line.get_value() == 1:
-                return 0
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Button.state: {e}")
-            self.Utils.StopRun()
+    def state(self): 
+        #Read button state
+        if self.button_line.get_value() == 0:
+            return 1
+        elif self.button_line.get_value() == 1:
+            return 0
       
     
     #Start the Thread for reading the StopButton    
     def start_StopButton(self):
-        try:
-            self.threadStop = 0
-            self.thread = threading.Thread(target=self.read_StopButton, daemon=True)
-            self.thread.start()
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Button.start_StopButton: {e}")
-            self.Utils.StopRun()
-        
+        self.threadStop = 0
+        self.thread = threading.Thread(target=self.read_StopButton, daemon=True)
+        self.thread.start()
+  
     
     #Function that kills the program if the StopButton is pressed    
     def read_StopButton(self):
@@ -510,160 +426,121 @@ class Button(Utility):
           
     #Stop the Thread for reading the StopButton      
     def stop_StopButton(self):
-        try:
-            self.threadStop = 1
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Button.stop_StopButton: {e}")
-            self.Utils.StopRun()
-     
-     
-        
+        self.threadStop = 1
+
+
 #A class for reading a TCS34725 ColorSensor         
 class ColorSensor(Utility):
     def __init__(self, Utils):
-        try:
-            #Variable init
-            self.color_rgb, self.color_temperature, self.lux = 0, 0, 0
-            self.Utils = Utils
-            
-            #Colorsensor init
-            i2c = board.I2C()
-            self.sensor = adafruit_tcs34725.TCS34725(i2c)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in ColorSensor initialization: {e}")
-            self.Utils.StopRun()
+        #Variable init
+        self.color_rgb, self.color_temperature, self.lux = 0, 0, 0
+        self.Utils = Utils
+        
+        #Colorsensor init
+        i2c = board.I2C()
+        self.sensor = adafruit_tcs34725.TCS34725(i2c)
             
     
     #Start a new thread for reading the sensor        
     def start_measurement(self):
-        try:
-            self.sensor.active = True
-            self.threadStop = 0
-            self.thread = threading.Thread(target=self.read, daemon=True)
-            self.thread.start()
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in ColorSensor.start_measurement: {e}")
-            self.Utils.StopRun()
+        self.sensor.active = True
+        self.threadStop = 0
+        self.thread = threading.Thread(target=self.read, daemon=True)
+        self.thread.start()
         
         
     #Read the sensor data    
     def read(self):
-        try:
-            #Write sensor data to variables
-            while self.threadStop == 0:
-                self.color_temperature = self.sensor.color_temperature
-                #self.color_rgb = self.sensor.color_rgb_bytes
-                #self.lux = self.sensor.lux
-                
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in ColorSensor.read: {e}")
-            self.Utils.StopRun()
+        #Write sensor data to variables
+        while self.threadStop == 0:
+            self.color_temperature = self.sensor.color_temperature
+            #self.color_rgb = self.sensor.color_rgb_bytes
+            #self.lux = self.sensor.lux
         
     
     #Stop the thread for reading the sensor   
     def stop_measurement(self):
-        try:
-            self.sensor.active = False
-            self.threadStop = 1
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in ColorSensor.stop_measurement: {e}")
-            self.Utils.StopRun()
+        self.sensor.active = False
+        self.threadStop = 1
         
         
 
 #A class for reading a MPU6050 Gyroscope
 class Gyroscope(Utility):
     def __init__(self, Utils):
-        try:
-            i2c = busio.I2C(board.D1, board.D0)
-            self.sensor = adafruit_mpu6050.MPU6050(i2c)
-            self.sensor._gyro_range = 0
-            self.Utils = Utils
-            
-            self.threadStop = 0
+        i2c = busio.I2C(board.D1, board.D0)
+        self.sensor = adafruit_mpu6050.MPU6050(i2c)
+        self.sensor._gyro_range = 0
+        self.Utils = Utils
+        
+        self.threadStop = 0
 
-            #Initialize variables for storing the angle and time
-            self.angle = 0.0  # Initial angle
-            self.last_time = time.time()
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Gyroscope initialization: {e}")
-            self.Utils.StopRun()
-
+        #Initialize variables for storing the angle and time
+        self.angle = 0.0  # Initial angle
+        self.last_time = time.time()
+    
 
     #Read the gyroscope data and calculate the angle
     def get_angle(self):
         while self.threadStop == 0:
-            try:
-                offset_x = 0.29
-                offset_y = 0.0
-                offset_z = 0.0
-                #Read gyroscope data
-                gyro_data = self.sensor.gyro
-                gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
+            time.sleep(0.005)
+            offset_x = 0.29
+            offset_y = 0.0
+            offset_z = 0.0
+            #Read gyroscope data
+            gyro_data = self.sensor.gyro
+            gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
 
-                # Get the current time
-                current_time = time.time()
+            # Get the current time
+            current_time = time.time()
 
-                # Calculate the time elapsed since the last measurement
-                delta_time = current_time - self.last_time
+            # Calculate the time elapsed since the last measurement
+            delta_time = current_time - self.last_time
+            
+            #bugfix for time-jumps
+            if delta_time >= 0.5:
+                delta_time = 0.003
+
+            # Integrate the gyroscope readings to get the change in angle
+            if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
+                gyro_data = 0
+            else:
+                gyro_data = gyro_data[0]
                 
-                #bugfix for time-jumps
-                if delta_time >= 0.5:
-                    delta_time = 0.003
+            delta_angle = gyro_data * delta_time * 60
 
-                # Integrate the gyroscope readings to get the change in angle
-                if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
-                    gyro_data = 0
-                else:
-                    gyro_data = gyro_data[0]
-                    
-                delta_angle = gyro_data * delta_time * 60
+            # Update the angle
+            self.angle += delta_angle
 
-                # Update the angle
-                self.angle += delta_angle
-
-                # Update the last time for the next iteration
-                self.last_time = current_time
-        
-            except Exception as e:
-                self.Utils.LogError(f"An Error occured in Gyroscope.get_angle: {e}")
-                self.Utils.StopRun()
+            # Update the last time for the next iteration
+            self.last_time = current_time
     
         
 
 #A class for reading a ADS1015 ADC        
 class AnalogDigitalConverter(Utility):
     def __init__(self, Utils, channel=2):
-        try:
-            #Variables
-            self.channel = channel
-            self.voltage = 12
-            
-            #ADC init
-            i2c = busio.I2C(board.D1, board.D0)
-            self.ads = ADS.ADS1015(i2c)
-            self.ads.active = True
-            self.Utils = Utils
-            
-            #Channel init
-            if channel == 0:
-                self.chan = AnalogIn(self.ads, ADS.P0)
-            elif channel == 1:
-                self.chan = AnalogIn(self.ads, ADS.P1)
-            elif channel == 2:
-                self.chan = AnalogIn(self.ads, ADS.P2)
-            elif channel == 3:
-                self.chan = AnalogIn(self.ads, ADS.P3)
-            else:
-                raise CustomException(f"No valid ADC channel specified: {channel}")
+        #Variables
+        self.channel = channel
+        self.voltage = 12
         
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in AnalogDigitalConverter initialization: {e}")
-            self.Utils.StopRun()
+        #ADC init
+        i2c = busio.I2C(board.D1, board.D0)
+        self.ads = ADS.ADS1015(i2c)
+        self.ads.active = True
+        self.Utils = Utils
+        
+        #Channel init
+        if channel == 0:
+            self.chan = AnalogIn(self.ads, ADS.P0)
+        elif channel == 1:
+            self.chan = AnalogIn(self.ads, ADS.P1)
+        elif channel == 2:
+            self.chan = AnalogIn(self.ads, ADS.P2)
+        elif channel == 3:
+            self.chan = AnalogIn(self.ads, ADS.P3)
+        else:
+            raise CustomException(f"No valid ADC channel specified: {channel}")
        
     
     #Read the voltage from the ADC    
@@ -676,166 +553,132 @@ class AnalogDigitalConverter(Utility):
 #A class for writing to a OLED Display
 class DisplayOled(Utility):
     def __init__(self, ADC=None, Gyro=None, Farbsensor=None, Utils=None):
-        try:
-            serial = i2c(port=0, address=0x3C)
-            self.device = sh1106(serial)
-            
-            #Variable init
-            self.first_line = ""
-            self.second_line = ""
-            self.ADC = ADC
-            self.Utils = Utils
-            self.Gyro = Gyro
-            self.ColorSensor = Farbsensor
-            
-            #Wake the screen by drawing an outline
-            with canvas(self.device) as draw:
-                draw.rectangle(self.device.bounding_box, outline="white", fill="black")
+        serial = i2c(port=0, address=0x3C)
+        self.device = sh1106(serial)
         
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled initialization: {e}")
-            self.Utils.StopRun()
+        #Variable init
+        self.first_line = ""
+        self.second_line = ""
+        self.ADC = ADC
+        self.Utils = Utils
+        self.Gyro = Gyro
+        self.ColorSensor = Farbsensor
         
+        #Wake the screen by drawing an outline
+        with canvas(self.device) as draw:
+            draw.rectangle(self.device.bounding_box, outline="white", fill="black")
+    
        
     #Clear the Display 
     def clear(self):
-        try:
-            with canvas(self.device) as draw:
-                draw.rectangle(self.device.bounding_box, outline="white", fill="black")
-                
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.clear: {e}")
-            self.Utils.StopRun()
-       
+        with canvas(self.device) as draw:
+            draw.rectangle(self.device.bounding_box, outline="white", fill="black")
+            
     
     #Write lines in variables so they get written by the update function   
     def write(self, first_line="", second_line="", reset=False, xCoord=0, yCoord=17):
-        try:
-            if reset:
-                self.first_line = ""
-                self.second_line = ""
-            
-            if first_line != "":
-                self.first_line = first_line
-            if second_line != "":
-                self.second_line = second_line
+        if reset:
+            self.first_line = ""
+            self.second_line = ""
         
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.write: {e}")
-            self.Utils.StopRun()
+        if first_line != "":
+            self.first_line = first_line
+        if second_line != "":
+            self.second_line = second_line
         
 
     #Start a new thread for updating the Display
     def start_update(self):
-        try:
-            self.threadStop = 0
-            self.thread1 = threading.Thread(target=self.update, daemon=True)
-            self.thread1.start()
-            
-            if self.Gyro != None:
-                self.Gyro.threadStop = 0
-                self.thread2 = threading.Thread(target=self.Gyro.get_angle, daemon=True)
-                self.thread2.start()
-            
-            if self.ColorSensor != None:
-                self.ColorSensor.threadStop = 0
-                self.thread3 = threading.Thread(target=self.ColorSensor.read, daemon=True)
-                self.thread3.start()
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.start_update: {e}")
-            self.Utils.StopRun()
+        self.threadStop = 0
+        self.thread1 = threading.Thread(target=self.update, daemon=True)
+        self.thread1.start()
+        
+        if self.Gyro != None:
+            self.Gyro.threadStop = 0
+            self.thread2 = threading.Thread(target=self.Gyro.get_angle, daemon=True)
+            self.thread2.start()
+        
+        if self.ColorSensor != None:
+            self.ColorSensor.threadStop = 0
+            self.thread3 = threading.Thread(target=self.ColorSensor.read, daemon=True)
+            self.thread3.start()
 
     
     #Update the Display
     def update(self):
         while self.threadStop == 0:
-            try:
-                #Get CPU temperature, CPU usage, RAM usage and Disk usage
-                cpuTemp = CPUTemperature()
-                self.cpu_usage = psutil.cpu_percent(interval=0)
-                self.ram = psutil.virtual_memory()
-                self.disk = psutil.disk_usage('/')
-                
-                #Format them to always have the same number of decimal points
-                cpu_temp_formatted = self.convert_to_decimal_points(cpuTemp.temperature, 1)
-                cpu_usage_formatted = self.convert_to_decimal_points(self.cpu_usage, 1)
-                ram_usage_formatted = self.convert_to_decimal_points(self.ram.percent, 1)
-                disk_usage_formatted = self.convert_to_decimal_points(self.disk.percent, 1)
-                voltage_value_formatted = self.convert_to_decimal_points(self.ADC.read(), 2)
-                
-                #Draw all the data on the Display
-                with canvas(self.device) as draw:
-                        #top
-                        draw.text((0, 0), f"{cpu_temp_formatted}°C", fill="white", align="left")
-                        draw.text((40, 0), f"DISK:{(int(float(disk_usage_formatted)))}%", fill="white")
-                        draw.text((92, 0), f"{voltage_value_formatted}V", fill="white")
-                        
-                        #bottom
-                        draw.text((0, 50), f"CPU:{cpu_usage_formatted}%", fill="white")
-                        draw.text((75, 50), f"RAM:{ram_usage_formatted}%", fill="white")
-                        
-                        #custom
-                        draw.multiline_text((0, 15), f"{self.first_line}\n{self.second_line}", fill="white", align="center", anchor="ma")
-                        
-                time.sleep(2)
+
+            #Get CPU temperature, CPU usage, RAM usage and Disk usage
+            cpuTemp = CPUTemperature()
+            self.cpu_usage = psutil.cpu_percent(interval=0)
+            self.ram = psutil.virtual_memory()
+            self.disk = psutil.disk_usage('/')
+            
+            #Format them to always have the same number of decimal points
+            cpu_temp_formatted = self.convert_to_decimal_points(cpuTemp.temperature, 1)
+            cpu_usage_formatted = self.convert_to_decimal_points(self.cpu_usage, 1)
+            ram_usage_formatted = self.convert_to_decimal_points(self.ram.percent, 1)
+            disk_usage_formatted = self.convert_to_decimal_points(self.disk.percent, 1)
+            voltage_value_formatted = self.convert_to_decimal_points(self.ADC.read(), 2)
+            
+            #Draw all the data on the Display
+            with canvas(self.device) as draw:
+                    #top
+                    draw.text((0, 0), f"{cpu_temp_formatted}°C", fill="white", align="left")
+                    draw.text((40, 0), f"DISK:{(int(float(disk_usage_formatted)))}%", fill="white")
+                    draw.text((92, 0), f"{voltage_value_formatted}V", fill="white")
                     
-            except Exception as e:
-                self.Utils.LogError(f"An Error occured in DisplayOled.update: {e}")
-                self.Utils.StopRun()
+                    #bottom
+                    draw.text((0, 50), f"CPU:{cpu_usage_formatted}%", fill="white")
+                    draw.text((75, 50), f"RAM:{ram_usage_formatted}%", fill="white")
+                    
+                    #custom
+                    draw.multiline_text((0, 15), f"{self.first_line}\n{self.second_line}", fill="white", align="center", anchor="ma")
+                    
+            time.sleep(2)
+
          
-    
     #Stop the thread for updating the Display      
     def stop_update(self):
-        try:
-            self.threadStop = 1
-            
-            if self.Gyro != None:
-                self.Gyro.threadStop = 1
-                
-            if self.ColorSensor != None:
-                self.ColorSensor.threadStop = 1
 
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in DisplayOled.stop_update: {e}")
-            self.Utils.StopRun()
+        self.threadStop = 1
+        
+        if self.Gyro != None:
+            self.Gyro.threadStop = 1
+            
+        if self.ColorSensor != None:
+            self.ColorSensor.threadStop = 1
+
 
 
 
 #A class for making sounds with a Buzzer
 class Buzzer(Utility):
     def __init__(self, SignalPin, Utils):
-        try:
-            self.Utils = Utils
-            self.SignalPin = chip.get_line(SignalPin)
-            self.SignalPin.request(consumer='buzzer', type=gpiod.LINE_REQ_DIR_OUT)
-            
-            all_lines.append(self.SignalPin)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Buzzer initialization: {e}")
-            self.Utils.StopRun()
-            
+
+        self.Utils = Utils
+        self.SignalPin = chip.get_line(SignalPin)
+        self.SignalPin.request(consumer='buzzer', type=gpiod.LINE_REQ_DIR_OUT)
+        
+        all_lines.append(self.SignalPin)
+
     def buzz(self, frequency, volume, duration):
-        try:
-            # Check if the volume value is greater than the frequency
-            if volume > frequency:
-                volume = frequency
+        # Check if the volume value is greater than the frequency
+        if volume > frequency:
+            volume = frequency
 
-            period = 1.0 / frequency  # Calculate the period of the frequency
-            on_time = period * volume / 100  # Calculate the time the signal should be on
-            off_time = period - on_time  # Calculate the time the signal should be off
+        period = 1.0 / frequency  # Calculate the period of the frequency
+        on_time = period * volume / 100  # Calculate the time the signal should be on
+        off_time = period - on_time  # Calculate the time the signal should be off
 
-            end_time = time.time() + duration
-            while time.time() < end_time:
-                self.SignalPin.set_value(1)
-                time.sleep(on_time)
-                self.SignalPin.set_value(0)
-                time.sleep(off_time)
+        end_time = time.time() + duration
+        while time.time() < end_time:
+            self.SignalPin.set_value(1)
+            time.sleep(on_time)
+            self.SignalPin.set_value(0)
+            time.sleep(off_time)
             
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Buzzer.buzz: {e}")
-            self.Utils.StopRun()
+
 
 
 
@@ -866,6 +709,7 @@ class Camera():
         self.upper_red2 = np.array([180, 255, 180])
 
         self.kernel = np.ones((5, 5), np.uint8)
+        self.desired_distance_wall = -1
 
         
     #Get the coordinates of the blocks in the camera stream
@@ -896,6 +740,7 @@ class Camera():
         contours_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         cv2.circle(frame, (640, 720), 10, (255, 0, 0), -1)
+        cv2.putText(frame, f"{self.desired_distance_wall}", (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
         
         block_array = []
 
