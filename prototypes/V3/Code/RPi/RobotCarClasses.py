@@ -147,15 +147,15 @@ class Utility:
                 
                 time.sleep(0.1)
                 
-                self.EspHoldDistance.write(f"D{50}\n".encode())
+                self.EspHoldDistance.write(f"D{70}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"KP{3}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"ED{125}\n".encode())
                 time.sleep(0.1)
-                self.EspHoldSpeed.write(f"SPEED{45}\n".encode())
+                self.EspHoldSpeed.write(f"SPEED{60}\n".encode())
                 time.sleep(0.1)
-                self.EspHoldDistance.write(f"MM{1}\n".encode())
+                self.EspHoldDistance.write(f"MM{10}\n".encode())
                 
                 self.Starttime = time.time()
                 self.LogDebug(f"Run started: {time.time()}")
@@ -554,7 +554,7 @@ class AnalogDigitalConverter(Utility):
     
 #A class for writing to a OLED Display
 class DisplayOled(Utility):
-    def __init__(self, ADC=None, Gyro=None, Farbsensor=None, Utils=None):
+    def __init__(self, ADC=None, Gyro=None, Farbsensor=None, Button=None, Utils=None):
         serial = i2c(port=0, address=0x3C)
         self.device = sh1106(serial)
         
@@ -565,6 +565,7 @@ class DisplayOled(Utility):
         self.Utils = Utils
         self.Gyro = Gyro
         self.ColorSensor = Farbsensor
+        self.Button = Button
         
         #Wake the screen by drawing an outline
         with canvas(self.device) as draw:
@@ -604,6 +605,11 @@ class DisplayOled(Utility):
             self.ColorSensor.threadStop = 0
             self.thread3 = threading.Thread(target=self.ColorSensor.read, daemon=True)
             self.thread3.start()
+            
+        if self.Button != None:
+            self.Button.threadStop = 0
+            self.thread4 = threading.Thread(target=self.Button.read_StopButton, daemon=True)
+            self.thread4.start()
 
     
     #Update the Display
