@@ -113,7 +113,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                         block_array.remove(block)
                     
             if len(block_array) > 0:
-                Utils.LogDebug(f"Lenght of block_array: {len(block_array)}")
+                #Utils.LogDebug(f"Lenght of block_array: {len(block_array)}")
                 #Sort blocks by size
                 
                 block_array.sort(key=lambda x: x['size'], reverse=True)
@@ -175,7 +175,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                             Utils.LogDebug(f"Switched to Sensor 2")
                             
             else:
-                if time.time() > Last_Esp_Command + 0.3:
+                if time.time() > Last_Esp_Command + 0.7:
                     Utils.LogDebug(f"Correcting to middle")
                     if Sensor != 2:
                         Utils.EspHoldDistance.write(f"S2\n".encode())
@@ -203,7 +203,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     Cam.desired_distance_wall = desired_distance_wall
                         
         else:
-            if time.time() > Time_detect_new_block + 5:
+            if time.time() > Time_detect_new_block + 4:
                 detect_new_block = True
                 print("Detect new block")
                         

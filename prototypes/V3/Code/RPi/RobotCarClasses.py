@@ -154,6 +154,8 @@ class Utility:
                 self.EspHoldDistance.write(f"ED{125}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldSpeed.write(f"SPEED{45}\n".encode())
+                time.sleep(0.1)
+                self.EspHoldDistance.write(f"MM{1}\n".encode())
                 
                 self.Starttime = time.time()
                 self.LogDebug(f"Run started: {time.time()}")
@@ -313,7 +315,7 @@ class Utility:
             
         #Identify both NodeMCUs
         for device in usb_devices:
-            ESP = serial.Serial(device,baudrate=1500000,timeout=1)
+            ESP = serial.Serial(device,baudrate=1000000,timeout=1)
             ESP.write(f"IDENT\n".encode())
             time.sleep(0.1)
             
@@ -326,12 +328,12 @@ class Utility:
             print(response)
             self.LogDebug(f"Received response from {device}")
             
-            if "HoldD" in response.decode("utf-8"):
+            if "HoldDistance" in response.decode("utf-8"):
                 ESP.close()
-                self.EspHoldDistance = serial.Serial(device,baudrate=1500000,timeout=1)
-            elif "HoldS" in response.decode("utf-8"):
+                self.EspHoldDistance = serial.Serial(device,baudrate=1000000,timeout=1)
+            elif "HoldSpeed" in response.decode("utf-8"):
                 ESP.close()
-                self.EspHoldSpeed = serial.Serial(device,baudrate=1500000,timeout=1)  
+                self.EspHoldSpeed = serial.Serial(device,baudrate=1000000,timeout=1)  
             else:
                 self.LogError(f"Could not identify NodeMCU on: {device}")
                 self.StopRun()

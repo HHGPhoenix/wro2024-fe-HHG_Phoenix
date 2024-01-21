@@ -62,7 +62,7 @@ void holdSpeed() {
 
 
 void setup() {
-  Serial.begin(1500000);
+  Serial.begin(1000000);
   pinMode(InternalLed, OUTPUT);
   digitalWrite(InternalLed, HIGH);
 }
