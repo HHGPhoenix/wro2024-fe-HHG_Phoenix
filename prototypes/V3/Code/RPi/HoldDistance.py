@@ -10,7 +10,8 @@ import RPi.GPIO as GPIO
 ##########################################################    
 Utils = Utility()
 
-Farbsensor = ColorSensor(Utils)
+#Farbsensor = ColorSensor(Utils)
+Farbsensor = None
 
 StartButton = Button(5, Utils)
 StopButton = Button(6, Utils)
@@ -21,7 +22,7 @@ Gyro = Gyroscope(Utils)
 
 
 ADC = AnalogDigitalConverter(Utils)
-Display = DisplayOled(ADC, Gyro, Farbsensor, Utils)
+Display = DisplayOled(ADC, Gyro, Farbsensor, StopButton, Utils)
 
 Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro)
 
@@ -77,6 +78,7 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
                     Utils.EspHoldDistance.write(f"S2\n".encode())
              
                 
+            """
             #Count rounds with ColorSensor
             if Utils.Farbsensor.color_temperature >= colorTemperature and time.time() > TIMEOUT2:
                 corners2 = corners2 + 1
@@ -86,7 +88,7 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
                     rounds2 = rounds2 + 1
                     
                 TIMEOUT2 = time.time() + LineWaitTime
-            
+            """
             
             #Count rounds with Gyro
             Utils.angle = Gyro.angle
@@ -121,11 +123,11 @@ def HoldDistance(Utils, colorTemperature=1, LineWaitTime=1):
                 if "Drive direction counterclockwise" in response:
                     direction = 1
                     time.sleep(0.1)
-                    Utils.EspHoldDistance.write(f"D{25}\n".encode())
+                    Utils.EspHoldDistance.write(f"D{70}\n".encode())
                 elif "Drive direction clockwise" in response:
                     direction = 0
                     time.sleep(0.1)
-                    Utils.EspHoldDistance.write(f"D{25}\n".encode())
+                    Utils.EspHoldDistance.write(f"D{70}\n".encode())
                     
                 Utils.LogDebug(f"Response from EspHoldDistance: {response}")
             

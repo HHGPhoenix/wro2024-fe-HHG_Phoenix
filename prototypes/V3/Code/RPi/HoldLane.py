@@ -100,7 +100,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                 oldAngle = newAngle
                 TIMEOUT = time.time() + LineWaitTime
         
-        
+        """
         #get objects and calculate new distance
         if detect_new_block:
             block_array = Cam.block_array
@@ -120,7 +120,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                 
                 nextBlock = block_array[0]
                 
-                if nextBlock['y'] + nextBlock['h'] > 500:
+                if nextBlock['y'] + nextBlock['h'] > 450:
                     detect_new_block = False
                     Time_detect_new_block = time.time()
                     Utils.LogDebug(f"Freeze")
@@ -131,15 +131,15 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     #nextBlock['distance'] = math.sqrt(nextBlock['distancex']**2 + nextBlock['distancey']**2)
                     
                     if nextBlock['color'] == "red":
-                        desired_distance_to_block = 500
+                        desired_distance_to_block = 600
                     elif nextBlock['color'] == "green":
-                        desired_distance_to_block = -500
+                        desired_distance_to_block = -600
                         
                     distance_divider = (nextBlock['y'] / coordinates_self[1]) * 2
                     #print("Distance Divider: ", distance_divider)
                     
                     error = (desired_distance_to_block - nextBlock['distancex']) * distance_divider
-                    desired_distance_wall =  50 - (error / 14.22)
+                    desired_distance_wall =  50 - (error / 12.22) #14.22
                     desired_distance_wall = int(desired_distance_wall)
                     Cam.desired_distance_wall = desired_distance_wall
                     
@@ -203,10 +203,10 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     Cam.desired_distance_wall = desired_distance_wall
                         
         else:
-            if time.time() > Time_detect_new_block + 4:
+            if time.time() > Time_detect_new_block + 2:
                 detect_new_block = True
                 print("Detect new block")
-                        
+        """       
         #check for direction
         if Utils.EspHoldDistance.in_waiting > 0:
             response = Utils.EspHoldDistance.read(Utils.EspHoldDistance.in_waiting).decode()
