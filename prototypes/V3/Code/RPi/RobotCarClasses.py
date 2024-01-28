@@ -69,6 +69,8 @@ class Utility:
         self.Starttime = 0
         self.UltraschallThreadStop = 1
         
+        self.stop_run_callable = True
+        
         
     #Cleanup after the run is finished or an error occured
     def cleanup(self):
@@ -147,13 +149,13 @@ class Utility:
                 
                 time.sleep(0.1)
                 
-                self.EspHoldDistance.write(f"D{70}\n".encode())
+                self.EspHoldDistance.write(f"D{50}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"KP{3}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"ED{125}\n".encode())
                 time.sleep(0.1)
-                self.EspHoldSpeed.write(f"SPEED{60}\n".encode())
+                self.EspHoldSpeed.write(f"SPEED{55}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"MM{10}\n".encode())
                 
@@ -170,6 +172,7 @@ class Utility:
     
     #Stop the run and calculate the time needed            
     def StopRun(self):
+        
         self.StopTime = time.time()
         self.LogDebug(f"Run ended: {self.StopTime}")
         
@@ -419,13 +422,12 @@ class Button(Utility):
     def read_StopButton(self):
         #Stop program if stopbutton is pressed
         while self.threadStop == 0:
-            StartTime = time.time()
             time.sleep(0.1)
             if self.state() == 1:
                 self.Utils.LogError("StopButton pressed")
-                self.Utils.StopRun()
-            StopTime = time.time()
-          
+                self.Utils.running = False
+                
+                
     #Stop the Thread for reading the StopButton      
     def stop_StopButton(self):
         self.threadStop = 1
@@ -671,20 +673,25 @@ class Buzzer(Utility):
         all_lines.append(self.SignalPin)
 
     def buzz(self, frequency, volume, duration):
-        # Check if the volume value is greater than the frequency
-        if volume > frequency:
-            volume = frequency
+        try:
+            # Check if the volume value is greater than the frequency
+            if volume > frequency:
+                volume = frequency
 
-        period = 1.0 / frequency  # Calculate the period of the frequency
-        on_time = period * volume / 100  # Calculate the time the signal should be on
-        off_time = period - on_time  # Calculate the time the signal should be off
+            period = 1.0 / frequency  # Calculate the period of the frequency
+            on_time = period * volume / 100  # Calculate the time the signal should be on
+            off_time = period - on_time  # Calculate the time the signal should be off
 
-        end_time = time.time() + duration
-        while time.time() < end_time:
-            self.SignalPin.set_value(1)
-            time.sleep(on_time)
-            self.SignalPin.set_value(0)
-            time.sleep(off_time)
+            end_time = time.time() + duration
+            while time.time() < end_time:
+                self.SignalPin.set_value(1)
+                time.sleep(on_time)
+                self.SignalPin.set_value(0)
+                time.sleep(off_time)
+                
+        except PermissionError:
+            self.Utils.LogDebug("Buzzer already in use, skipping")
+            return
             
 
 
@@ -693,6 +700,8 @@ class Buzzer(Utility):
 #A class for detecting red and green blocks in the camera stream           
 class Camera():
     def __init__(self, video_stream=False, video_source=0):
+        self.freeze = False
+        
         self.frame = None
         self.frame_lock = threading.Lock()
         
@@ -749,6 +758,7 @@ class Camera():
         
         cv2.circle(frame, (640, 720), 10, (255, 0, 0), -1)
         cv2.putText(frame, f"{self.desired_distance_wall}", (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
+        cv2.putText(frame, f"Freeze: {self.freeze}", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
         
         block_array = []
 
