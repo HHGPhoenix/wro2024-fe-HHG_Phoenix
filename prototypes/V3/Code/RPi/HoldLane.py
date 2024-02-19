@@ -52,14 +52,15 @@ Utils.ED = 125 #Edge detection distance in cm
 ##                     Functions                        ##
 ##                                                      ##
 ##########################################################
-def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Sensor=2):
+def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, GyroWaitTime=1, Sensor=2):
     #Variables
     TIMEOUT = 0
-    TIMEOUTBlock = 0
+    TIMEOUTBlock = 2
     corners = 0
     rounds = 0
     Sensor = 0
     direction = 0
+    relative_angle = 0
     oldAngle = 0
     detect_new_block = True
     Last_Esp_Command = 0
@@ -68,6 +69,13 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
     old_desired_distance_wall = 0
     
     coordinates_self = (640, 720) #x, y
+    middledistance = 50
+    GyroCornerAngle = 90
+    FreezeSize = 30000
+    KP = 0.3
+    
+    desired_distance_to_block_red = 700
+    desired_distance_to_block_green = -700
     
     #Hold Lane
     while Utils.running and rounds < 3:
@@ -76,7 +84,8 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
         #Count rounds with Gyro
         Utils.angle = Gyro.angle
         if direction == 0:
-            newAngle = oldAngle -90
+            relative_angle = Gyro.angle - oldAngle
+            newAngle = oldAngle - GyroCornerAngle
             if Gyro.angle < newAngle and time.time() > TIMEOUT:
                 corners = corners + 1
                 Utils.LogDebug(f"Corner: {corners}")
@@ -88,8 +97,10 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     
                 oldAngle = newAngle
                 TIMEOUT = time.time() + LineWaitTime
+                
         else:
-            newAngle = oldAngle + 90
+            relative_angle = Gyro.angle - oldAngle
+            newAngle = oldAngle + GyroCornerAngle
             if Gyro.angle > newAngle and time.time() > TIMEOUT:
                 corners = corners + 1
                 Utils.LogDebug(f"Corner: {corners}")
@@ -100,7 +111,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                 oldAngle = newAngle
                 TIMEOUT = time.time() + LineWaitTime
         
-        """
+        
         #get objects and calculate new distance
         if detect_new_block:
             block_array = Cam.block_array
@@ -120,10 +131,10 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                 
                 nextBlock = block_array[0]
                 
-                if nextBlock['y'] + nextBlock['h'] > 450:
+                if nextBlock['w'] * nextBlock['h'] > FreezeSize:
                     detect_new_block = False
                     Time_detect_new_block = time.time()
-                    Utils.LogDebug(f"Freeze")
+                    Utils.LogInfo(f"Freeze")
 
                 else:
                     nextBlock['distancex'] = -(coordinates_self[0] - nextBlock['mx'])
@@ -131,15 +142,15 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     #nextBlock['distance'] = math.sqrt(nextBlock['distancex']**2 + nextBlock['distancey']**2)
                     
                     if nextBlock['color'] == "red":
-                        desired_distance_to_block = 600
+                        desired_distance_to_block = desired_distance_to_block_red
                     elif nextBlock['color'] == "green":
-                        desired_distance_to_block = -600
+                        desired_distance_to_block = desired_distance_to_block_green
                         
-                    distance_divider = (nextBlock['y'] / coordinates_self[1]) * 2
+                    distance_divider = (nextBlock['y'] / coordinates_self[1]) * 2.5
                     #print("Distance Divider: ", distance_divider)
                     
                     error = (desired_distance_to_block - nextBlock['distancex']) * distance_divider
-                    desired_distance_wall =  50 - (error / 12.22) #14.22
+                    desired_distance_wall =  middledistance - error * KP
                     desired_distance_wall = int(desired_distance_wall)
                     Cam.desired_distance_wall = desired_distance_wall
                     
@@ -148,54 +159,54 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     elif desired_distance_wall > 95:
                         desired_distance_wall = 95
 
-                    if desired_distance_wall > 50:
+                    if desired_distance_wall > middledistance:
                         desired_distance_wall = (100 - desired_distance_wall)
                             
                         #Send ESPHoldDistance new Distance
                         if abs(desired_distance_wall - old_desired_distance_wall) > 3:
                             Utils.EspHoldDistance.write(f"D{desired_distance_wall}\n".encode())
-                            Utils.LogDebug(f"New Distance {desired_distance_wall}, Current Sensor: {Sensor}")
+                            Utils.LogInfo(f"New Distance {desired_distance_wall}, Current Sensor: {Sensor}")
                             old_desired_distance_wall = desired_distance_wall
                         
                         #Send ESPHoldDistance new Sensor
                         if Sensor != 1:
                             Sensor = 1
                             Utils.EspHoldDistance.write(f"S1\n".encode())
-                            Utils.LogDebug(f"Switched to Sensor 1")
+                            Utils.LogInfo(f"Switched to Sensor 1")
                             
                     else:
                         if abs(desired_distance_wall - old_desired_distance_wall) > 3:
                             Utils.EspHoldDistance.write(f"D{desired_distance_wall}\n".encode())
-                            Utils.LogDebug(f"New Distance {desired_distance_wall}, Current Sensor: {Sensor}")
+                            Utils.LogInfo(f"New Distance {desired_distance_wall}, Current Sensor: {Sensor}")
                             old_desired_distance_wall = desired_distance_wall
                         
                         if Sensor != 2:
                             Sensor = 2
                             Utils.EspHoldDistance.write(f"S2\n".encode())
-                            Utils.LogDebug(f"Switched to Sensor 2")
+                            Utils.LogInfo(f"Switched to Sensor 2")
                             
             else:
                 if time.time() > Last_Esp_Command + 0.7:
-                    Utils.LogDebug(f"Correcting to middle")
+                    #Utils.LogInfo(f"Correcting to middle")
                     if Sensor != 2:
                         Utils.EspHoldDistance.write(f"S2\n".encode())
                         Sensor = 2
                         time.sleep(0.05)
                         
-                    if desired_distance_wall > 52:
+                    if desired_distance_wall > middledistance + 2:
                         desired_distance_wall -= 4
                         Utils.EspHoldDistance.write(f"D{desired_distance_wall}\n".encode())
 
                         Last_Esp_Command = time.time()
                         
-                    elif desired_distance_wall < 48:
+                    elif desired_distance_wall < middledistance - 2:
                         desired_distance_wall += 4
                         Utils.EspHoldDistance.write(f"D{desired_distance_wall}\n".encode())
 
                         Last_Esp_Command = time.time()
                         
-                    elif desired_distance_wall != 50:
-                        desired_distance_wall = 50
+                    elif desired_distance_wall != middledistance:
+                        desired_distance_wall = middledistance
                         Utils.EspHoldDistance.write(f"D{desired_distance_wall}\n".encode())
                         
                         Last_Esp_Command = time.time()
@@ -203,10 +214,10 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     Cam.desired_distance_wall = desired_distance_wall
                         
         else:
-            if time.time() > Time_detect_new_block + 2:
+            if time.time() > Time_detect_new_block + TIMEOUTBlock:
                 detect_new_block = True
-                print("Detect new block")
-        """       
+                Utils.LogInfo("Detect new block")
+                    
         #check for direction
         if Utils.EspHoldDistance.in_waiting > 0:
             response = Utils.EspHoldDistance.read(Utils.EspHoldDistance.in_waiting).decode()
@@ -215,7 +226,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
             elif "Drive direction clockwise" in response:
                 direction = 0
                 
-            Utils.LogDebug(f"Response from EspHoldDistance: {response}")
+            Utils.LogInfo(f"Response from EspHoldDistance: {response}")
         
         Utils.LogData()    
 
@@ -241,6 +252,10 @@ if __name__ == "__main__":
             def video_feed():
                 return Response(Cam.video_frames(),
                                 mimetype='multipart/x-mixed-replace; boundary=frame')
+                
+            @app.route('/data_feed')
+            def data_feed():
+                return jsonify(Utils.data_feed())
 
             # Run the server in a separate thread
             server_thread = Thread(target=app.run, kwargs={'host':'0.0.0.0', 'threaded':True})

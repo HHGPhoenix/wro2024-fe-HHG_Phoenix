@@ -15,7 +15,7 @@ import multiprocessing as mp
 import logging
 import serial
 import subprocess
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, jsonify
 import cv2
 import numpy as np
 from picamera2 import Picamera2
@@ -68,6 +68,8 @@ class Utility:
         self.file_path = "/tmp/StandbyScript.lock"
         self.Starttime = 0
         self.UltraschallThreadStop = 1
+        
+        self.stop_run_callable = True
         
         
     #Cleanup after the run is finished or an error occured
@@ -149,7 +151,7 @@ class Utility:
                 
                 self.EspHoldDistance.write(f"D{70}\n".encode())
                 time.sleep(0.1)
-                self.EspHoldDistance.write(f"KP{3}\n".encode())
+                self.EspHoldDistance.write(f"KP{2}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"ED{125}\n".encode())
                 time.sleep(0.1)
@@ -170,26 +172,28 @@ class Utility:
     
     #Stop the run and calculate the time needed            
     def StopRun(self):
-        self.StopTime = time.time()
-        self.LogDebug(f"Run ended: {self.StopTime}")
-        
-        if self.Starttime != None:
-            seconds = round(self.StopTime - self.StartTime, 2)
-        
-            #self.Utils.LogError time needed
-            minutes = seconds // 60
-            hours = minutes // 60
-            if hours > 0:
-                self.LogDebug(f"{hours} hour(s), {minutes % 60} minute(s), {seconds % 60} second(s) needed")
-                self.Display.write("Time needed:", f"{hours}h {minutes % 60}m {seconds % 60}s")
-            elif minutes > 0:
-                self.LogDebug(f"{minutes} minute(s), {seconds % 60} second(s) needed")
-                self.Display.write("Time needed:", f"{minutes}m {seconds % 60}s")
-            else:
-                self.LogDebug(f"{seconds} second(s) needed")
-                self.Display.write("Time needed:", f"{seconds}s")
+        if self.stop_run_callable:
+            self.StopTime = time.time()
+            self.LogDebug(f"Run ended: {self.StopTime}")
             
-        self.cleanup()
+            if self.Starttime != None:
+                seconds = round(self.StopTime - self.StartTime, 2)
+            
+                #self.Utils.LogError time needed
+                minutes = seconds // 60
+                hours = minutes // 60
+                if hours > 0:
+                    self.LogDebug(f"{hours} hour(s), {minutes % 60} minute(s), {seconds % 60} second(s) needed")
+                    self.Display.write("Time needed:", f"{hours}h {minutes % 60}m {seconds % 60}s")
+                elif minutes > 0:
+                    self.LogDebug(f"{minutes} minute(s), {seconds % 60} second(s) needed")
+                    self.Display.write("Time needed:", f"{minutes}m {seconds % 60}s")
+                else:
+                    self.LogDebug(f"{seconds} second(s) needed")
+                    self.Display.write("Time needed:", f"{seconds}s")
+                
+            self.stop_run_callable = False
+            self.cleanup()
           
     
     #Setup datalogging
@@ -383,6 +387,10 @@ class Utility:
         
         time.sleep(0.1)
     
+    
+    #Collect data from the sensors
+    def data_feed(self):
+        return {"angle": self.Gyro.angle, "voltage": self.ADC.voltage, "cpu_usage": psutil.cpu_percent(), "ram_usage": psutil.virtual_memory().percent}
         
         
 #A class for reading a Button; A Button that instantly stops the program if pressed            
@@ -419,13 +427,12 @@ class Button(Utility):
     def read_StopButton(self):
         #Stop program if stopbutton is pressed
         while self.threadStop == 0:
-            StartTime = time.time()
             time.sleep(0.1)
             if self.state() == 1:
                 self.Utils.LogError("StopButton pressed")
-                self.Utils.StopRun()
-            StopTime = time.time()
-          
+                self.Utils.running = False
+                
+                
     #Stop the Thread for reading the StopButton      
     def stop_StopButton(self):
         self.threadStop = 1
@@ -671,20 +678,25 @@ class Buzzer(Utility):
         all_lines.append(self.SignalPin)
 
     def buzz(self, frequency, volume, duration):
-        # Check if the volume value is greater than the frequency
-        if volume > frequency:
-            volume = frequency
+        try:
+            # Check if the volume value is greater than the frequency
+            if volume > frequency:
+                volume = frequency
 
-        period = 1.0 / frequency  # Calculate the period of the frequency
-        on_time = period * volume / 100  # Calculate the time the signal should be on
-        off_time = period - on_time  # Calculate the time the signal should be off
+            period = 1.0 / frequency  # Calculate the period of the frequency
+            on_time = period * volume / 100  # Calculate the time the signal should be on
+            off_time = period - on_time  # Calculate the time the signal should be off
 
-        end_time = time.time() + duration
-        while time.time() < end_time:
-            self.SignalPin.set_value(1)
-            time.sleep(on_time)
-            self.SignalPin.set_value(0)
-            time.sleep(off_time)
+            end_time = time.time() + duration
+            while time.time() < end_time:
+                self.SignalPin.set_value(1)
+                time.sleep(on_time)
+                self.SignalPin.set_value(0)
+                time.sleep(off_time)
+                
+        except PermissionError:
+            self.Utils.LogDebug("Buzzer already in use, skipping")
+            return
             
 
 
