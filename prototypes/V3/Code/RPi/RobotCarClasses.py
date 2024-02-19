@@ -68,6 +68,8 @@ class Utility:
         self.file_path = "/tmp/StandbyScript.lock"
         self.Starttime = 0
         self.UltraschallThreadStop = 1
+        self.SensorDistance1 = 0
+        self.SensorDistance2 = 0
         
         self.stop_run_callable = True
         
@@ -402,7 +404,7 @@ class Utility:
     
     #Collect data from the sensors
     def data_feed(self):
-        return {"angle": self.Gyro.angle, "voltage": self.ADC.voltage, "cpu_usage": psutil.cpu_percent(), "ram_usage": psutil.virtual_memory().percent}
+        return {"D1": self.SensorDistance1, "D2": self.SensorDistance2, "angle": self.Gyro.angle, "voltage": self.ADC.voltage, "cpu_usage": psutil.cpu_percent(), "ram_usage": psutil.virtual_memory().percent}
         
         
 #A class for reading a Button; A Button that instantly stops the program if pressed            

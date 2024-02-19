@@ -27,7 +27,7 @@ def draw_graph():
 # Replace 'url' with the actual URL from where you want to fetch the data
 url = 'http://192.168.178.71:5000/data_feed'
 
-data = {'angle': [], 'cpu_usage': [], 'ram_usage': [], 'voltage': []}
+data = {'D1': [], 'D2': [], 'angle': [], 'cpu_usage': [], 'ram_usage': [], 'voltage': []}
 
 def animate(i): 
     new_data = fetch_data(url)
