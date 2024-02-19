@@ -15,7 +15,7 @@ import multiprocessing as mp
 import logging
 import serial
 import subprocess
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, jsonify
 import cv2
 import numpy as np
 from picamera2 import Picamera2
@@ -151,7 +151,7 @@ class Utility:
                 
                 self.EspHoldDistance.write(f"D{50}\n".encode())
                 time.sleep(0.1)
-                self.EspHoldDistance.write(f"KP{3}\n".encode())
+                self.EspHoldDistance.write(f"KP{2}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"ED{125}\n".encode())
                 time.sleep(0.1)
@@ -172,7 +172,6 @@ class Utility:
     
     #Stop the run and calculate the time needed            
     def StopRun(self):
-        
         self.StopTime = time.time()
         self.LogDebug(f"Run ended: {self.StopTime}")
         
@@ -192,7 +191,21 @@ class Utility:
                 self.LogDebug(f"{seconds} second(s) needed")
                 self.Display.write("Time needed:", f"{seconds}s")
             
-        self.cleanup()
+                #self.Utils.LogError time needed
+                minutes = seconds // 60
+                hours = minutes // 60
+                if hours > 0:
+                    self.LogDebug(f"{hours} hour(s), {minutes % 60} minute(s), {seconds % 60} second(s) needed")
+                    self.Display.write("Time needed:", f"{hours}h {minutes % 60}m {seconds % 60}s")
+                elif minutes > 0:
+                    self.LogDebug(f"{minutes} minute(s), {seconds % 60} second(s) needed")
+                    self.Display.write("Time needed:", f"{minutes}m {seconds % 60}s")
+                else:
+                    self.LogDebug(f"{seconds} second(s) needed")
+                    self.Display.write("Time needed:", f"{seconds}s")
+                
+            self.stop_run_callable = False
+            self.cleanup()
           
     
     #Setup datalogging
@@ -386,6 +399,10 @@ class Utility:
         
         time.sleep(0.1)
     
+    
+    #Collect data from the sensors
+    def data_feed(self):
+        return {"angle": self.Gyro.angle, "voltage": self.ADC.voltage, "cpu_usage": psutil.cpu_percent(), "ram_usage": psutil.virtual_memory().percent}
         
         
 #A class for reading a Button; A Button that instantly stops the program if pressed            

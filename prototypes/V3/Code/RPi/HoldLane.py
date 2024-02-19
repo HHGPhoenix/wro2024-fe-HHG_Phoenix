@@ -71,6 +71,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
     coordinates_self = (640, 720) #x, y
     middledistance = 50
     GyroCornerAngle = 90
+
     FreezeSize = 35000
     KP = 0.13
     
@@ -130,7 +131,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                 block_array.sort(key=lambda x: x['size'], reverse=True)
                 
                 nextBlock = block_array[0]
-                
+
                 if nextBlock['w'] * nextBlock['h'] > FreezeSize or old_desired_distance_wall < 25 or old_desired_distance_wall > 75:
                     detect_new_block = False
                     Cam.freeze = True
@@ -148,6 +149,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                         desired_distance_to_block = desired_distance_to_block_green
                         
                     distance_divider = (nextBlock['y'] / coordinates_self[1]) * 1.3
+
                     #print("Distance Divider: ", distance_divider)
                     
                     error = (desired_distance_to_block - nextBlock['distancex']) * distance_divider
@@ -223,7 +225,9 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
         else:
             if time.time() > Time_detect_new_block + TIMEOUTBlock:
                 detect_new_block = True
+                
                 Cam.freeze = False
+
                 Utils.LogInfo("Detect new block")
                     
         #check for direction
@@ -235,7 +239,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
             elif "Drive direction clockwise" in response:
                 direction = 0
                 
-            Utils.LogDebug(f"Response from EspHoldDistance: {response}")
+            Utils.LogInfo(f"Response from EspHoldDistance: {response}")
         
         Utils.LogData()    
 
@@ -261,6 +265,10 @@ if __name__ == "__main__":
             def video_feed():
                 return Response(Cam.video_frames(),
                                 mimetype='multipart/x-mixed-replace; boundary=frame')
+                
+            @app.route('/data_feed')
+            def data_feed():
+                return jsonify(Utils.data_feed())
 
             # Run the server in a separate thread
             server_thread = Thread(target=app.run, kwargs={'host':'0.0.0.0', 'threaded':True})

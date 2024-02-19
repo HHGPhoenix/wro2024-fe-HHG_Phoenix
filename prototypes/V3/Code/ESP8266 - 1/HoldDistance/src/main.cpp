@@ -101,6 +101,7 @@ void loop()
   // Main loop if started and not in manual mode
   if (started)
   {
+    delay(10); // wait so the loop isn't too fast
     if (!manual)
     {
       // command checker
@@ -212,13 +213,13 @@ void loop()
           float correction = error * KP;
 
           //  limit correction to servo range
-          if (correction > 70)
+          if (correction > 60)
           {
-            correction = 70;
+            correction = 60;
           }
-          else if (correction < -70)
+          else if (correction < -60)
           {
-            correction = -70;
+            correction = -60;
           }
 
           servo.write(ServoMiddlePosition - correction); // Set servo position
@@ -274,13 +275,13 @@ void loop()
           float correction = error * KP;
 
           //  limit correction to servo range
-          if (correction > 70)
+          if (correction > 60)
           {
-            correction = 70;
+            correction = 60;
           }
-          else if (correction < -70)
+          else if (correction < -60)
           {
-            correction = -70;
+            correction = -60;
           }
 
           servo.write(ServoMiddlePosition + correction); // Set servo position
