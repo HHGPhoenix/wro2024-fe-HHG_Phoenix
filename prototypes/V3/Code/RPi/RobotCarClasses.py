@@ -149,13 +149,13 @@ class Utility:
                 
                 time.sleep(0.1)
                 
-                self.EspHoldDistance.write(f"D{70}\n".encode())
+                self.EspHoldDistance.write(f"D{50}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"KP{2}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"ED{125}\n".encode())
                 time.sleep(0.1)
-                self.EspHoldSpeed.write(f"SPEED{60}\n".encode())
+                self.EspHoldSpeed.write(f"SPEED{55}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"MM{10}\n".encode())
                 
@@ -172,12 +172,24 @@ class Utility:
     
     #Stop the run and calculate the time needed            
     def StopRun(self):
-        if self.stop_run_callable:
-            self.StopTime = time.time()
-            self.LogDebug(f"Run ended: {self.StopTime}")
-            
-            if self.Starttime != None:
-                seconds = round(self.StopTime - self.StartTime, 2)
+        self.StopTime = time.time()
+        self.LogDebug(f"Run ended: {self.StopTime}")
+        
+        if self.Starttime != None:
+            seconds = round(self.StopTime - self.StartTime, 2)
+        
+            #self.Utils.LogError time needed
+            minutes = seconds // 60
+            hours = minutes // 60
+            if hours > 0:
+                self.LogDebug(f"{hours} hour(s), {minutes % 60} minute(s), {seconds % 60} second(s) needed")
+                self.Display.write("Time needed:", f"{hours}h {minutes % 60}m {seconds % 60}s")
+            elif minutes > 0:
+                self.LogDebug(f"{minutes} minute(s), {seconds % 60} second(s) needed")
+                self.Display.write("Time needed:", f"{minutes}m {seconds % 60}s")
+            else:
+                self.LogDebug(f"{seconds} second(s) needed")
+                self.Display.write("Time needed:", f"{seconds}s")
             
                 #self.Utils.LogError time needed
                 minutes = seconds // 60
@@ -705,6 +717,8 @@ class Buzzer(Utility):
 #A class for detecting red and green blocks in the camera stream           
 class Camera():
     def __init__(self, video_stream=False, video_source=0):
+        self.freeze = False
+        
         self.frame = None
         self.frame_lock = threading.Lock()
         
@@ -761,6 +775,7 @@ class Camera():
         
         cv2.circle(frame, (640, 720), 10, (255, 0, 0), -1)
         cv2.putText(frame, f"{self.desired_distance_wall}", (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
+        cv2.putText(frame, f"Freeze: {self.freeze}", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
         
         block_array = []
 
