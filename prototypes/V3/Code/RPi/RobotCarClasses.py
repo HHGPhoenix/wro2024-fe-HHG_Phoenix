@@ -157,7 +157,7 @@ class Utility:
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"ED{125}\n".encode())
                 time.sleep(0.1)
-                self.EspHoldSpeed.write(f"SPEED{55}\n".encode())
+                self.EspHoldSpeed.write(f"SPEED{50}\n".encode())
                 time.sleep(0.1)
                 self.EspHoldDistance.write(f"MM{10}\n".encode())
                 

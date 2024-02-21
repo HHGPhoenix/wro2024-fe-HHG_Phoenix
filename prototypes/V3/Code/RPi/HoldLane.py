@@ -54,7 +54,7 @@ Utils.ED = 125 #Edge detection distance in cm
 def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, GyroWaitTime=1, Sensor=2):
     #Variables
     TIMEOUT = 0
-    TIMEOUTBlock = 2
+    TIMEOUTBlock = 1.2
     corners = 0
     rounds = 0
     Sensor = 0
@@ -71,11 +71,11 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
     middledistance = 50
     GyroCornerAngle = 90
 
-    FreezeSize = 35000
-    KP = 0.13
+    FreezeSize = 30000
+    KP = 0.19
     
-    desired_distance_to_block_red = 400
-    desired_distance_to_block_green = -400
+    desired_distance_to_block_red = 550
+    desired_distance_to_block_green = -600
     
     #Hold Lane
     while Utils.running and rounds < 3:
@@ -131,7 +131,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                 
                 nextBlock = block_array[0]
 
-                if nextBlock['w'] * nextBlock['h'] > FreezeSize or old_desired_distance_wall < 25 or old_desired_distance_wall > 75:
+                if nextBlock['w'] * nextBlock['h'] > FreezeSize or old_desired_distance_wall < 15 or old_desired_distance_wall > 75:
                     detect_new_block = False
                     Cam.freeze = True
                     Time_detect_new_block = time.time()
@@ -156,8 +156,8 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     desired_distance_wall = int(desired_distance_wall)
                     Cam.desired_distance_wall = desired_distance_wall
                     
-                    if desired_distance_wall < 25:
-                        desired_distance_wall =  25 
+                    if desired_distance_wall < 15:
+                        desired_distance_wall =  15 
                     elif desired_distance_wall > 75:
                         desired_distance_wall = 75
 
@@ -188,7 +188,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                             Utils.LogInfo(f"Switched to Sensor 2")
                             
             else:
-                if time.time() > Last_Esp_Command + 1:
+                if time.time() > Last_Esp_Command + 1.5:
                     time.sleep(0.1)
                     Utils.LogInfo(f"Desired Distance: {desired_distance_wall}, Current Sensor: {Sensor}")
                     if Sensor != 2:
