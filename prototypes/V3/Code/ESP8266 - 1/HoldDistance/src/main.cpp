@@ -29,7 +29,9 @@ int distanceEdgeDetection = -1; // distance in cm to detect an edge
 int edgeDetectionCounter = 0;
 
 float distance1 = 0;
+int distance1counter = 0;
 float distance2 = 0;
+int distance2counter = 0;
 
 // Ultrasonic setup
 Ultrasonic ultraschall1(TrigPin1, EchoPin1, 100000); // Trigger Pin, Echo Pin
@@ -190,6 +192,16 @@ void loop()
       {
         distance1 = ultraschall1.read(); // get distance in cm
 
+        if (distance1counter == 4)
+        {
+          Serial.println("SD1: " + String(distance1));
+          distance1counter = 0;
+        }
+        else
+        {
+          distance1counter++;
+        }
+
         if (commandedDistance > 0)
         {
           if (desiredDistance > (commandedDistance + smoothingSteps - 1))
@@ -235,11 +247,6 @@ void loop()
             if (edgeDetectionCounter == 4)
             {
               distance2 = ultraschall2.read();
-              if (distance2 > distanceEdgeDetection)
-              {
-                firstCornerDetected = true;
-                Serial.println("Drive direction counterclockwise");
-              }
             }
             else
             {
@@ -251,102 +258,111 @@ void loop()
       else if (activeSensor == 2)
       {
         distance2 = ultraschall2.read();
-
-        if (commandedDistance > 0)
+        if (distance2counter == 4)
         {
-          if (desiredDistance > (commandedDistance + smoothingSteps - 1))
-          {
-            desiredDistance = desiredDistance - smoothingSteps;
-          }
-          else if (desiredDistance < (commandedDistance - smoothingSteps + 1))
-          {
-            desiredDistance = desiredDistance + smoothingSteps;
-          }
-          else
-          {
-            desiredDistance = commandedDistance;
-          }
-        }
-
-        if (distance2 > 0)
-        {
-          // calculate error and correction
-          float error = desiredDistance - distance2;
-          float correction = error * KP;
-
-          //  limit correction to servo range
-          if (correction > 60)
-          {
-            correction = 60;
-          }
-          else if (correction < -60)
-          {
-            correction = -60;
-          }
-
-          servo.write(ServoMiddlePosition + correction); // Set servo position
-
-          if (!firstCornerDetected && (distanceEdgeDetection > 0))
-          {
-            if (distance2 > distanceEdgeDetection)
-            {
-              firstCornerDetected = true;
-              Serial.println("Drive direction counterclockwise");
-            }
-            // read other sensor sometimes
-            if (edgeDetectionCounter == 4)
-            {
-              distance1 = ultraschall1.read();
-              if (distance1 > distanceEdgeDetection)
-              {
-                firstCornerDetected = true;
-                Serial.println("Drive direction clockwise");
-              }
-            }
-            else
-            {
-              edgeDetectionCounter++;
-            }
-          }
-        }
-      }
-      else
-      {
-        delay(10);
-      }
-    }
-
-    // Main loop if started and in manual mode
-    else
-    {
-      // command checker
-      if (Serial.available() > 0)
-      {
-        String command = Serial.readStringUntil('\n');
-
-        // check for stop command
-        if (command == "STOP")
-        {
-          Serial.println("Received STOP command. Performing action...");
-          servo.write(ServoMiddlePosition);
-          digitalWrite(InternalLed, HIGH);
-          started = false;
-        }
-        // check for manual mode
-        else if (command == "MANUAL")
-        {
-          Serial.println("Received MANUAL command. Deactivating manual mode...");
-          manual = false;
+          Serial.println("SD2: " + String(distance2));
+          distance2counter = 0;
         }
         else
         {
-          int numberLength = command.length();
-          String numberStr = command.substring(0, numberLength);
-          int ServoAngle = numberStr.toInt();
-          servo.write(ServoAngle);
+          distance2counter++;
         }
-        delay(10); // wait so the loop isn't too fast
       }
+
+      if (commandedDistance > 0)
+      {
+        if (desiredDistance > (commandedDistance + smoothingSteps - 1))
+        {
+          desiredDistance = desiredDistance - smoothingSteps;
+        }
+        else if (desiredDistance < (commandedDistance - smoothingSteps + 1))
+        {
+          desiredDistance = desiredDistance + smoothingSteps;
+        }
+        else
+        {
+          desiredDistance = commandedDistance;
+        }
+      }
+
+      if (distance2 > 0)
+      {
+        // calculate error and correction
+        float error = desiredDistance - distance2;
+        float correction = error * KP;
+
+        //  limit correction to servo range
+        if (correction > 60)
+        {
+          correction = 60;
+        }
+        else if (correction < -60)
+        {
+          correction = -60;
+        }
+
+        servo.write(ServoMiddlePosition + correction); // Set servo position
+
+        if (!firstCornerDetected && (distanceEdgeDetection > 0))
+        {
+          if (distance2 > distanceEdgeDetection)
+          {
+            firstCornerDetected = true;
+            Serial.println("Drive direction counterclockwise");
+          }
+          // read other sensor sometimes
+          if (edgeDetectionCounter == 4)
+          {
+            distance1 = ultraschall1.read();
+            if (distance1 > distanceEdgeDetection)
+            {
+              firstCornerDetected = true;
+              Serial.println("Drive direction clockwise");
+            }
+          }
+          else
+          {
+            edgeDetectionCounter++;
+          }
+        }
+      }
+    }
+    else
+    {
+      delay(10);
+    }
+  }
+
+  // Main loop if started and in manual mode
+  else
+  {
+    // command checker
+    if (Serial.available() > 0)
+    {
+      String command = Serial.readStringUntil('\n');
+
+      // check for stop command
+      if (command == "STOP")
+      {
+        Serial.println("Received STOP command. Performing action...");
+        servo.write(ServoMiddlePosition);
+        digitalWrite(InternalLed, HIGH);
+        started = false;
+      }
+      // check for manual mode
+      else if (command == "MANUAL")
+      {
+        Serial.println("Received MANUAL command. Deactivating manual mode...");
+        manual = false;
+      }
+      else
+      {
+        int numberLength = command.length();
+        String numberStr = command.substring(0, numberLength);
+        int ServoAngle = numberStr.toInt();
+        servo.write(ServoAngle);
+      }
+      delay(10); // wait so the loop isn't too fast
     }
   }
 }

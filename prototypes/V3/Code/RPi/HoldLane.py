@@ -1,7 +1,6 @@
 import time
 from RobotCarClasses import *
 from threading import Thread
-import math
 import traceback
 
 
@@ -232,12 +231,19 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     
         #check for direction
         if Utils.EspHoldDistance.in_waiting > 0:
+            Utils.LogInfo("Reading from EspHoldDistance")
             time.sleep(0.1)
             response = Utils.EspHoldDistance.read(Utils.EspHoldDistance.in_waiting).decode()
-            if "Drive direction counterclockwise" in response:
-                direction = 1
-            elif "Drive direction clockwise" in response:
-                direction = 0
+            values = response.split("\r\n")
+            for value in values:
+                if "Drive direction counterclockwise" in value:
+                    direction = 1
+                elif "Drive direction clockwise" in value:
+                    direction = 0
+                elif "SD1:" in value:
+                    Utils.SensorDistance1 = float(value.split(":")[1].strip())
+                elif "SD2:" in value:
+                    Utils.SensorDistance2 = float(value.split(":")[1].strip())
                 
             Utils.LogInfo(f"Response from EspHoldDistance: {response}")
         
