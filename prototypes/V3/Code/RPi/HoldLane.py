@@ -64,6 +64,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
     detect_new_block = True
     Last_Esp_Command = 0
     desired_distance_wall = 50
+    timelastcorner = time.time()
     
     old_desired_distance_wall = 50
     
@@ -88,6 +89,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
             newAngle = oldAngle - GyroCornerAngle
             if Gyro.angle < newAngle and time.time() > TIMEOUT:
                 corners = corners + 1
+                timelastcorner = time.time()
                 Utils.LogDebug(f"Corner: {corners}")
                 Display.write(f"Corner: {corners}")
                 if corners == 4:
@@ -99,7 +101,6 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                 TIMEOUT = time.time() + LineWaitTime
                 
         else:
-            relative_angle = Gyro.angle - oldAngle
             newAngle = oldAngle + GyroCornerAngle
             if Gyro.angle > newAngle and time.time() > TIMEOUT:
                 corners = corners + 1
