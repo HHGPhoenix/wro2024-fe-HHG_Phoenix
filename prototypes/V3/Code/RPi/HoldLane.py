@@ -104,6 +104,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
             newAngle = oldAngle + GyroCornerAngle
             if Gyro.angle > newAngle and time.time() > TIMEOUT:
                 corners = corners + 1
+                timelastcorner = time.time()
                 Utils.LogDebug(f"Corner: {corners}")
                 if corners == 4:
                     corners = 0
@@ -137,6 +138,13 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     Cam.freeze = True
                     Time_detect_new_block = time.time()
                     Utils.LogInfo(f"Freeze")
+                    
+                    if timelastcorner + 1 > time.time():
+                        nextBlock['position'] = "1"
+                    elif timelastcorner + 2 > time.time():
+                        nextBlock['position'] = "2"
+                    elif timelastcorner + 3 > time.time():
+                        nextBlock['position'] = "3"
 
                 else:
                     nextBlock['distancex'] = -(coordinates_self[0] - nextBlock['mx'])
@@ -190,6 +198,14 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                             
             else:
                 if time.time() > Last_Esp_Command + 1.5:
+                    # Change this part based on the position of the block
+                    if nextBlock['position'] == "1":
+                        desired_distance_wall = 50
+                    elif nextBlock['position'] == "2":
+                        desired_distance_wall = 50
+                    elif nextBlock['position'] == "3":
+                        desired_distance_wall = 50
+                    
                     time.sleep(0.1)
                     Utils.LogInfo(f"Desired Distance: {desired_distance_wall}, Current Sensor: {Sensor}")
                     if Sensor != 2:
