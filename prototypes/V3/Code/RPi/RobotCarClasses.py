@@ -20,6 +20,7 @@ import cv2
 import numpy as np
 from picamera2 import Picamera2
 from libcamera import controls
+from USB_communication_handler import USBCommunication
 
 
 
@@ -54,6 +55,10 @@ class Utility:
     #Transfer data so it can be used in other classes
     def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Display=None, ADC=None, Buzzer1=None, Gyro=None, Pixy=None):
         #self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.Funcs = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, Funcs
+        
+        self.usb_communication = USBCommunication()
+        self.ESPHoldDistance, self.ESPHoldSpeed = self.usb_communication.initNodeMCUs()
+        
         self.Farbsensor = Farbsensor
         self.StartButton = StartButton
         self.StopButton = StopButton
@@ -73,6 +78,8 @@ class Utility:
         
         self.stop_run_callable = True
         
+        return self.ESPHoldDistance, self.ESPHoldSpeed
+        
         
     #Cleanup after the run is finished or an error occured
     def cleanup(self):
@@ -91,9 +98,9 @@ class Utility:
             self.StopButton.stop_StopButton()
         
         #Stop Nodemcu's
-        self.EspHoldDistance.write(f"STOP\n".encode())
+        self.usb_communication.sendMessage("STOP", self.ESPHoldDistance)
         time.sleep(0.1)
-        self.EspHoldSpeed.write(f"STOP\n".encode())
+        self.usb_communication.sendMessage("STOP", self.ESPHoldSpeed)
         
         #self.StopNodemcus()
         
@@ -105,12 +112,7 @@ class Utility:
             line.release()
         
         self.running = False
-        
-        time.sleep(0.1)
-        self.EspHoldDistance.close()
-        time.sleep(0.1)
-        self.EspHoldSpeed.close()
-        
+        self.usb_communication.closeNodeMCUs(self.ESPHoldDistance, self.ESPHoldSpeed)
         os.kill(os.getpid(), signal.SIGTERM)
     
     
@@ -118,8 +120,6 @@ class Utility:
     def StartRun(self):
         #clear console
         os.system('cls' if os.name=='nt' else 'clear')
-
-        self.InitNodemcus()
 
         #Start Processes
         if self.Display != None:
@@ -147,19 +147,15 @@ class Utility:
             time.sleep(0.1)
             if self.StartButton.state() == 1:
         
-                self.StartNodemcus()
+                self.usb_communication.startNodeMCUs()
                 
                 time.sleep(0.1)
                 
-                self.EspHoldDistance.write(f"D{50}\n".encode())
-                time.sleep(0.1)
-                self.EspHoldDistance.write(f"KP{2}\n".encode())
-                time.sleep(0.1)
-                self.EspHoldDistance.write(f"ED{125}\n".encode())
-                time.sleep(0.1)
-                self.EspHoldSpeed.write(f"SPEED{50}\n".encode())
-                time.sleep(0.1)
-                self.EspHoldDistance.write(f"MM{10}\n".encode())
+                self.usb_communication.sendMessage(f"D {50}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"KP {2}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"ED {125}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"SPEED {50}", self.ESPHoldSpeed)
+                self.usb_communication.sendMessage(f"MM {10}", self.ESPHoldSpeed)
                 
                 self.Starttime = time.time()
                 self.LogDebug(f"Run started: {time.time()}")
@@ -170,7 +166,6 @@ class Utility:
 
                 self.waiting = False
                 
-    
     
     #Stop the run and calculate the time needed            
     def StopRun(self):
@@ -313,93 +308,6 @@ class Utility:
         final_number = f"{padded_integer_part}.{decimal_part}"
         
         return final_number
-
-
-    #Init both NodeMCUs
-    def InitNodemcus(self):
-        usb_devices = []
-        # Run the 'ls /dev/tty*' command using a shell and capture the output
-        result = subprocess.run('ls /dev/tty*', shell=True, stdout=subprocess.PIPE, text=True, check=True)
-        
-        # Split the output into lines and print each line
-        devices = result.stdout.split('\n')
-        for device in devices:
-            if "/dev/ttyUSB" in device:
-                usb_devices.append(device)
-
-        if len(usb_devices) != 2:
-            self.LogError(f"Could not find both NodeMCUs: {usb_devices}")
-            self.StopRun()
-            
-        #Identify both NodeMCUs
-        for device in usb_devices:
-            ESP = serial.Serial(device,baudrate=1000000,timeout=1)
-            ESP.write(f"IDENT\n".encode())
-            time.sleep(0.1)
-            
-            #wait for response
-            Timeout = time.time() + 5
-            self.LogDebug(f"Waiting for response from {device} ...")
-            while not ESP.in_waiting and time.time() < Timeout:
-                time.sleep(0.01)
-            response = ESP.read(ESP.inWaiting())
-            print(response)
-            self.LogDebug(f"Received response from {device}")
-            
-            if "HoldDistance" in response.decode("utf-8"):
-                ESP.close()
-                self.EspHoldDistance = serial.Serial(device,baudrate=1000000,timeout=1)
-            elif "HoldSpeed" in response.decode("utf-8"):
-                ESP.close()
-                self.EspHoldSpeed = serial.Serial(device,baudrate=1000000,timeout=1)  
-            else:
-                self.LogError(f"Could not identify NodeMCU on: {device}")
-                self.StopRun()
-            
-            time.sleep(0.1)
-    
-    
-    #Start both NodeMCUs and wait for responses
-    def StartNodemcus(self):
-        #Start both NodeMCUs
-        for esp in [self.EspHoldDistance, self.EspHoldSpeed]:
-            esp.write(f"START\n".encode())
-            time.sleep(0.1)
-            waitingForResponse = True
-            responseTimeout = time.time() + 5
-
-            while waitingForResponse:
-                response = esp.read(esp.inWaiting())
-                if "Received START command. Performing action..." in response.decode("utf-8"):
-                    waitingForResponse = False
-                elif time.time() > responseTimeout:
-                    self.LogError("No response from NodeMCU")
-                    self.StopRun()
-                else:
-                    time.sleep(0.01)
-
-            time.sleep(0.1)
-                    
-                    
-    #Stop both NodeMCUs and wait for responses
-    def StopNodemcus(self):
-        for esp in [self.EspHoldDistance, self.EspHoldSpeed]:
-            esp.flush()
-            esp.write(f"STOP\n".encode())
-            waitingForResponse = True
-            responseTimeout = time.time() + 5
-
-            while waitingForResponse:
-                response = esp.read(esp.inWaiting())
-                if "Received STOP command. Performing action..." in response.decode("utf-8"):
-                    waitingForResponse = False
-                elif time.time() > responseTimeout:
-                    self.LogError("No response from NodeMCU")
-                    self.StopRun()
-                else:
-                    time.sleep(0.01)
-        
-        time.sleep(0.1)
     
     
     #Collect data from the sensors
@@ -719,22 +627,20 @@ class Buzzer(Utility):
 #A class for detecting red and green blocks in the camera stream           
 class Camera():
     def __init__(self, video_stream=False, video_source=0):
+        # Variable initialization
         self.freeze = False
-        
         self.frame = None
         self.frame_lock = threading.Lock()
-        
         self.video_stream = video_stream
-        
         self.picam2 = Picamera2()
-
+        
+        # Configure and start the camera
         config = self.picam2.create_still_configuration(main={"size": (1280, 720)}, raw={"size": (1280, 720)}, controls={"FrameRate": 34})
         self.picam2.configure(config)
-
         self.picam2.start()
         self.picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
         
-        # Define the color ranges for green and red
+        # Define the color ranges for green and red in HSV color space
         self.lower_green = np.array([35, 60, 35])
         self.upper_green = np.array([85, 255, 255])
 
@@ -744,6 +650,7 @@ class Camera():
         self.lower_red2 = np.array([160, 200, 100])
         self.upper_red2 = np.array([180, 255, 180])
 
+        # Define the kernel for morphological operations
         self.kernel = np.ones((5, 5), np.uint8)
         self.desired_distance_wall = -1
 

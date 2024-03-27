@@ -37,10 +37,6 @@ void holdSpeed() {
   float derivative = error - previousError;
   float output = desiredSpeed + error * kp + derivative * kd;
   // 255 = 50 + (35 - 0 / 10) * 10
-  Serial.print("Current Speed: " + String(currentSpeed));
-  Serial.print(" | Error: " + String(error));
-  Serial.print(" | Output: " + String(output));
-  Serial.println(" | Desired Speed: " + String(desiredSpeed));
 
   // PWM limit
   if (output < 0) {
@@ -87,6 +83,10 @@ void loop() {
       else if (command == "IDENT") {
         Serial.println("HoldSpeed");
       }
+			// heartbeat response
+			else if (command == "H") {
+				Serial.println("HB");
+			}
 
       delay(10);
     }
@@ -143,6 +143,10 @@ void loop() {
         Serial.print("Received KD: ");
         Serial.println(kd);
       }
+			// heartbeat response
+			else if (command == "H") {
+				Serial.println("HB");
+			}
     }
 
     holdSpeed();
