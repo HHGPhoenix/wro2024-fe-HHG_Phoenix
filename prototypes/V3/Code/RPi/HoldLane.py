@@ -28,7 +28,8 @@ Display = DisplayOled(ADC, Gyro, Utils=Utils)
 Cam = Camera(video_stream=True)
 Cam.start_processing()
 
-Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro)
+global ESPHoldDistance, ESPHoldSpeed
+ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro)
 
 Utils.setupLog()
 Utils.setupDataLog()
@@ -64,6 +65,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
     detect_new_block = True
     Last_Esp_Command = 0
     desired_distance_wall = 50
+    timelastcorner = time.time()
     
     old_desired_distance_wall = 50
     
@@ -71,7 +73,8 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
     middledistance = 50
     GyroCornerAngle = 90
 
-    FreezeSize = 30000
+    FreezeSize = 500
+    FreezeY = 500
     KP = 0.19
     
     desired_distance_to_block_red = 550
@@ -88,6 +91,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
             newAngle = oldAngle - GyroCornerAngle
             if Gyro.angle < newAngle and time.time() > TIMEOUT:
                 corners = corners + 1
+                timelastcorner = time.time()
                 Utils.LogDebug(f"Corner: {corners}")
                 Display.write(f"Corner: {corners}")
                 if corners == 4:
@@ -99,10 +103,10 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                 TIMEOUT = time.time() + LineWaitTime
                 
         else:
-            relative_angle = Gyro.angle - oldAngle
             newAngle = oldAngle + GyroCornerAngle
             if Gyro.angle > newAngle and time.time() > TIMEOUT:
                 corners = corners + 1
+                timelastcorner = time.time()
                 Utils.LogDebug(f"Corner: {corners}")
                 if corners == 4:
                     corners = 0
@@ -131,11 +135,18 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                 
                 nextBlock = block_array[0]
 
-                if nextBlock['w'] * nextBlock['h'] > FreezeSize or old_desired_distance_wall < 15 or old_desired_distance_wall > 75:
+                if nextBlock['w'] > FreezeSize or nextBlock['y'] > FreezeY or old_desired_distance_wall < 15 or old_desired_distance_wall > 75:
                     detect_new_block = False
                     Cam.freeze = True
                     Time_detect_new_block = time.time()
                     Utils.LogInfo(f"Freeze")
+                    
+                    if timelastcorner + 1 > time.time():
+                        nextBlock['position'] = "1"
+                    elif timelastcorner + 2 > time.time():
+                        nextBlock['position'] = "2"
+                    elif timelastcorner + 3 > time.time():
+                        nextBlock['position'] = "3"
 
                 else:
                     nextBlock['distancex'] = -(coordinates_self[0] - nextBlock['mx'])
@@ -150,7 +161,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     distance_divider = (nextBlock['y'] / coordinates_self[1]) * 1.3
 
                     #print("Distance Divider: ", distance_divider)
-                    
+                    # Calculation of desired distance to wall
                     error = (desired_distance_to_block - nextBlock['distancex']) * distance_divider
                     desired_distance_wall =  middledistance - error * KP
                     desired_distance_wall = int(desired_distance_wall)
@@ -166,51 +177,61 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                             
                         #Send ESPHoldDistance new Distance
                         if abs(desired_distance_wall_other_direction - old_desired_distance_wall) > 3:
-                            Utils.EspHoldDistance.write(f"D{desired_distance_wall_other_direction}\n".encode())
+                            Utils.usb_communication.sendMessage(f"D{desired_distance_wall_other_direction}", ESPHoldDistance)
                             Utils.LogInfo(f"New Distance {desired_distance_wall_other_direction}, Current Sensor: {Sensor}")
-                            old_desired_distance_wall = desired_distance_wall
+                            old_desired_distance_wall = desired_distance_wall_other_direction
                         
                         #Send ESPHoldDistance new Sensor
                         if Sensor != 1:
                             Sensor = 1
-                            Utils.EspHoldDistance.write(f"S1\n".encode())
+                            Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
                             Utils.LogInfo(f"Switched to Sensor 1")
                             
                     else:
                         if abs(desired_distance_wall - old_desired_distance_wall) > 3:
-                            Utils.EspHoldDistance.write(f"D{desired_distance_wall}\n".encode())
+                            Utils.usb_communication.sendMessage(f"D{desired_distance_wall}", ESPHoldDistance)
                             Utils.LogInfo(f"New Distance {desired_distance_wall}, Current Sensor: {Sensor}")
                             old_desired_distance_wall = desired_distance_wall
                         
                         if Sensor != 2:
                             Sensor = 2
-                            Utils.EspHoldDistance.write(f"S2\n".encode())
+                            Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
                             Utils.LogInfo(f"Switched to Sensor 2")
                             
             else:
                 if time.time() > Last_Esp_Command + 1.5:
+                    # Change this part based on the position of the block
+                    """
+                    if nextBlock['position'] == "1":
+                        desired_distance_wall = 50
+                    elif nextBlock['position'] == "2":
+                        desired_distance_wall = 50
+                    elif nextBlock['position'] == "3":
+                        desired_distance_wall = 50
+                    """
+                    
                     time.sleep(0.1)
                     Utils.LogInfo(f"Desired Distance: {desired_distance_wall}, Current Sensor: {Sensor}")
                     if Sensor != 2:
-                        Utils.EspHoldDistance.write(f"S2\n".encode())
+                        Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
                         Sensor = 2
                         time.sleep(0.05)
                         
                     if desired_distance_wall > middledistance + 2:
                         desired_distance_wall -= 4
-                        Utils.EspHoldDistance.write(f"D{desired_distance_wall}\n".encode())
+                        Utils.usb_communication.sendMessage(f"D{desired_distance_wall}", ESPHoldDistance)
 
                         Last_Esp_Command = time.time()
                         
                     elif desired_distance_wall < middledistance - 2:
                         desired_distance_wall += 4
-                        Utils.EspHoldDistance.write(f"D{desired_distance_wall}\n".encode())
+                        Utils.usb_communication.sendMessage(f"D{desired_distance_wall}", ESPHoldDistance)
 
                         Last_Esp_Command = time.time()
                         
                     elif desired_distance_wall != middledistance:
                         desired_distance_wall = middledistance
-                        Utils.EspHoldDistance.write(f"D{desired_distance_wall}\n".encode())
+                        Utils.usb_communication.sendMessage(f"D{desired_distance_wall}", ESPHoldDistance)
                         
                         Last_Esp_Command = time.time()
                         
@@ -228,26 +249,21 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                 Cam.freeze = False
 
                 Utils.LogInfo("Detect new block")
+          
                     
-        #check for direction
-        if Utils.EspHoldDistance.in_waiting > 0:
-            Utils.LogInfo("Reading from EspHoldDistance")
-            time.sleep(0.1)
-            response = Utils.EspHoldDistance.read(Utils.EspHoldDistance.in_waiting).decode()
-            values = response.split("\r\n")
-            for value in values:
-                if "Drive direction counterclockwise" in value:
+        responses = Utils.usb_communication.getResponses(ESPHoldDistance)
+        if (responses != None):
+            for response in responses:
+                if "Drive direction counterclockwise" in responses:
                     direction = 1
-                elif "Drive direction clockwise" in value:
+                if "Drive direction clockwise" in responses:
                     direction = 0
-                elif "SD1:" in value:
-                    Utils.SensorDistance1 = float(value.split(":")[1].strip())
-                elif "SD2:" in value:
-                    Utils.SensorDistance2 = float(value.split(":")[1].strip())
-                
-            Utils.LogInfo(f"Response from EspHoldDistance: {response}")
+                if "SD1:" in responses:
+                    Utils.SensorDistance1 = float(response.split(":")[1].strip())
+                if "SD2:" in responses:
+                    Utils.SensorDistance2 = float(response.split(":")[1].strip())
         
-        Utils.LogData()    
+        Utils.LogData()
 
 
 
