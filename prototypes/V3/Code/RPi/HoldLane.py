@@ -19,19 +19,12 @@ StopButton = Button(6, Utils)
 
 Buzzer1 = Buzzer(12, Utils)
 
-Gyro = Gyroscope(Utils)
-
-
-ADC = AnalogDigitalConverter(Utils)
-Display = DisplayOled(ADC, Gyro, Utils=Utils)
-
 Cam = Camera(video_stream=True)
 Cam.start_processing()
 
 global ESPHoldDistance, ESPHoldSpeed
-ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Display, ADC, Buzzer1, Gyro)
+ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1)
 
-Utils.setupLog()
 Utils.setupDataLog()
 
 
@@ -84,27 +77,25 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
     while Utils.running and rounds < 3:
         time.sleep(0.001)
                 
-        #Count rounds with Gyro
-        Utils.angle = Gyro.angle
         if direction == 0:
-            relative_angle = Gyro.angle - oldAngle
+            relative_angle = Utils.Gyro.angle - oldAngle
             newAngle = oldAngle - GyroCornerAngle
-            if Gyro.angle < newAngle and time.time() > TIMEOUT:
+            if Utils.Gyro.angle < newAngle and time.time() > TIMEOUT:
                 corners = corners + 1
                 timelastcorner = time.time()
                 Utils.LogDebug(f"Corner: {corners}")
-                Display.write(f"Corner: {corners}")
+                Utils.Display.write(f"Corner: {corners}")
                 if corners == 4:
                     corners = 0
                     rounds = rounds + 1
-                    Display.write(f"Corner: {corners}", f"Round: {rounds}")
+                    Utils.Display.write(f"Corner: {corners}", f"Round: {rounds}")
                     
                 oldAngle = newAngle
                 TIMEOUT = time.time() + LineWaitTime
                 
         else:
             newAngle = oldAngle + GyroCornerAngle
-            if Gyro.angle > newAngle and time.time() > TIMEOUT:
+            if Utils.Gyro.angle > newAngle and time.time() > TIMEOUT:
                 corners = corners + 1
                 timelastcorner = time.time()
                 Utils.LogDebug(f"Corner: {corners}")
