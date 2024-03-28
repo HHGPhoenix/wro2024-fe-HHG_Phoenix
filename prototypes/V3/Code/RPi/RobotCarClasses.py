@@ -1,26 +1,18 @@
 import gpiod
 import time
 import threading
-import board, adafruit_tcs34725, adafruit_mpu6050
-import adafruit_ads1x15.ads1015 as ADS
-from adafruit_ads1x15.analog_in import AnalogIn
 import os, signal, socket
-from luma.core.interface.serial import i2c
-from luma.core.render import canvas
-from luma.oled.device import sh1106
 from gpiozero import CPUTemperature
 import psutil
-import busio
 import multiprocessing as mp
 import logging
-import serial
-import subprocess
 from flask import Flask, render_template, Response, jsonify
 import cv2
 import numpy as np
 from picamera2 import Picamera2
 from libcamera import controls
 from USB_communication_handler import USBCommunication
+from I2C_handler import I2Ccommunication
 
 
 
@@ -53,28 +45,25 @@ class CustomException(Exception):
 #A class that has some necessary tools for calculating, usw.
 class Utility:
     #Transfer data so it can be used in other classes
-    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Display=None, ADC=None, Buzzer1=None, Gyro=None, Pixy=None):
-        #self.Ultraschall1, self.Ultraschall2, self.Farbsensor, self.Motor1, self.Servo1, self.StartButton, self.StopButton, self.Pixy, self.Funcs = Ultraschall1, Ultraschall2, Farbsensor, Motor1, Servo1, StartButton, StopButton, Pixy, Funcs
+    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Buzzer1=None):
+        self.setupLog()
         
-        self.usb_communication = USBCommunication()
+        self.usb_communication = USBCommunication(self)
         self.ESPHoldDistance, self.ESPHoldSpeed = self.usb_communication.initNodeMCUs()
+        
+        self.I2C_communication = I2Ccommunication(self)
+        self.Display = self.I2C_communication.Display
+        self.ADC = self.I2C_communication.ADC
+        self.Gyro = self.I2C_communication.Gyro
         
         self.Farbsensor = Farbsensor
         self.StartButton = StartButton
         self.StopButton = StopButton
-        self.Pixy = Pixy
-        self.Display = Display
-        self.ADC = ADC
         self.Buzzer1 = Buzzer1
         self.StartTime = time.time()
-        self.Gyro = Gyro
         
         self.ActivSensor = 0
         self.file_path = "/tmp/StandbyScript.lock"
-        self.Starttime = 0
-        self.UltraschallThreadStop = 1
-        self.SensorDistance1 = 0
-        self.SensorDistance2 = 0
         
         self.stop_run_callable = True
         
@@ -84,18 +73,9 @@ class Utility:
     #Cleanup after the run is finished or an error occured
     def cleanup(self):
         self.LogDebug("Started cleanup")
-        
-        
-        #Stop all Threads if the class has been initialized
-        #if self.Farbsensor != None:
-        #    self.Farbsensor.stop_measurement()
-        if self.Pixy != None:
-            self.Pixy.LED(0)
-            self.Pixy.stop_reading()
-        if self.Display != None:
-            self.Display.stop_update()
-        if self.StopButton != None:
-            self.StopButton.stop_StopButton()
+
+        self.I2C_communication.stop_threads()
+        self.StopButton.stop_StopButton()
         
         #Stop Nodemcu's
         self.usb_communication.sendMessage("STOP", self.ESPHoldDistance)
@@ -120,17 +100,13 @@ class Utility:
     def StartRun(self):
         #clear console
         os.system('cls' if os.name=='nt' else 'clear')
+        
+        pI2C = mp.Process(target=self.I2C_communication.start_threads())
+        pI2C.start()
 
-        #Start Processes
-        if self.Display != None:
-            p1 = mp.Process(target=self.Display.start_update())
-            p1.start()
         if self.StopButton != None:
             p2 = mp.Process(target=self.StopButton.start_StopButton())
             p2.start()
-        if self.Pixy != None:
-            p3 = mp.Process(target=self.Pixy.start_reading())
-            p3.start()
 
         #Wait for StartButton to be pressed
         self.running = True
@@ -148,9 +124,8 @@ class Utility:
             if self.StartButton.state() == 1:
         
                 self.usb_communication.startNodeMCUs()
-                
-                time.sleep(0.1)
-                
+                self.Gyro.GyroStart = True
+
                 self.usb_communication.sendMessage(f"D {50}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"KP {2}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"ED {125}", self.ESPHoldDistance)
@@ -162,8 +137,6 @@ class Utility:
                 self.Display.write("Run started:", f"{time.time()}")  
                 self.Buzzer1.buzz(1000, 80, 0.1) 
                 
-                self.Gyro.angle = 0
-
                 self.waiting = False
                 
     
@@ -359,236 +332,7 @@ class Button(Utility):
     def stop_StopButton(self):
         self.threadStop = 1
 
-
-#A class for reading a TCS34725 ColorSensor         
-class ColorSensor(Utility):
-    def __init__(self, Utils):
-        #Variable init
-        self.color_rgb, self.color_temperature, self.lux = 0, 0, 0
-        self.Utils = Utils
-        
-        #Colorsensor init
-        i2c = board.I2C()
-        self.sensor = adafruit_tcs34725.TCS34725(i2c)
-            
-    
-    #Start a new thread for reading the sensor        
-    def start_measurement(self):
-        self.sensor.active = True
-        self.threadStop = 0
-        self.thread = threading.Thread(target=self.read, daemon=True)
-        self.thread.start()
-        
-        
-    #Read the sensor data    
-    def read(self):
-        #Write sensor data to variables
-        while self.threadStop == 0:
-            self.color_temperature = self.sensor.color_temperature
-            #self.color_rgb = self.sensor.color_rgb_bytes
-            #self.lux = self.sensor.lux
-        
-    
-    #Stop the thread for reading the sensor   
-    def stop_measurement(self):
-        self.sensor.active = False
-        self.threadStop = 1
-        
-        
-
-#A class for reading a MPU6050 Gyroscope
-class Gyroscope(Utility):
-    def __init__(self, Utils):
-        i2c = busio.I2C(board.D1, board.D0)
-        self.sensor = adafruit_mpu6050.MPU6050(i2c)
-        self.sensor._gyro_range = 0
-        self.Utils = Utils
-        
-        self.threadStop = 0
-
-        #Initialize variables for storing the angle and time
-        self.angle = 0.0  # Initial angle
-        self.last_time = time.time()
-    
-
-    #Read the gyroscope data and calculate the angle
-    def get_angle(self):
-        while self.threadStop == 0:
-            time.sleep(0.005)
-            offset_x = 0.29
-            offset_y = 0.0
-            offset_z = 0.0
-            #Read gyroscope data
-            gyro_data = self.sensor.gyro
-            gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
-
-            # Get the current time
-            current_time = time.time()
-
-            # Calculate the time elapsed since the last measurement
-            delta_time = current_time - self.last_time
-            
-            #bugfix for time-jumps
-            if delta_time >= 0.5:
-                delta_time = 0.003
-
-            # Integrate the gyroscope readings to get the change in angle
-            if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
-                gyro_data = 0
-            else:
-                gyro_data = gyro_data[0]
-                
-            delta_angle = gyro_data * delta_time * 60
-
-            # Update the angle
-            self.angle += delta_angle
-
-            # Update the last time for the next iteration
-            self.last_time = current_time
-    
-        
-
-#A class for reading a ADS1015 ADC        
-class AnalogDigitalConverter(Utility):
-    def __init__(self, Utils, channel=2):
-        #Variables
-        self.channel = channel
-        self.voltage = 12
-        
-        #ADC init
-        i2c = busio.I2C(board.D1, board.D0)
-        self.ads = ADS.ADS1015(i2c)
-        self.ads.active = True
-        self.Utils = Utils
-        
-        #Channel init
-        if channel == 0:
-            self.chan = AnalogIn(self.ads, ADS.P0)
-        elif channel == 1:
-            self.chan = AnalogIn(self.ads, ADS.P1)
-        elif channel == 2:
-            self.chan = AnalogIn(self.ads, ADS.P2)
-        elif channel == 3:
-            self.chan = AnalogIn(self.ads, ADS.P3)
-        else:
-            raise CustomException(f"No valid ADC channel specified: {channel}")
-       
-    
-    #Read the voltage from the ADC    
-    def read(self):
-        self.voltage = self.chan.voltage * 4.395
-        return self.chan.voltage * 4.395
-
-
-    
-#A class for writing to a OLED Display
-class DisplayOled(Utility):
-    def __init__(self, ADC=None, Gyro=None, Farbsensor=None, Button=None, Utils=None):
-        serial = i2c(port=0, address=0x3C)
-        self.device = sh1106(serial)
-        
-        #Variable init
-        self.first_line = ""
-        self.second_line = ""
-        self.ADC = ADC
-        self.Utils = Utils
-        self.Gyro = Gyro
-        self.ColorSensor = Farbsensor
-        self.Button = Button
-        
-        #Wake the screen by drawing an outline
-        with canvas(self.device) as draw:
-            draw.rectangle(self.device.bounding_box, outline="white", fill="black")
-    
-       
-    #Clear the Display 
-    def clear(self):
-        with canvas(self.device) as draw:
-            draw.rectangle(self.device.bounding_box, outline="white", fill="black")
-            
-    
-    #Write lines in variables so they get written by the update function   
-    def write(self, first_line="", second_line="", reset=False, xCoord=0, yCoord=17):
-        if reset:
-            self.first_line = ""
-            self.second_line = ""
-        
-        if first_line != "":
-            self.first_line = first_line
-        if second_line != "":
-            self.second_line = second_line
-        
-
-    #Start a new thread for updating the Display
-    def start_update(self):
-        self.threadStop = 0
-        self.thread1 = threading.Thread(target=self.update, daemon=True)
-        self.thread1.start()
-        
-        if self.Gyro != None:
-            self.Gyro.threadStop = 0
-            self.thread2 = threading.Thread(target=self.Gyro.get_angle, daemon=True)
-            self.thread2.start()
-        
-        if self.ColorSensor != None:
-            self.ColorSensor.threadStop = 0
-            self.thread3 = threading.Thread(target=self.ColorSensor.read, daemon=True)
-            self.thread3.start()
-            
-        if self.Button != None:
-            self.Button.threadStop = 0
-            self.thread4 = threading.Thread(target=self.Button.read_StopButton, daemon=True)
-            self.thread4.start()
-
-    
-    #Update the Display
-    def update(self):
-        while self.threadStop == 0:
-
-            #Get CPU temperature, CPU usage, RAM usage and Disk usage
-            cpuTemp = CPUTemperature()
-            self.cpu_usage = psutil.cpu_percent(interval=0)
-            self.ram = psutil.virtual_memory()
-            self.disk = psutil.disk_usage('/')
-            
-            #Format them to always have the same number of decimal points
-            cpu_temp_formatted = self.convert_to_decimal_points(cpuTemp.temperature, 1)
-            cpu_usage_formatted = self.convert_to_decimal_points(self.cpu_usage, 1)
-            ram_usage_formatted = self.convert_to_decimal_points(self.ram.percent, 1)
-            disk_usage_formatted = self.convert_to_decimal_points(self.disk.percent, 1)
-            voltage_value_formatted = self.convert_to_decimal_points(self.ADC.read(), 2)
-            
-            #Draw all the data on the Display
-            with canvas(self.device) as draw:
-                    #top
-                    draw.text((0, 0), f"{cpu_temp_formatted}°C", fill="white", align="left")
-                    draw.text((40, 0), f"DISK:{(int(float(disk_usage_formatted)))}%", fill="white")
-                    draw.text((92, 0), f"{voltage_value_formatted}V", fill="white")
-                    
-                    #bottom
-                    draw.text((0, 50), f"CPU:{cpu_usage_formatted}%", fill="white")
-                    draw.text((75, 50), f"RAM:{ram_usage_formatted}%", fill="white")
-                    
-                    #custom
-                    draw.multiline_text((0, 15), f"{self.first_line}\n{self.second_line}", fill="white", align="center", anchor="ma")
-                    
-            time.sleep(2)
-
-         
-    #Stop the thread for updating the Display      
-    def stop_update(self):
-
-        self.threadStop = 1
-        
-        if self.Gyro != None:
-            self.Gyro.threadStop = 1
-            
-        if self.ColorSensor != None:
-            self.ColorSensor.threadStop = 1
-
-
-
-
+          
 #A class for making sounds with a Buzzer
 class Buzzer(Utility):
     def __init__(self, SignalPin, Utils):
@@ -620,9 +364,6 @@ class Buzzer(Utility):
             self.Utils.LogDebug("Buzzer already in use, skipping")
             return
             
-
-
-
 
 #A class for detecting red and green blocks in the camera stream           
 class Camera():
@@ -734,410 +475,3 @@ class Camera():
                     else:
                         yield (b'--frame\r\n'
                                 b'Content-Type: image/jpeg\r\n\r\n' + b'\r\n')
-
-
-   
-##########################################################
-##                                                      ##
-##                 Old-Classes                          ##
-##                                                      ##
-##########################################################
-
-#A class for reading a LM393 speed sensor
-class SpeedSensor(Utility):
-    def __init__(self, SignalPin, NumberSlots, Utils, P=1):
-        try:
-            #Variables
-            self.SignalPin = SignalPin
-            self.speed = 0
-            self.NumSlots = NumberSlots
-            self.Utils = Utils
-            self.P = P
-            
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(SignalPin, GPIO.IN)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SpeedSensor initialization: {e}")
-            self.Utils.StopRun()
-            
-    
-    #Start a new thread for measuring the sensor
-    def start_measurement(self):
-        try:
-            GPIO.setmode(GPIO.BCM)
-            self.threadStop = 0
-            self.thread = threading.Thread(target=self.hold_speed, daemon=True, args=(self.Utils, self.NumSlots,))
-            self.thread.start()
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SpeedSensor.start_measurement: {e}")
-            self.Utils.StopRun()
-            
-    
-    #Measure the speed with the sensor
-    def hold_speed(self, Utils, NumSlots):
-        try:
-            GPIO.setmode(GPIO.BCM)
-            self.Utils = Utils
-            PulseTime = time.time()
-            lastPulseTime = 0
-            GPIO.setup(self.SignalPin, GPIO.IN)
-            
-            while self.threadStop == 0:
-                try:
-                    if self.Utils.Motor1.MotorSpeed != 0:
-                        GPIO.wait_for_edge(self.SignalPin, GPIO.FALLING)
-                            
-                        #GPIO setup
-                        #GPIO.setmode(GPIO.BCM)
-                        
-                        #Measure speed
-                        GPIO.wait_for_edge(self.SignalPin, GPIO.RISING)
-                        PulseTime = time.time()
-                            
-                        self.speed = (60 * 1000) / (NumSlots * (PulseTime - lastPulseTime)) / 100000 * 1.5
-                        lastPulseTime = PulseTime
-                        
-                        Error = self.speed - self.Utils.Motor1.MotorSpeed
-                        Correction = self.P * Error * -1
-                        
-                        if Correction > 100:
-                            Correction = 100
-                        elif Correction < 0:
-                            Correction = 0
-                            
-                        self.Utils.Motor1.drive('f', Correction)
-                        
-                except Exception as e:
-                    self.Utils.LogError(f"An Error occured in SpeedSensor.hold_speed: {e}")
-                    self.Utils.StopRun()
-                
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SpeedSensor.hold_speed: {e}")
-            self.Utils.StopRun()
-        
-      
-    #Stop the thread for measuring the sensor  
-    def stop_measurement(self):
-        try:
-            self.threadStop = 1
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SpeedSensor.stop_measurement: {e}")
-            self.Utils.StopRun()
-
-
-
-#Class for reading a SuperSonicSensor
-class SuperSonicSensor(Utility):
-    def __init__(self, TrigPin, EchoPin, ID, Utils, smoothing_window_size=7):
-        try:
-            #Variable init
-            self.EchoPin, self.TrigPin, self.distance, self.smoothing_window_size, self.sDistance = EchoPin, TrigPin, 0, smoothing_window_size, 0
-            self.ID = ID
-            self.ThreadStop = 0
-            self.Utils = Utils
-            #Moving Average init
-            self.values = [0] * self.smoothing_window_size
-            self.index = 0
-            
-            
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(TrigPin, GPIO.OUT)
-            GPIO.setup(EchoPin, GPIO.IN)
-            
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SuperSonicSensor initialization: {e}")
-            self.Utils.StopRun()
-        
-    
-    #Start a new thread for measuring the sensor   
-    def start_measurement(self):
-        try:
-            #GPIO.remove_event_detect(self.EchoPin)
-            self.Utils.UltraschallThreadStop = 0
-            self.thread = threading.Thread(target=self.measure_distance, daemon=True, name=f"Ultraschall{self.ID}", args=(self.Utils,))
-            self.thread.start()
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SuperSonicSensor.start_measurement: {e}")
-            self.Utils.StopRun()
-    
-    
-    #measure the distance with the sensor
-    def measure_distance(self, Utils):
-        GPIO.remove_event_detect(self.EchoPin)
-        GPIO.add_event_detect(self.EchoPin, GPIO.RISING)
-        #Variables
-        MAXTIME = 40
-        StartTime = 0
-        StopTime = 0
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.TrigPin, GPIO.OUT)
-        GPIO.setup(self.EchoPin, GPIO.IN)
-        
-        while Utils.UltraschallThreadStop == 0:
-            try:
-                StartTime2 = time.time()
-                #GPIO setup
-                #Trigger
-                GPIO.output(self.TrigPin, 0)
-                time.sleep(0.03)
-                
-                GPIO.output(self.TrigPin, 1)
-                time.sleep(0.00001)
-                GPIO.output(self.TrigPin, 0)
-
-                #Get times
-                time.sleep(0.010)
-                TIMEOUT = time.time() + MAXTIME
-                while not GPIO.event_detected(self.EchoPin) and StopTime < TIMEOUT:
-                    StartTime = time.time()
-
-                TIMEOUT = time.time() + MAXTIME
-                while GPIO.input(self.EchoPin) == 1 and StopTime < TIMEOUT:
-                    StopTime = time.time()
-               
-
-                #Calculate distance
-                delay = StopTime - StartTime
-                distance = (delay * 34030) / 2
-                
-                if distance < 0:
-                    self.distance = 0
-                elif distance > 500:
-                    self.distance = 500
-                else:
-                    self.distance = distance
-                
-                self.values[self.index] = self.distance
-                self.index = (self.index + 1) % self.smoothing_window_size
-                self.sDistance = sum(self.values) / self.smoothing_window_size
-                StopTime2 = time.time()
-            
-            except Exception as e:
-                self.Utils.LogError(f"An Error occured in SuperSonicSensor.measure_distance: {e}")
-                self.threadStop = 1
-                self.Utils.StopRun()
-       
-    
-    #Stop the thread for measuring the sensor
-    def stop_measurement(self):
-        try:
-            self.Utils.UltraschallThreadStop = 1
-        
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in SuperSonicSensor.stop_measurement: {e}")
-            self.Utils.StopRun()
-
-
-
-#A class for reading the PixyCam ############################ WIP - may be abandoned #########################################            
-class PixyCam(Utility):
-    def __init__(self, Utils):
-        self.count, self.output = 0, ()
-        self.Utils = Utils
-        pixy.init()
-        pixy.change_prog ("color_connected_components");        
-        
-        
-    def start_reading(self):
-        self.threadStop = 0
-        self.thread = threading.Thread(target=self.read, daemon=True)
-        self.thread.start()
-       
-        
-    def read(self):
-        self.output = BlockArray(100)
-            
-        while self.threadStop == 0:
-            time.sleep(0.01)
-            self.count = pixy.ccc_get_blocks(100, self.output)
-       
-            
-    def stop_reading(self):
-        self.threadStop = 1
-      
-        
-    def LED(self, state):
-        if state == 1:
-            set_lamp(1, 1)
-        elif state == 0:
-            set_lamp(0, 0)
-        else:
-            self.Utils.LogError(f"no valid state specified: {state}")
-            raise CustomException(f"no valid state specified: {state}")
-      
- 
-      
-#Class for the drive Motor
-class Motor(Utility):
-    def __init__(self, frequency, fpin, rpin, spin, Utils):
-        try:
-            #Setup Variables
-            self.frequency, self.fpin, self.rpin, self.spin, self.speed = frequency, fpin, rpin, spin, 0
-            self.Utils = Utils
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(fpin, GPIO.OUT)
-            GPIO.setup(rpin, GPIO.OUT)
-            GPIO.setup(spin, GPIO.OUT)
-            
-            self.pwm = GPIO.PWM(self.spin, self.frequency)
-            self.MotorSpeed = 0
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor initialization: {e}")
-            self.Utils.StopRun()
-
-
-    #Set the direction and speed of the Motor
-    def drive(self, direction="f", speed=0):
-        try:
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.fpin, GPIO.OUT)
-            GPIO.setup(self.rpin, GPIO.OUT)
-
-            self.speed = speed
-            
-            #Set direction
-            if direction == 'f':
-                GPIO.output(self.fpin, 1)
-                GPIO.output(self.rpin, 0)
-            elif direction == 'r':
-                GPIO.output(self.fpin, 0)
-                GPIO.output(self.rpin, 1)
-            else:
-                self.Utils.LogError(f"No valid direction specified: {direction}")
-                raise CustomException(f"No valid direction specified: {direction}")
-
-            #Set speed
-            self.pwm.ChangeDutyCycle(speed)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor.drive: {e}")
-            self.Utils.StopRun()
-
-       
-    #Start the Motor with the last known speed        
-    def start(self):
-        try:
-            self.pwm.start(self.speed)  
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor.start: {e}")
-            self.Utils.StopRun()
-       
-       
-    #Stop the Motor        
-    def stop(self):
-        try:
-            GPIO.setmode(GPIO.BCM)
-            GPIO.output(self.fpin, 0) 
-            GPIO.output(self.rpin, 0)
-            self.pwm.stop()
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Motor.stop: {e}")
-            self.Utils.StopRun()
-        
-    
-    #Set a motor speed that gets controlled by the Speed Sensor, if it was started   
-    def setMotorSpeed(self, Speed):
-        self.drive("f", 100)
-        time.sleep(0.01)
-        self.MotorSpeed = Speed
-        
-           
-
-#A class for controlling the Servo that is used for steering        
-class Servo(Utility):
-    def __init__(self, SignalPin, frequency, Utils):
-        try:
-            #Variable init
-            self.SignalPin, self.frequency = SignalPin, frequency
-            self.Utils = Utils
-            self.percentage = 0
-            
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.SignalPin, GPIO.OUT)
-            
-            #Start steering at 0
-
-            self.pwm = GPIO.PWM(SignalPin, frequency)
-            self.pwm.start(6.6)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Servo initialization: {e}")
-            self.Utils.StopRun()
-
-        
-    #Calculate the DutyCycle from a steering percentage and steer the Servo    
-    def steer(self, percentage):
-        try:    
-            self.percentage = percentage
-            
-            #Calculate DutyCycle and set it
-            try:
-                DutyCycle = 3e-5 * self.percentage**2 + 0.018 * self.percentage + 6.57
-                self.pwm.ChangeDutyCycle(DutyCycle)
-            except:
-                self.Utils.LogError(f"No valid steering percentage specified: {percentage}")
-                raise CustomException(f"No valid steering percentage specified: {percentage}")
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Servo.steer: {e}")
-            self.Utils.StopRun()
-        
-    
-    #Set a motor speed that gets controlled by the Speed Sensor, if it was started   
-    def setMotorSpeed(self, Speed):
-        self.drive("f", 100)
-        time.sleep(0.01)
-        self.MotorSpeed = Speed
-        
-           
-
-#A class for controlling the Servo that is used for steering        
-class Servo(Utility):
-    def __init__(self, SignalPin, frequency, Utils):
-        try:
-            #Variable init
-            self.SignalPin, self.frequency = SignalPin, frequency
-            self.Utils = Utils
-            self.percentage = 0
-            
-            #GPIO setup
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.SignalPin, GPIO.OUT)
-            
-            #Start steering at 0
-
-            self.pwm = GPIO.PWM(SignalPin, frequency)
-            self.pwm.start(6.6)
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Servo initialization: {e}")
-            self.Utils.StopRun()
-
-        
-    #Calculate the DutyCycle from a steering percentage and steer the Servo    
-    def steer(self, percentage):
-        try:    
-            self.percentage = percentage
-            
-            #Calculate DutyCycle and set it
-            try:
-                DutyCycle = 3e-5 * self.percentage**2 + 0.018 * self.percentage + 6.57
-                self.pwm.ChangeDutyCycle(DutyCycle)
-            except:
-                self.Utils.LogError(f"No valid steering percentage specified: {percentage}")
-                raise CustomException(f"No valid steering percentage specified: {percentage}")
-            
-        except Exception as e:
-            self.Utils.LogError(f"An Error occured in Servo.steer: {e}")
-            self.Utils.StopRun()

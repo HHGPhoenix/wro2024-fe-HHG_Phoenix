@@ -12,9 +12,8 @@ chip = gpiod.Chip('gpiochip4')
 all_lines = []
 
 class USBCommunication:
-    def __init__(self):
-        from RobotCarClasses import Utility
-        self.Utils = Utility()
+    def __init__(self, Utils):
+        self.Utils = Utils
         
         self.HoldSpeedCounter = 0
         self.HoldDistanceCounter = 0
@@ -34,7 +33,6 @@ class USBCommunication:
         self.EspHoldSpeedPin.set_value(1)
         """
         
-        self.Utils.setupLog()
         
     def handleHeartbeat(self):
         self.sendMessage("H", self.EspHoldSpeed)
@@ -88,7 +86,7 @@ class USBCommunication:
                 self.responsesHoldDistance.append(response)
             
         except UnicodeDecodeError:
-            self.Utils.Logger.warn("UnicodeDecodeError for HoldDistance")
+            self.Utils.LogWarning("UnicodeDecodeError for HoldDistance")
             return None
 
         try:
