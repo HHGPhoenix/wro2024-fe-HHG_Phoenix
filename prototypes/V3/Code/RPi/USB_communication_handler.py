@@ -55,6 +55,7 @@ class USBCommunication:
     def handleSendMessage(self):
         totalSizeHoldDistance = 0
         for message in self.messageArrayHoldDistance:
+            print(message)
             messageSize = len(f"{message}\n".encode())
             if totalSizeHoldDistance + messageSize > 64:
                 break
@@ -67,6 +68,7 @@ class USBCommunication:
 
         totalSizeHoldSpeed = 0
         for message in self.messageArrayHoldSpeed:
+            print(message)
             messageSize = len(f"{message}\n".encode())
             if totalSizeHoldSpeed + messageSize > 64:
                 break
@@ -85,8 +87,8 @@ class USBCommunication:
             for response in responsesHoldDistance:
                 self.responsesHoldDistance.append(response)
             
-        except UnicodeDecodeError:
-            self.Utils.LogWarning("UnicodeDecodeError for HoldDistance")
+        except UnicodeDecodeError as e:
+            self.Utils.LogWarning(f"UnicodeDecodeError for HoldDistance: {e}")
             return None
 
         try:
@@ -98,8 +100,8 @@ class USBCommunication:
                 self.responsesHoldSpeed.append(response)
             
         
-        except UnicodeDecodeError:
-            self.Utils.LogWarning("UnicodeDecodeError for HoldSpeed")
+        except UnicodeDecodeError as e:
+            self.Utils.LogWarning(f"UnicodeDecodeError for HoldSpeed: {e}")
             return None
         
         

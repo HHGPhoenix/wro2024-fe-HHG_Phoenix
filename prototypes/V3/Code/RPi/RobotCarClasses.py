@@ -92,7 +92,7 @@ class Utility:
             line.release()
         
         self.running = False
-        self.usb_communication.closeNodeMCUs(self.ESPHoldDistance, self.ESPHoldSpeed)
+        self.usb_communication.closeNodeMCUs()
         os.kill(os.getpid(), signal.SIGTERM)
     
     
