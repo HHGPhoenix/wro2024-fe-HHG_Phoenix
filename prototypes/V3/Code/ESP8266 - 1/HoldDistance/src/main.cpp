@@ -123,13 +123,8 @@ void loop()
 			while (Serial.available() > 0)
 			{
 				c = Serial.read();
-				//Serial.print("c: ");
-				//Serial.println(c);
 				if (c == '\n')
 				{
-					//command = String(command);
-					//Serial.println("command");
-					//Serial.println(command);
 					// check for stop command
 					if (command == "STOP")
 					{

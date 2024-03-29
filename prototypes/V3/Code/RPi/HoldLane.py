@@ -75,7 +75,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
     
     #Hold Lane
     while Utils.running and rounds < 3:
-        time.sleep(0.001)
+        time.sleep(0.01)
                 
         if direction == 0:
             relative_angle = Utils.Gyro.angle - oldAngle
@@ -206,7 +206,6 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     if Sensor != 2:
                         Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
                         Sensor = 2
-                        time.sleep(0.05)
                         
                     if desired_distance_wall > middledistance + 2:
                         desired_distance_wall -= 4

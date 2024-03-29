@@ -60,11 +60,11 @@ class USBCommunication:
             if totalSizeHoldDistance + messageSize > 64:
                 break
             self.EspHoldDistance.write(f"{message}\n".encode())
-            time.sleep(0.02)
+            time.sleep(0.01)
             totalSizeHoldDistance += messageSize
             self.messageArrayHoldDistance.remove(message)
 
-        time.sleep(0.1)
+        time.sleep(0.05)
 
         totalSizeHoldSpeed = 0
         for message in self.messageArrayHoldSpeed:
@@ -73,7 +73,7 @@ class USBCommunication:
             if totalSizeHoldSpeed + messageSize > 64:
                 break
             self.EspHoldSpeed.write(f"{message}\n".encode())
-            time.sleep(0.02)
+            time.sleep(0.01)
             totalSizeHoldSpeed += messageSize
             self.messageArrayHoldSpeed.remove(message)
         
@@ -109,10 +109,8 @@ class USBCommunication:
         counter = 0
         while True:
             self.handleSendMessage()
-            time.sleep(0.05)
             self.handleGetResponse()
-            time.sleep(0.05)
-            if counter == 10:
+            if counter == 20:
                 self.handleHeartbeat()
                 counter = 0
             else:
