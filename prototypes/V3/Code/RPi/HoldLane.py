@@ -35,7 +35,7 @@ Utils.setupDataLog()
 ##                                                      ##
 ##########################################################
 #Constants
-Utils.Speed = 50
+Utils.Speed = 40
 Utils.KP = 3.5
 Utils.ED = 125 #Edge detection distance in cm
 
@@ -45,10 +45,10 @@ Utils.ED = 125 #Edge detection distance in cm
 ##                     Functions                        ##
 ##                                                      ##
 ##########################################################
-def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, GyroWaitTime=1, Sensor=2):
+def HoldLane(Utils, YCutOffTop=165, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, GyroWaitTime=1, Sensor=2):
     #Variables
     TIMEOUT = 0
-    TIMEOUTBlock = 1.2
+    TIMEOUTBlock = 0.8
     corners = 0
     rounds = 0
     Sensor = 0
@@ -66,12 +66,12 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
     middledistance = 50
     GyroCornerAngle = 90
 
-    FreezeSize = 300
-    FreezeY = 500
-    KP = 0.19
+    FreezeSize = 150
+    FreezeY = 350
+    KP = 0.20
     
-    desired_distance_to_block_red = 550
-    desired_distance_to_block_green = -600
+    desired_distance_to_block_red = 650
+    desired_distance_to_block_green = -650
     
     #Hold Lane
     while Utils.running and rounds < 3:
@@ -113,7 +113,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
             if len(block_array) > 0:
                 #Delete blocks not meeting requirements
                 for block in block_array:
-                    if block['my'] < YCutOffTop and block['my'] > YCutOffBottom and block["size"] > SIZE:
+                    if block['y'] > YCutOffTop and block["size"] > SIZE:
                         pass
                     else:
                         block_array.remove(block)
@@ -149,7 +149,7 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     elif nextBlock['color'] == "green":
                         desired_distance_to_block = desired_distance_to_block_green
                         
-                    distance_divider = (nextBlock['y'] / coordinates_self[1]) * 1.3
+                    distance_divider = (nextBlock['y'] / coordinates_self[1]) * 0.8
 
                     #print("Distance Divider: ", distance_divider)
                     # Calculation of desired distance to wall
@@ -165,12 +165,6 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
 
                     if desired_distance_wall > middledistance:
                         desired_distance_wall_other_direction = (100 - desired_distance_wall)
-                            
-                        #Send ESPHoldDistance new Distance
-                        if abs(desired_distance_wall_other_direction - old_desired_distance_wall) > 1:
-                            Utils.usb_communication.sendMessage(f"D{desired_distance_wall_other_direction}", ESPHoldDistance)
-                            Utils.LogInfo(f"New Distance {desired_distance_wall_other_direction}, Current Sensor: {Sensor}")
-                            old_desired_distance_wall = desired_distance_wall_other_direction
                         
                         #Send ESPHoldDistance new Sensor
                         if Sensor != 1:
@@ -178,17 +172,23 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                             Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
                             Utils.LogInfo(f"Switched to Sensor 1")
                             
-                    else:
-                        if abs(desired_distance_wall - old_desired_distance_wall) > 1:
-                            Utils.usb_communication.sendMessage(f"D{desired_distance_wall}", ESPHoldDistance)
-                            Utils.LogInfo(f"New Distance {desired_distance_wall}, Current Sensor: {Sensor}")
-                            old_desired_distance_wall = desired_distance_wall
+                        #Send ESPHoldDistance new Distance
+                        if abs(desired_distance_wall_other_direction - old_desired_distance_wall) > 3:
+                            Utils.usb_communication.sendMessage(f"D{desired_distance_wall_other_direction}", ESPHoldDistance)
+                            Utils.LogInfo(f"New Distance {desired_distance_wall_other_direction}, Current Sensor: {Sensor}")
+                            old_desired_distance_wall = desired_distance_wall_other_direction
                         
+                    else:
                         if Sensor != 2:
                             Sensor = 2
                             Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
                             Utils.LogInfo(f"Switched to Sensor 2")
                             
+                        if abs(desired_distance_wall - old_desired_distance_wall) > 3:
+                            Utils.usb_communication.sendMessage(f"D{desired_distance_wall}", ESPHoldDistance)
+                            Utils.LogInfo(f"New Distance {desired_distance_wall}, Current Sensor: {Sensor}")
+                            old_desired_distance_wall = desired_distance_wall
+                        
             else:
                 if time.time() > Last_Esp_Command + 1.5:
                     # Change this part based on the position of the block
@@ -242,7 +242,8 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
           
                     
         responses = Utils.usb_communication.getResponses(ESPHoldDistance)
-        if (responses != None):
+        if (responses != None and responses != []):
+            Utils.LogDebug(f"Responses: {responses}")
             for response in responses:
                 if "Drive direction counterclockwise" in responses:
                     direction = 1
@@ -254,6 +255,8 @@ def HoldLane(Utils, YCutOffTop=1000000, YCutOffBottom=-1, SIZE=0, LineWaitTime=1
                     Utils.SensorDistance2 = float(response.split(":")[1].strip())
         
         Utils.LogData()
+        
+    #time.sleep(2)
 
 
 

@@ -53,29 +53,33 @@ class USBCommunication:
         
         
     def handleSendMessage(self):
+        completeMessage = ""
         totalSizeHoldDistance = 0
         for message in self.messageArrayHoldDistance:
             print(message)
             messageSize = len(f"{message}\n".encode())
             if totalSizeHoldDistance + messageSize > 64:
                 break
-            self.EspHoldDistance.write(f"{message}\n".encode())
-            time.sleep(0.01)
+            completeMessage += f"{message}\n"
             totalSizeHoldDistance += messageSize
             self.messageArrayHoldDistance.remove(message)
+            
+        self.EspHoldDistance.write(f"{completeMessage}".encode())
 
         time.sleep(0.05)
 
+        completeMessage = ""
         totalSizeHoldSpeed = 0
         for message in self.messageArrayHoldSpeed:
             print(message)
             messageSize = len(f"{message}\n".encode())
             if totalSizeHoldSpeed + messageSize > 64:
                 break
-            self.EspHoldSpeed.write(f"{message}\n".encode())
-            time.sleep(0.01)
+            completeMessage += f"{message}\n"
             totalSizeHoldSpeed += messageSize
             self.messageArrayHoldSpeed.remove(message)
+            
+        self.EspHoldSpeed.write(f"{completeMessage}".encode())
         
         
     def handleGetResponse(self):
@@ -110,7 +114,7 @@ class USBCommunication:
         while True:
             self.handleSendMessage()
             self.handleGetResponse()
-            if counter == 20:
+            if counter == 60:
                 self.handleHeartbeat()
                 counter = 0
             else:

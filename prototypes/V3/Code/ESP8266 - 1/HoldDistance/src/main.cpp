@@ -249,7 +249,7 @@ void loop()
 				{
 					// calculate error and correction
 					float error = desiredDistance - distance1;
-					float correction = error * KP * -1;
+					float correction = error * KP;
 
 					// Serial.print("correction: ");
 					// Serial.println(correction);
