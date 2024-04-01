@@ -45,14 +45,14 @@ Utils.ED = 125 #Edge detection distance in cm
 ##                     Functions                        ##
 ##                                                      ##
 ##########################################################
-def HoldLane(Utils, YCutOffTop=165, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, GyroWaitTime=1, Sensor=2):
+def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, GyroWaitTime=1, Sensor=2):
     #Variables
     TIMEOUT = 0
-    TIMEOUTBlock = 0.8
+    TIMEOUTBlock = 0.5
     corners = 0
     rounds = 0
-    Sensor = 0
-    direction = 0
+    Sensor = 2
+    direction = -1
     relative_angle = 0
     oldAngle = 0
     detect_new_block = True
@@ -69,16 +69,24 @@ def HoldLane(Utils, YCutOffTop=165, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
 
     FreezeSize = 150
     FreezeY = 350
-    KP = 0.20
-    desired_distance_to_block_red = 650
-    desired_distance_to_block_green = -650
+    KP = 0.2
+    desired_distance_to_block_red = -700
+    desired_distance_to_block_green = 650
+    
+    SensorFirstCornerChanged = False
 
     #Hold Lane
     while Utils.running and rounds < 3:
         time.sleep(0.01)
                 
+                
+        Utils.LogDebug(f"direction: {direction}, Sensor: {Sensor}, Inverted: {Inverted}, SensorFirstCornerChanged: {SensorFirstCornerChanged}")
         if direction == 0:
             Inverted = True
+            if not SensorFirstCornerChanged:
+                Sensor = 1
+                Utils.usb_communication.sendMessage("S1", ESPHoldDistance)
+                SensorFirstCornerChanged = True
             
             relative_angle = Utils.Gyro.angle - oldAngle
             newAngle = oldAngle - GyroCornerAngle
@@ -95,8 +103,12 @@ def HoldLane(Utils, YCutOffTop=165, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                 oldAngle = newAngle
                 TIMEOUT = time.time() + LineWaitTime
                 
-        else:
+        elif direction == 1:
             Inverted = False
+            if not SensorFirstCornerChanged:
+                Sensor = 2
+                Utils.usb_communication.sendMessage("S2", ESPHoldDistance)
+                SensorFirstCornerChanged = True
             
             newAngle = oldAngle + GyroCornerAngle
             if Utils.Gyro.angle > newAngle and time.time() > TIMEOUT:
@@ -135,6 +147,9 @@ def HoldLane(Utils, YCutOffTop=165, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                     Time_detect_new_block = time.time()
                     Utils.LogInfo(f"Freeze")
                     
+                    Utils.usb_communication.sendMessage("MANUAL", ESPHoldDistance)
+                    Utils.usb_communication.sendMessage("ANG90", ESPHoldDistance)
+                    
                     if timelastcorner + 1 > time.time():
                         nextBlock['position'] = "1"
                     elif timelastcorner + 2 > time.time():
@@ -152,7 +167,7 @@ def HoldLane(Utils, YCutOffTop=165, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                     elif nextBlock['color'] == "green":
                         desired_distance_to_block = desired_distance_to_block_green
                         
-                    distance_divider = (nextBlock['y'] / coordinates_self[1]) * 0.8
+                    distance_divider = (nextBlock['y'] / coordinates_self[1]) * 0.6
 
                     #print("Distance Divider: ", distance_divider)
                     # Calculation of desired distance to wall
@@ -169,16 +184,10 @@ def HoldLane(Utils, YCutOffTop=165, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                     if desired_distance_wall > middledistance:
                         desired_distance_wall_other_direction = (100 - desired_distance_wall)
                         
-                        if Inverted:
-                            if Sensor != 2:
-                                Sensor = 2
-                                Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
-                                Utils.LogInfo(f"Switched to Sensor 2")
-                        else:
-                            if Sensor != 1:
-                                Sensor = 1
-                                Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
-                                Utils.LogInfo(f"Switched to Sensor 1")
+                        if Sensor != 1:
+                            Sensor = 1
+                            Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
+                            Utils.LogInfo(f"Switched to Sensor 1")
                             
                         #Send ESPHoldDistance new Distance
                         if abs(desired_distance_wall_other_direction - old_desired_distance_wall) > 3:
@@ -187,16 +196,11 @@ def HoldLane(Utils, YCutOffTop=165, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                             old_desired_distance_wall = desired_distance_wall_other_direction
                         
                     else:
-                        if Inverted:
-                            if Sensor != 1:
-                                Sensor = 1
-                                Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
-                                Utils.LogInfo(f"Switched to Sensor 1")
-                        else:
-                            if Sensor != 2:
-                                Sensor = 2
-                                Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
-                                Utils.LogInfo(f"Switched to Sensor 2")
+                        
+                        if Sensor != 2:
+                            Sensor = 2
+                            Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
+                            Utils.LogInfo(f"Switched to Sensor 2")
                             
                         if abs(desired_distance_wall - old_desired_distance_wall) > 3:
                             Utils.usb_communication.sendMessage(f"D{desired_distance_wall}", ESPHoldDistance)
@@ -215,11 +219,16 @@ def HoldLane(Utils, YCutOffTop=165, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                         desired_distance_wall = 50
                     """
                     
-                    time.sleep(0.1)
+                   # time.sleep(0.1)
                     Utils.LogInfo(f"Desired Distance: {desired_distance_wall}, Current Sensor: {Sensor}")
-                    if Sensor != 2:
-                        Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
-                        Sensor = 2
+                    if Inverted:
+                        if Sensor != 1:
+                            Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
+                            Sensor = 1
+                    else:
+                        if Sensor != 2:
+                            Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
+                            Sensor = 2
                         
                     if desired_distance_wall > middledistance + 2:
                         desired_distance_wall -= 4
@@ -248,7 +257,11 @@ def HoldLane(Utils, YCutOffTop=165, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                         
         else:
             if time.time() > Time_detect_new_block + TIMEOUTBlock:
+                Utils.usb_communication.sendMessage("MANUAL", ESPHoldDistance)
+                
+                time.sleep(0.5)
                 detect_new_block = True
+                
                 
                 Cam.freeze = False
 

@@ -50,7 +50,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
     TIMEOUT = 0
     corners = 0
     rounds = 0
-    direction = 0
+    direction = -1
     oldAngle = 0
     GyroCornerAngle = 90
     Sensor = 0
@@ -64,6 +64,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
                 Sensor = 1
                 Utils.LogInfo("Switched to Sensor 1")
                 Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D25", Utils.ESPHoldDistance)
                 
             newAngle = oldAngle - GyroCornerAngle
             if Utils.Gyro.angle < newAngle and time.time() > TIMEOUT:
@@ -83,6 +84,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
                 Sensor = 2
                 Utils.LogInfo("Switched to Sensor 2")
                 Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D25", Utils.ESPHoldDistance)
             
             newAngle = oldAngle + GyroCornerAngle
             if Utils.Gyro.angle > newAngle and time.time() > TIMEOUT:
@@ -110,6 +112,8 @@ def HoldLane(Utils, CornerWaiTTime=1):
                     Utils.SensorDistance2 = float(response.split(":")[1].strip())
         
         Utils.LogData()
+        
+    time.sleep(1)
 
 
 

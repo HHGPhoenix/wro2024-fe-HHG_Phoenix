@@ -130,7 +130,8 @@ class Utility:
                 self.usb_communication.sendMessage(f"KP {2}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"ED {125}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"SPEED {50}", self.ESPHoldSpeed)
-                self.usb_communication.sendMessage(f"MM {10}", self.ESPHoldSpeed)
+                self.usb_communication.sendMessage(f"MM {10}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"S{2}", self.ESPHoldDistance)
                 
                 self.Starttime = time.time()
                 self.LogDebug(f"Run started: {time.time()}")

@@ -56,7 +56,6 @@ class USBCommunication:
         completeMessage = ""
         totalSizeHoldDistance = 0
         for message in self.messageArrayHoldDistance:
-            print(message)
             messageSize = len(f"{message}\n".encode())
             if totalSizeHoldDistance + messageSize > 64:
                 break
@@ -71,7 +70,6 @@ class USBCommunication:
         completeMessage = ""
         totalSizeHoldSpeed = 0
         for message in self.messageArrayHoldSpeed:
-            print(message)
             messageSize = len(f"{message}\n".encode())
             if totalSizeHoldSpeed + messageSize > 64:
                 break
@@ -225,7 +223,7 @@ class USBCommunication:
     def startNodeMCUs(self):
         #Start both NodeMCUs
         for ESP in [self.EspHoldDistance, self.EspHoldSpeed]:
-            ESP.write(f"START\n".encode())
+            self.sendMessage("START", ESP)
             time.sleep(0.2)
             waitingForResponse = True
             responseTimeout = time.time() + 5 # 5 seconds timeout
