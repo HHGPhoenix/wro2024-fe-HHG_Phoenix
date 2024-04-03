@@ -2,6 +2,7 @@ import time
 from RobotCarClasses import *
 from threading import Thread
 import traceback
+import multiprocessing as mp
 
 
 ##########################################################
@@ -20,10 +21,9 @@ StopButton = Button(6, Utils)
 Buzzer1 = Buzzer(12, Utils)
 
 Cam = Camera(video_stream=True)
-Cam.start_processing()
 
 global ESPHoldDistance, ESPHoldSpeed
-ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1)
+ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1, Cam)
 
 Utils.setupDataLog()
 
@@ -45,7 +45,7 @@ Utils.ED = 125 #Edge detection distance in cm
 ##                     Functions                        ##
 ##                                                      ##
 ##########################################################
-def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, GyroWaitTime=1, Sensor=2):
+def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, GyroWaitTime=1, Sensor=2):
     #Variables
     TIMEOUT = 0
     TIMEOUTBlock = 0.5
@@ -77,6 +77,7 @@ def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
 
     #Hold Lane
     while Utils.running and rounds < 3:
+        StartTime = time.time()
         time.sleep(0.01)
                 
                 
@@ -124,7 +125,7 @@ def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
         
         #get objects and calculate new distance
         if detect_new_block:
-            block_array = Cam.block_array
+            block_array = Utils.Cam.block_array.copy()
             if len(block_array) > 0:
                 #Delete blocks not meeting requirements
                 for block in block_array:
@@ -133,6 +134,7 @@ def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                     else:
                         block_array.remove(block)
                     
+            #print(block_array)
             if len(block_array) > 0:
                 #Utils.LogDebug(f"Lenght of block_array: {len(block_array)}")
                 #Sort blocks by size
@@ -143,18 +145,18 @@ def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
 
                 if nextBlock['w'] > FreezeSize or nextBlock['y'] > FreezeY or old_desired_distance_wall < 15 or old_desired_distance_wall > 75:
                     detect_new_block = False
-                    Cam.freeze = True
+                    Utils.Cam.freeze = True
                     Time_detect_new_block = time.time()
                     Utils.LogInfo(f"Freeze")
                     
                     Utils.usb_communication.sendMessage("MANUAL", ESPHoldDistance)
                     Utils.usb_communication.sendMessage("ANG90", ESPHoldDistance)
                     
-                    #Cam.get_edge_distances = 5
+                    Utils.Cam.get_edge_distances = 5
                     
-                    #time.sleep(0.3)
+                    time.sleep(0.3)
                     
-                    #Utils.LogInfo(f"edge distances: {Cam.edge_distances}")
+                    Utils.LogInfo(f"edge distances: {Utils.Cam.edge_distances}")
 
                 else:
                     nextBlock['distancex'] = -(coordinates_self[0] - nextBlock['mx'])
@@ -173,7 +175,7 @@ def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                     error = (desired_distance_to_block - nextBlock['distancex']) * distance_divider
                     desired_distance_wall =  middledistance - error * KP
                     desired_distance_wall = int(desired_distance_wall)
-                    Cam.desired_distance_wall = desired_distance_wall
+                    Utils.Cam.desired_distance_wall = desired_distance_wall
                     
                     if desired_distance_wall < 15:
                         desired_distance_wall =  15 
@@ -247,7 +249,7 @@ def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                         
                         Last_Esp_Command = time.time()
                         
-                    Cam.desired_distance_wall = desired_distance_wall
+                    Utils.Cam.desired_distance_wall = desired_distance_wall
                     if desired_distance_wall <= 30:
                         desired_distance_wall = 31
                     elif desired_distance_wall >= 70:
@@ -262,7 +264,7 @@ def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                 detect_new_block = True
                 
                 
-                Cam.freeze = False
+                Utils.Cam.freeze = False
 
                 Utils.LogInfo("Detect new block")
           
@@ -281,13 +283,16 @@ def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                     Utils.SensorDistance2 = float(response.split(":")[1].strip())
         
         Utils.LogData()
+        
+        StopTime = time.time()
+        #Utils.LogDebug(f"Time: {StopTime - StartTime}, block_array: {Utils.Cam.block_array}")
 
 
 
 if __name__ == "__main__":
     try: 
         #start flask server if needed
-        if Cam.video_stream:
+        if Utils.Cam.video_stream:
             app = Flask(__name__)
             
             @app.route('/')
@@ -297,7 +302,7 @@ if __name__ == "__main__":
 
             @app.route('/video_feed')
             def video_feed():
-                return Response(Cam.video_frames(),
+                return Response(Utils.Cam.video_frames(),
                                 mimetype='multipart/x-mixed-replace; boundary=frame')
                 
             @app.route('/data_feed')

@@ -47,7 +47,7 @@ class CustomException(Exception):
 #A class that has some necessary tools for calculating, usw.
 class Utility:
     #Transfer data so it can be used in other classes
-    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Buzzer1=None):
+    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Buzzer1=None, Cam=None):
         self.setupLog()
         
         self.usb_communication = USBCommunication(self)
@@ -57,6 +57,7 @@ class Utility:
         self.Display = self.I2C_communication.Display
         self.ADC = self.I2C_communication.ADC
         self.Gyro = self.I2C_communication.Gyro
+        self.Cam = Cam
         
         self.Farbsensor = Farbsensor
         self.StartButton = StartButton
@@ -103,12 +104,14 @@ class Utility:
         #clear console
         #os.system('cls' if os.name=='nt' else 'clear')
         
+        pCam = mp.Process(target=self.Cam.start_processing())
+        pCam.start()
+        
         pI2C = mp.Process(target=self.I2C_communication.start_threads())
         pI2C.start()
 
-        if self.StopButton != None:
-            p2 = mp.Process(target=self.StopButton.start_StopButton())
-            p2.start()
+        p2 = mp.Process(target=self.StopButton.start_StopButton())
+        p2.start()
 
         #Wait for StartButton to be pressed
         self.running = True
@@ -523,10 +526,10 @@ class Camera():
         frameraw = self.picam2.capture_array()
         
         frameraw = cv2.cvtColor(frameraw, cv2.COLOR_BGR2RGB)
+        frame = frameraw.copy()
         
         frameraw = frameraw[150:, :]
         
-        frame = frameraw.copy()
         
         # Convert the image from BGR to HSV
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -572,15 +575,18 @@ class Camera():
                 cv2.putText(frame, 'Red Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
                 block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
                 cv2.line(frame, (640, 720), (int(x+w/2), int(y+h/2)), (0, 0, 255), 2)
-                
+            
         return block_array, frame, frameraw
         
         
     #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
     def process_blocks(self):
         while True:
+            StartTime = time.time()
             self.block_array, self.frame, frameraw = self.get_coordinates()
-            #self.get_edges(frameraw)
+            StopTime = time.time()
+            #print(f"Time needed: {StopTime - StartTime}")
+            self.get_edges(frameraw)
      
           
     #Start a new thread for processing the camera stream          
