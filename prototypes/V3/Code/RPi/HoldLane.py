@@ -80,7 +80,7 @@ def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
         time.sleep(0.01)
                 
                 
-        Utils.LogDebug(f"direction: {direction}, Sensor: {Sensor}, Inverted: {Inverted}, SensorFirstCornerChanged: {SensorFirstCornerChanged}")
+        #Utils.LogDebug(f"direction: {direction}, Sensor: {Sensor}, Inverted: {Inverted}, SensorFirstCornerChanged: {SensorFirstCornerChanged}")
         if direction == 0:
             Inverted = True
             if not SensorFirstCornerChanged:
@@ -150,12 +150,11 @@ def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                     Utils.usb_communication.sendMessage("MANUAL", ESPHoldDistance)
                     Utils.usb_communication.sendMessage("ANG90", ESPHoldDistance)
                     
-                    if timelastcorner + 1 > time.time():
-                        nextBlock['position'] = "1"
-                    elif timelastcorner + 2 > time.time():
-                        nextBlock['position'] = "2"
-                    elif timelastcorner + 3 > time.time():
-                        nextBlock['position'] = "3"
+                    #Cam.get_edge_distances = 5
+                    
+                    #time.sleep(0.3)
+                    
+                    #Utils.LogInfo(f"edge distances: {Cam.edge_distances}")
 
                 else:
                     nextBlock['distancex'] = -(coordinates_self[0] - nextBlock['mx'])
@@ -220,7 +219,7 @@ def HoldLane(Utils, YCutOffTop=140, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gy
                     """
                     
                    # time.sleep(0.1)
-                    Utils.LogInfo(f"Desired Distance: {desired_distance_wall}, Current Sensor: {Sensor}")
+                    #Utils.LogInfo(f"Desired Distance: {desired_distance_wall}, Current Sensor: {Sensor}")
                     if Inverted:
                         if Sensor != 1:
                             Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)

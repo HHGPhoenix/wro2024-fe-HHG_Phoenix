@@ -13,6 +13,8 @@ from picamera2 import Picamera2
 from libcamera import controls
 from USB_communication_handler import USBCommunication
 from I2C_handler import I2Ccommunication
+from sklearn.linear_model import LinearRegression
+from math import tan, radians, cos, atan, degrees
 
 
 
@@ -396,53 +398,125 @@ class Camera():
         self.kernel = np.ones((5, 5), np.uint8)
         self.desired_distance_wall = -1
         
+        self.get_edge_distances = 0
+        self.edge_distances = []
+        
     def get_edges(self, frame):
+        if self.get_edge_distances == 0:
+            return
+        
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        #gray = cv2.GaussianBlur(gray, (5, 5), 0)
 
         # Threshold the grayscale image to get a binary image
         _, binary = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY)
+        
+        binary = cv2.dilate(binary, self.kernel, iterations=1)
 
        # Perform Canny edge detection
-        edges = cv2.Canny(binary, 50, 150, apertureSize=3)
+        edges = cv2.Canny(binary, 50, 120, apertureSize=3)
 
         # Perform Probabilistic Hough Line Transform
-        lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, minLineLength=100, maxLineGap=10)
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, minLineLength=100, maxLineGap=30)
 
         # Initialize an empty list to store the groups of lines
         line_groups = []
 
-        # Define a function to calculate the distance between two lines
-        def line_distance(line1, line2):
-            x1, y1, x2, y2 = line1[0]
-            x3, y3, x4, y4 = line2[0]
-            return np.sqrt((x3 - x1)**2 + (y3 - y1)**2)
-
-        # Define a function to calculate the length of a line
-        def line_length(line):
+        # Define a function to calculate the slope and intercept of a line
+        def get_slope_intercept(line):
             x1, y1, x2, y2 = line[0]
-            return np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            slope = (y2 - y1) / (x2 - x1)
+            intercept = y1 - slope * x1
+            return slope, intercept
 
-        # Define a threshold for the distance
-        threshold = 25
+        # Define a threshold for the difference in slopes and intercepts
+        slope_threshold = 0.1
+        intercept_threshold = 10.0
 
         # Group the lines
         for line in lines:
+            slope1, intercept1 = get_slope_intercept(line)
             for group in line_groups:
-                if line_distance(line, group[0]) < threshold:
+                slope2, intercept2 = get_slope_intercept(group[0])
+                if abs(slope1 - slope2) < slope_threshold and abs(intercept1 - intercept2) < intercept_threshold:
                     group.append(line)
                     break
             else:
                 line_groups.append([line])
 
-        # Draw the longest line from each group on the image
-        for group in line_groups:
-            best_line = max(group, key=line_length)
-            x1, y1, x2, y2 = best_line[0]
-            cv2.line(binary, (x1, y1), (x2, y2), (125, 125, 125), 2)
+        # Initialize a Linear Regression model
+        model = LinearRegression()
 
-        return binary      
-    
+        # Initialize a dictionary to store the lines grouped by their angles
+        lines_by_angle = {}
+
+        for group in line_groups:
+            # Prepare the data for Linear Regression
+            x = np.array([val for line in group for val in line[0][::2]]).reshape(-1, 1)
+            y = np.array([val for line in group for val in line[0][1::2]])
+
+            # Fit the model to the data
+            model.fit(x, y)
+
+            # Get the slope and intercept of the line
+            slope = model.coef_[0]
+            intercept = model.intercept_
+
+            # Calculate the start and end points of the line
+            x1 = int(min(x))
+            y1 = int(slope * x1 + intercept)
+            x2 = int(max(x))
+            y2 = int(slope * x2 + intercept)
+
+            # Calculate the angle of the line
+            angle = atan((y2 - y1) / (x2 - x1))
+            angle = degrees(angle)
+
+            # Group the lines by their angles with a 5 degree tolerance
+            grouped = False
+            for existing_angle in lines_by_angle.keys():
+                if abs(angle - existing_angle) <= 5:
+                    lines_by_angle[existing_angle].append(((x1, y1), (x2, y2)))
+                    grouped = True
+                    break
+            if not grouped:
+                lines_by_angle[angle] = [((x1, y1), (x2, y2))]
+
+            # Draw the line
+            cv2.line(binary, (x1, y1), (x2, y2), (125, 125, 125), 4)
+
+        # Known height of the boundary (in meters)
+        known_height = 0.1
+
+        # Focal length of the camera (in pixels)
+        focal_length = 373.8461538461538
+
+        # Camera mounting details
+        camera_height = 0.15  # in meters
+        camera_angle = 15  # in degrees
+        
+        known_height_image = known_height * cos(radians(camera_angle))
+
+        for angle, lines in lines_by_angle.items():
+            apparent_height = 0
+            if len(lines) > 1:
+                apparent_height = abs(lines[0][0][1] - lines[1][0][1])
+
+            if apparent_height != 0:
+                # Calculate the distance to the boundary in the image plane
+                image_distance = (known_height_image * focal_length) / apparent_height
+
+                # Adjust for the camera angle
+                real_distance = image_distance * 2.22 #* tan(radians(90 - camera_angle))
+
+                print(f"Distance to boundary at angle {angle} degrees: {real_distance} meters")
+            else:
+                print(f"Line at angle {angle} degrees has zero apparent height.")
+                        
+        self.edge_distances.append(real_distance)
+        self.get_edge_distances -= 1
     
     #Get the coordinates of the blocks in the camera stream
     def get_coordinates(self):
@@ -505,8 +579,8 @@ class Camera():
     #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
     def process_blocks(self):
         while True:
-            self.block_array, frame, frameraw = self.get_coordinates()
-            self.frame = self.get_edges(frameraw)
+            self.block_array, self.frame, frameraw = self.get_coordinates()
+            #self.get_edges(frameraw)
      
           
     #Start a new thread for processing the camera stream          
