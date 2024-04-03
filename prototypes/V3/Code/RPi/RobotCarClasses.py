@@ -99,7 +99,7 @@ class Utility:
     #Do some init and wait until StartButton is pressed
     def StartRun(self):
         #clear console
-        os.system('cls' if os.name=='nt' else 'clear')
+        #os.system('cls' if os.name=='nt' else 'clear')
         
         pI2C = mp.Process(target=self.I2C_communication.start_threads())
         pI2C.start()
@@ -395,13 +395,68 @@ class Camera():
         # Define the kernel for morphological operations
         self.kernel = np.ones((5, 5), np.uint8)
         self.desired_distance_wall = -1
-
         
+    def get_edges(self, frame):
+        # Convert the frame to grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # Threshold the grayscale image to get a binary image
+        _, binary = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY)
+
+        # Define the thresholds for Canny edge detection
+        threshold1 = 100
+        threshold2 = 150
+
+        # Apply Canny edge detection on the binary image
+        edges = cv2.Canny(binary, threshold1, threshold2)
+
+        # Dilate the edges to make them sharper
+        dilated_edges = cv2.dilate(edges, None, iterations=2)
+
+        # Use Hough Line Transform to detect lines
+        lines = cv2.HoughLinesP(dilated_edges, 5, 5 * np.pi/180, 150, minLineLength=100, maxLineGap=5)
+
+        # Iterate over the lines
+        merged_lines = []
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            
+            angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
+            
+            # Check if there are any existing lines with a similar angle
+            merged = False
+            for merged_line in merged_lines:
+                merged_x1, merged_y1, merged_x2, merged_y2 = merged_line[0]
+                merged_angle = np.arctan2(merged_y2 - merged_y1, merged_x2 - merged_x1) * 180 / np.pi
+                
+                # If the angles are similar and the distance is not too big, merge the lines
+                if abs(angle - merged_angle) < 3: # and abs(x1 - merged_x1) < 60:
+                    if merged_y1 <= y1:
+                        merged_line = line
+                    merged = True
+                    break
+
+            # If no similar angle lines found, add the line as a new merged line
+            if not merged:
+                merged_lines.append(line)
+            
+        # Draw the merged lines on the binary image
+        for merged_line in merged_lines:
+            x1, y1, x2, y2 = merged_line[0]
+            cv2.line(binary, (x1, y1), (x2, y2), (125, 125, 125), 4)
+
+        return binary      
+    
+    
     #Get the coordinates of the blocks in the camera stream
     def get_coordinates(self):
-        frame = self.picam2.capture_array()
+        frameraw = self.picam2.capture_array()
         
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frameraw = cv2.cvtColor(frameraw, cv2.COLOR_BGR2RGB)
+        
+        frameraw = frameraw[150:, :]
+        
+        frame = frameraw.copy()
         
         # Convert the image from BGR to HSV
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -448,13 +503,14 @@ class Camera():
                 block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
                 cv2.line(frame, (640, 720), (int(x+w/2), int(y+h/2)), (0, 0, 255), 2)
                 
-        return block_array, frame
+        return block_array, frame, frameraw
         
         
     #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
     def process_blocks(self):
         while True:
-            self.block_array, self.frame = self.get_coordinates()
+            self.block_array, frame, frameraw = self.get_coordinates()
+            self.frame = self.get_edges(frameraw)
      
           
     #Start a new thread for processing the camera stream          
