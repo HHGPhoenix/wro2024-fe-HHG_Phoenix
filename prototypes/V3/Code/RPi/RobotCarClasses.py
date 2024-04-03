@@ -403,47 +403,43 @@ class Camera():
         # Threshold the grayscale image to get a binary image
         _, binary = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY)
 
-        # Define the thresholds for Canny edge detection
-        threshold1 = 100
-        threshold2 = 150
+       # Perform Canny edge detection
+        edges = cv2.Canny(binary, 50, 150, apertureSize=3)
 
-        # Apply Canny edge detection on the binary image
-        edges = cv2.Canny(binary, threshold1, threshold2)
+        # Perform Probabilistic Hough Line Transform
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, minLineLength=100, maxLineGap=10)
 
-        # Dilate the edges to make them sharper
-        dilated_edges = cv2.dilate(edges, None, iterations=2)
+        # Initialize an empty list to store the groups of lines
+        line_groups = []
 
-        # Use Hough Line Transform to detect lines
-        lines = cv2.HoughLinesP(dilated_edges, 5, 5 * np.pi/180, 150, minLineLength=100, maxLineGap=5)
+        # Define a function to calculate the distance between two lines
+        def line_distance(line1, line2):
+            x1, y1, x2, y2 = line1[0]
+            x3, y3, x4, y4 = line2[0]
+            return np.sqrt((x3 - x1)**2 + (y3 - y1)**2)
 
-        # Iterate over the lines
-        merged_lines = []
-        for line in lines:
+        # Define a function to calculate the length of a line
+        def line_length(line):
             x1, y1, x2, y2 = line[0]
-            
-            angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
-            
-            # Check if there are any existing lines with a similar angle
-            merged = False
-            for merged_line in merged_lines:
-                merged_x1, merged_y1, merged_x2, merged_y2 = merged_line[0]
-                merged_angle = np.arctan2(merged_y2 - merged_y1, merged_x2 - merged_x1) * 180 / np.pi
-                
-                # If the angles are similar and the distance is not too big, merge the lines
-                if abs(angle - merged_angle) < 3: # and abs(x1 - merged_x1) < 60:
-                    if merged_y1 <= y1:
-                        merged_line = line
-                    merged = True
-                    break
+            return np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-            # If no similar angle lines found, add the line as a new merged line
-            if not merged:
-                merged_lines.append(line)
-            
-        # Draw the merged lines on the binary image
-        for merged_line in merged_lines:
-            x1, y1, x2, y2 = merged_line[0]
-            cv2.line(binary, (x1, y1), (x2, y2), (125, 125, 125), 4)
+        # Define a threshold for the distance
+        threshold = 25
+
+        # Group the lines
+        for line in lines:
+            for group in line_groups:
+                if line_distance(line, group[0]) < threshold:
+                    group.append(line)
+                    break
+            else:
+                line_groups.append([line])
+
+        # Draw the longest line from each group on the image
+        for group in line_groups:
+            best_line = max(group, key=line_length)
+            x1, y1, x2, y2 = best_line[0]
+            cv2.line(binary, (x1, y1), (x2, y2), (125, 125, 125), 2)
 
         return binary      
     
