@@ -53,29 +53,31 @@ class USBCommunication:
         
         
     def handleSendMessage(self):
+        completeMessage = ""
         totalSizeHoldDistance = 0
         for message in self.messageArrayHoldDistance:
-            print(message)
             messageSize = len(f"{message}\n".encode())
             if totalSizeHoldDistance + messageSize > 64:
                 break
-            self.EspHoldDistance.write(f"{message}\n".encode())
-            time.sleep(0.02)
+            completeMessage += f"{message}\n"
             totalSizeHoldDistance += messageSize
             self.messageArrayHoldDistance.remove(message)
+            
+        self.EspHoldDistance.write(f"{completeMessage}".encode())
 
-        time.sleep(0.1)
+        time.sleep(0.05)
 
+        completeMessage = ""
         totalSizeHoldSpeed = 0
         for message in self.messageArrayHoldSpeed:
-            print(message)
             messageSize = len(f"{message}\n".encode())
             if totalSizeHoldSpeed + messageSize > 64:
                 break
-            self.EspHoldSpeed.write(f"{message}\n".encode())
-            time.sleep(0.02)
+            completeMessage += f"{message}\n"
             totalSizeHoldSpeed += messageSize
             self.messageArrayHoldSpeed.remove(message)
+            
+        self.EspHoldSpeed.write(f"{completeMessage}".encode())
         
         
     def handleGetResponse(self):
@@ -107,12 +109,10 @@ class USBCommunication:
         
     def handleThreadedFunctions(self):
         counter = 0
-        while True:
+        while self.started:
             self.handleSendMessage()
-            time.sleep(0.05)
             self.handleGetResponse()
-            time.sleep(0.05)
-            if counter == 10:
+            if counter == 60:
                 self.handleHeartbeat()
                 counter = 0
             else:
@@ -214,6 +214,7 @@ class USBCommunication:
             
             time.sleep(0.1)
 
+        self.started = True
         tUSBcomm = threading.Thread(target=self.handleThreadedFunctions)
         tUSBcomm.start()
         
@@ -223,7 +224,7 @@ class USBCommunication:
     def startNodeMCUs(self):
         #Start both NodeMCUs
         for ESP in [self.EspHoldDistance, self.EspHoldSpeed]:
-            ESP.write(f"START\n".encode())
+            self.sendMessage("START", ESP)
             time.sleep(0.2)
             waitingForResponse = True
             responseTimeout = time.time() + 5 # 5 seconds timeout
@@ -234,7 +235,6 @@ class USBCommunication:
                     waitingForResponse = False
                 elif time.time() > responseTimeout:
                     self.Utils.LogError("No response from NodeMCU")
-                    self.StopRun()
                 else:
                     time.sleep(0.01)
 
@@ -257,7 +257,6 @@ class USBCommunication:
                     waitingForResponse = False
                 elif time.time() > responseTimeout:
                     self.Utils.LogError("No response from NodeMCU")
-                    self.StopRun()
                 else:
                     time.sleep(0.01)
         
@@ -265,6 +264,8 @@ class USBCommunication:
         
         
     def closeNodeMCUs(self):
+        self.started = False
+        
         time.sleep(0.1)
         self.EspHoldDistance.close()
         time.sleep(0.1)

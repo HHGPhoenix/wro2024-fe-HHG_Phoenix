@@ -123,13 +123,8 @@ void loop()
 			while (Serial.available() > 0)
 			{
 				c = Serial.read();
-				//Serial.print("c: ");
-				//Serial.println(c);
 				if (c == '\n')
 				{
-					//command = String(command);
-					//Serial.println("command");
-					//Serial.println(command);
 					// check for stop command
 					if (command == "STOP")
 					{
@@ -254,7 +249,7 @@ void loop()
 				{
 					// calculate error and correction
 					float error = desiredDistance - distance1;
-					float correction = error * KP * -1;
+					float correction = error * KP;
 
 					// Serial.print("correction: ");
 					// Serial.println(correction);
@@ -359,32 +354,40 @@ void loop()
 		else
 		{
 			// command checker
-			if (Serial.available() > 0)
+			while (Serial.available() > 0)
 			{
-				String command = Serial.readStringUntil('\n');
+				c = Serial.read();
+				if (c == '\n')
+				{
+					// check for stop command
+					if (command == "STOP")
+					{
+						Serial.println("Received STOP command. Performing action...");
+						servo.write(ServoMiddlePosition);
+						digitalWrite(InternalLed, HIGH);
+						started = false;
+					}
+					// check for manual mode
+					else if (command == "MANUAL")
+					{
+						Serial.println("Received MANUAL command. Deactivating manual mode...");
+						manual = false;
+					}
+					else if (command.startsWith("ANG"))
+					{
+						int numberLength = command.length();
+						String numberStr = command.substring(3, numberLength);
+						int ServoAngle = numberStr.toInt();
+						servo.write(ServoAngle);
+					}
+					delay(10); // wait so the loop isn't too fast
 
-				// check for stop command
-				if (command == "STOP")
-				{
-					Serial.println("Received STOP command. Performing action...");
-					servo.write(ServoMiddlePosition);
-					digitalWrite(InternalLed, HIGH);
-					started = false;
-				}
-				// check for manual mode
-				else if (command == "MANUAL")
-				{
-					Serial.println("Received MANUAL command. Deactivating manual mode...");
-					manual = false;
+					command = "";
 				}
 				else
 				{
-					int numberLength = command.length();
-					String numberStr = command.substring(0, numberLength);
-					int ServoAngle = numberStr.toInt();
-					servo.write(ServoAngle);
+					command += c;
 				}
-				delay(10); // wait so the loop isn't too fast
 			}
 		}
 	}
