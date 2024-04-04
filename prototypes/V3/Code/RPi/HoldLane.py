@@ -45,6 +45,26 @@ Utils.ED = 125 #Edge detection distance in cm
 ##                     Functions                        ##
 ##                                                      ##
 ##########################################################
+def getAverageEdgeDistance(amount=5):
+    Utils.Cam.get_edge_distances = amount
+    
+    while len(Utils.Cam.edge_distances) < amount:
+        time.sleep(0.01)
+        
+    edge_distances = Utils.Cam.edge_distances.copy()
+
+    edge_distances_filtered = []
+    for distance in edge_distances:
+        if distance < 75 or distance > 320:  # Remove distances less than 75 or greater than 320
+            continue
+        edge_distances_filtered.append(distance)
+        
+    Utils.Cam.edge_distances = []
+    if len(edge_distances_filtered) == 0:
+        return 0
+    
+    return sum(edge_distances_filtered) / len(edge_distances_filtered)
+
 def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, GyroWaitTime=1, Sensor=2):
     #Variables
     TIMEOUT = 0
@@ -74,6 +94,7 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
     desired_distance_to_block_green = 650
     
     SensorFirstCornerChanged = False
+    IsAtPos3 = False
 
     #Hold Lane
     while Utils.running and rounds < 3:
@@ -138,10 +159,24 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
             if len(block_array) > 0:
                 #Utils.LogDebug(f"Lenght of block_array: {len(block_array)}")
                 #Sort blocks by size
-                
+
                 block_array.sort(key=lambda x: x['size'], reverse=True)
-                
+
                 nextBlock = block_array[0]
+                
+                avg_edge_distance = getAverageEdgeDistance()
+                
+                Utils.LogInfo(f"avg_edge_distance: {avg_edge_distance}")
+                
+                if 140 < avg_edge_distance < 210:
+                    IsAtPos3 = True
+                else:
+                    IsAtPos3 = False
+                
+                if IsAtPos3:
+                    if nextBlock['x'] < 200:
+                        nextBlock['position'] = "1"
+                    Utils.blockPositions.update({corners + 1 if corners != 3 else corners - 3: {"position": nextBlock['position'], "color": nextBlock['color']}})
 
                 if nextBlock['w'] > FreezeSize or nextBlock['y'] > FreezeY or old_desired_distance_wall < 15 or old_desired_distance_wall > 75:
                     detect_new_block = False
@@ -152,11 +187,18 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                     Utils.usb_communication.sendMessage("MANUAL", ESPHoldDistance)
                     Utils.usb_communication.sendMessage("ANG90", ESPHoldDistance)
                     
-                    Utils.Cam.get_edge_distances = 5
-                    
-                    time.sleep(0.3)
-                    
-                    Utils.LogInfo(f"edge distances: {Utils.Cam.edge_distances}")
+                    avg_edge_distance = getAverageEdgeDistance()
+
+                    if getattr(nextBlock, 'position', None) == None:
+                        if 100 < avg_edge_distance < 175:
+                            nextBlock['position'] = "3"
+                        elif 190 < avg_edge_distance < 240:
+                            nextBlock['position'] = "2"
+                        else:
+                            nextBlock['position'] = "0"
+                        
+                    Utils.LogInfo(f"Position: {nextBlock['position']}, avg_edge_distance: {avg_edge_distance}")
+                    Utils.blockPositions.update({corners: {"position": nextBlock['position'], "color": nextBlock['color']}})
 
                 else:
                     nextBlock['distancex'] = -(coordinates_self[0] - nextBlock['mx'])
@@ -209,7 +251,7 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                             old_desired_distance_wall = desired_distance_wall
                         
             else:
-                if time.time() > Last_Esp_Command + 1:
+                if time.time() > Last_Esp_Command + 1:  
                     # Change this part based on the position of the block
                     """
                     if nextBlock['position'] == "1":
@@ -312,6 +354,14 @@ if __name__ == "__main__":
             # Run the server in a separate thread
             server_thread = Thread(target=app.run, kwargs={'host':'0.0.0.0', 'threaded':True})
             server_thread.start()
+            
+            @app.route('/positions')
+            def positions():
+                return render_template('positions.html')
+            
+            @app.route('/positions_feed')
+            def positions_feed():
+                return jsonify(Utils.blockPositions)
                 
         Utils.StartRun()
         HoldLane(Utils)

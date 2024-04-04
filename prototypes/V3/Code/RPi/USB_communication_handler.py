@@ -109,7 +109,7 @@ class USBCommunication:
         
     def handleThreadedFunctions(self):
         counter = 0
-        while True:
+        while self.started:
             self.handleSendMessage()
             self.handleGetResponse()
             if counter == 60:
@@ -214,6 +214,7 @@ class USBCommunication:
             
             time.sleep(0.1)
 
+        self.started = True
         tUSBcomm = threading.Thread(target=self.handleThreadedFunctions)
         tUSBcomm.start()
         
@@ -234,7 +235,6 @@ class USBCommunication:
                     waitingForResponse = False
                 elif time.time() > responseTimeout:
                     self.Utils.LogError("No response from NodeMCU")
-                    self.StopRun()
                 else:
                     time.sleep(0.01)
 
@@ -257,7 +257,6 @@ class USBCommunication:
                     waitingForResponse = False
                 elif time.time() > responseTimeout:
                     self.Utils.LogError("No response from NodeMCU")
-                    self.StopRun()
                 else:
                     time.sleep(0.01)
         
@@ -265,6 +264,8 @@ class USBCommunication:
         
         
     def closeNodeMCUs(self):
+        self.started = False
+        
         time.sleep(0.1)
         self.EspHoldDistance.close()
         time.sleep(0.1)
