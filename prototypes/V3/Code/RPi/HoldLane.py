@@ -45,26 +45,6 @@ Utils.ED = 125 #Edge detection distance in cm
 ##                     Functions                        ##
 ##                                                      ##
 ##########################################################
-def getAverageEdgeDistance(amount=5):
-    Utils.Cam.get_edge_distances = amount
-    
-    while len(Utils.Cam.edge_distances) < amount:
-        time.sleep(0.01)
-        
-    edge_distances = Utils.Cam.edge_distances.copy()
-
-    edge_distances_filtered = []
-    for distance in edge_distances:
-        if distance < 75 or distance > 320:  # Remove distances less than 75 or greater than 320
-            continue
-        edge_distances_filtered.append(distance)
-        
-    Utils.Cam.edge_distances = []
-    if len(edge_distances_filtered) == 0:
-        return 0
-    
-    return sum(edge_distances_filtered) / len(edge_distances_filtered)
-
 def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, GyroWaitTime=1, Sensor=2):
     #Variables
     TIMEOUT = 0
@@ -159,25 +139,27 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
             if len(block_array) > 0:
                 #Utils.LogDebug(f"Lenght of block_array: {len(block_array)}")
                 #Sort blocks by size
-
                 block_array.sort(key=lambda x: x['size'], reverse=True)
 
                 nextBlock = block_array[0]
+                Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}")
                 
-                avg_edge_distance = getAverageEdgeDistance()
-                
-                Utils.LogInfo(f"avg_edge_distance: {avg_edge_distance}")
-                
-                if 140 < avg_edge_distance < 210:
-                    IsAtPos3 = True
+                block_distance_to_wall = Utils.Cam.avg_edge_distance - block['distance']
+                if 100 < block_distance_to_wall < 175:
+                    nextBlock['position'] = "3"
+                    BlockPos = corners
+                elif 190 < block_distance_to_wall < 240:
+                    nextBlock['position'] = "2"
+                    BlockPos = corners
+                elif (100 < Utils.Cam.avg_edge_distance < 175) and nextBlock['x'] < 200 and nextBlock['y'] > 450:
+                    nextBlock['position'] = "1"
+                    BlockPos = corners + 1 if corners < 3 else 0
                 else:
-                    IsAtPos3 = False
-                
-                if IsAtPos3:
-                    if nextBlock['x'] < 200:
-                        nextBlock['position'] = "1"
-                    Utils.blockPositions.update({corners + 1 if corners != 3 else corners - 3: {"position": nextBlock['position'], "color": nextBlock['color']}})
-
+                    nextBlock['position'] = "0"
+                    BlockPos = corners
+                    
+                Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
+                    
                 if nextBlock['w'] > FreezeSize or nextBlock['y'] > FreezeY or old_desired_distance_wall < 15 or old_desired_distance_wall > 75:
                     detect_new_block = False
                     Utils.Cam.freeze = True
@@ -186,24 +168,21 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                     
                     Utils.usb_communication.sendMessage("MANUAL", ESPHoldDistance)
                     Utils.usb_communication.sendMessage("ANG90", ESPHoldDistance)
-                    
-                    avg_edge_distance = getAverageEdgeDistance()
 
                     if getattr(nextBlock, 'position', None) == None:
-                        if 100 < avg_edge_distance < 175:
+                        if 100 < Utils.Cam.avg_edge_distance < 175:
                             nextBlock['position'] = "3"
-                        elif 190 < avg_edge_distance < 240:
+                        elif 190 < Utils.Cam.avg_edge_distance < 240:
                             nextBlock['position'] = "2"
                         else:
                             nextBlock['position'] = "0"
                         
-                    Utils.LogInfo(f"Position: {nextBlock['position']}, avg_edge_distance: {avg_edge_distance}")
+                    Utils.LogInfo(f"Position: {nextBlock['position']}, avg_edge_distance: {Utils.Cam.avg_edge_distance}")
                     Utils.blockPositions.update({corners: {"position": nextBlock['position'], "color": nextBlock['color']}})
 
                 else:
                     nextBlock['distancex'] = -(coordinates_self[0] - nextBlock['mx'])
                     nextBlock['distancey'] = coordinates_self[1] - nextBlock['y']
-                    #nextBlock['distance'] = math.sqrt(nextBlock['distancex']**2 + nextBlock['distancey']**2)
                     
                     if nextBlock['color'] == "red":
                         desired_distance_to_block = desired_distance_to_block_red
@@ -211,8 +190,7 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                         desired_distance_to_block = desired_distance_to_block_green
                         
                     distance_divider = (nextBlock['y'] / coordinates_self[1]) * 0.6
-
-                    #print("Distance Divider: ", distance_divider)
+                    
                     # Calculation of desired distance to wall
                     error = (desired_distance_to_block - nextBlock['distancex']) * distance_divider
                     desired_distance_wall =  middledistance - error * KP
