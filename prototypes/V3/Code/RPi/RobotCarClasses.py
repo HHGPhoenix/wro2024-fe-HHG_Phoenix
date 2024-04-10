@@ -544,14 +544,18 @@ class Camera():
                     #print(f"Line at angle {angle} degrees has zero apparent height.")
         except:
             real_distance = 0
+            
+        real_distance = real_distance * 100
                     
         if real_distance != 0:
-            if distance > 50 and distance < 350:
+            if real_distance > 50 and real_distance < 350:
+                #print(self.edge_distances)
                 if len(self.edge_distances) > 5:
                     self.edge_distances.pop(0)
                     
-                self.edge_distances.append(round(real_distance * 100, 3))
+                self.edge_distances.append(round(real_distance, 3))
                 self.avg_edge_distance = np.mean(self.edge_distances)
+                
         
         return binary
     
@@ -619,7 +623,7 @@ class Camera():
         image_distance = (self.focal_length * self.known_height) / block['h']
         real_distance = image_distance * self.distance_multiplier
         
-        return real_distance        
+        return real_distance * 100
         
         
     #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
