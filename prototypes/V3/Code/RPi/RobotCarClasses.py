@@ -403,14 +403,18 @@ class Camera():
         self.kernel = np.ones((5, 5), np.uint8)
         self.desired_distance_wall = -1
         
-        self.get_edge_distances = 0
         self.edge_distances = []
+        self.avg_edge_distance = 0
+        
+        self.focal_length = 373.8461538461538
+        self.known_height = 0.1
+        self.camera_angle = 15
+        self.distance_multiplier = 2.22
+        
         
     def get_edges(self, frame):
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
-        #gray = cv2.GaussianBlur(gray, (5, 5), 0)
 
         # Threshold the grayscale image to get a binary image
         _, binary = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY)
@@ -500,32 +504,18 @@ class Camera():
 
                 # Draw the line
                 cv2.line(binary, (x1, y1), (x2, y2), (125, 125, 125), 4)
-
-            # Known height of the boundary (in meters)
-            known_height = 0.1
-
-            # Focal length of the camera (in pixels)
-            focal_length = 373.8461538461538
-
-            # Camera mounting details
-            camera_height = 0.15  # in meters
-            camera_angle = 15  # in degrees
             
-            known_height_image = known_height * cos(radians(camera_angle))
+            known_height_image = self.known_height * cos(radians(self.camera_angle))
 
             for angle, lines in lines_by_angle.items():
                 apparent_height = 0
                 if len(lines) > 1:
                     num_points = 30
                     # Calculate the x and y increments for each point along the lines
-                    #x_increment_left = (lines[1][0][0] - lines[0][0][0]) / num_points
                     y_increment_left = (lines[1][0][1] - lines[0][0][1]) / num_points
-
-                    #x_increment_right = (lines[1][1][0] - lines[0][1][0]) / num_points
                     y_increment_right = (lines[1][1][1] - lines[0][1][1]) / num_points
 
                     distances = []
-
                     # Loop through each point along the lines
                     for i in range(num_points):
                         # Calculate the y coordinates of the points on the left and right lines
@@ -543,25 +533,28 @@ class Camera():
 
                 if apparent_height != 0:
                     # Calculate the distance to the boundary in the image plane
-                    image_distance = (known_height_image * focal_length) / apparent_height
+                    image_distance = (known_height_image * self.focal_length) / apparent_height
 
                     # Adjust for the camera angle
-                    real_distance = image_distance * 2.22 #* tan(radians(90 - camera_angle))
-
-                    #print(f"Distance to boundary at angle {angle} degrees: {real_distance} meters")
+                    real_distance = image_distance * self.distance_multiplier
                     cv2.putText(binary, f"{round(real_distance * 100, 3)} cm", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (125, 125, 125), 4)
+                    
                 else:
                     real_distance = 0
                     #print(f"Line at angle {angle} degrees has zero apparent height.")
         except:
             real_distance = 0
-            #print("No lines detected.")
                     
-        if self.get_edge_distances != 0:    
-            self.edge_distances.append(round(real_distance * 100, 3))
-            self.get_edge_distances -= 1
+        if real_distance != 0:
+            if distance > 50 and distance < 350:
+                if len(self.edge_distances) > 5:
+                    self.edge_distances.pop(0)
+                    
+                self.edge_distances.append(round(real_distance * 100, 3))
+                self.avg_edge_distance = np.mean(self.edge_distances)
         
         return binary
+    
     
     #Get the coordinates of the blocks in the camera stream
     def get_coordinates(self):
@@ -606,7 +599,7 @@ class Camera():
             if w > 20 and h > 50:  # Only consider boxes larger than 50x50
                 cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
                 cv2.putText(frame, 'Green Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
-                block_array.append({'color': 'green', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
+                block_array.append({'color': 'green', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h, 'distance': self.get_distance_to_block({'x': x, 'y': y, 'w': w, 'h': h})})
                 cv2.line(frame, (640, 720), (int(x+w/2), int(y+h/2)), (0, 255, 0), 2)
 
         # Process each red contour
@@ -615,10 +608,18 @@ class Camera():
             if w > 20 and h > 50:  # Only consider boxes larger than 50x50
                 cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 255), 2)
                 cv2.putText(frame, 'Red Object', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
-                block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h})
+                block_array.append({'color': 'red', 'x': x, 'y': y, 'w': w, 'h': h, 'mx': x+w/2, 'my': y+h/2, 'size': w*h, 'distance': self.get_distance_to_block({'x': x, 'y': y, 'w': w, 'h': h})})
                 cv2.line(frame, (640, 720), (int(x+w/2), int(y+h/2)), (0, 0, 255), 2)
             
         return block_array, frame, frameraw
+    
+    
+    def get_distance_to_block(self, block):
+        # Calculate the distance to the block
+        image_distance = (self.focal_length * self.known_height) / block['h']
+        real_distance = image_distance * self.distance_multiplier
+        
+        return real_distance        
         
         
     #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
