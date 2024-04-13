@@ -47,7 +47,7 @@ class CustomException(Exception):
 #A class that has some necessary tools for calculating, usw.
 class Utility:
     #Transfer data so it can be used in other classes
-    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Buzzer1=None, Cam=None):
+    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Buzzer1=None, StartSpeed=50, Cam=None):
         self.setupLog()
         
         self.usb_communication = USBCommunication(self)
@@ -71,6 +71,8 @@ class Utility:
         self.stop_run_callable = True
         
         self.blockPositions = {}
+        
+        self.StartSpeed = StartSpeed
         
         return self.ESPHoldDistance, self.ESPHoldSpeed
         
@@ -106,8 +108,9 @@ class Utility:
         #clear console
         os.system('cls' if os.name=='nt' else 'clear')
         
-        pCam = mp.Process(target=self.Cam.start_processing())
-        pCam.start()
+        if self.Cam:
+            pCam = mp.Process(target=self.Cam.start_processing())
+            pCam.start()
         
         pI2C = mp.Process(target=self.I2C_communication.start_threads())
         pI2C.start()
@@ -136,7 +139,7 @@ class Utility:
                 self.usb_communication.sendMessage(f"D {50}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"KP {2}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"ED {125}", self.ESPHoldDistance)
-                self.usb_communication.sendMessage(f"SPEED {50}", self.ESPHoldSpeed)
+                self.usb_communication.sendMessage(f"SPEED {self.StartSpeed}", self.ESPHoldSpeed)
                 self.usb_communication.sendMessage(f"MM {10}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"S{2}", self.ESPHoldDistance)
                 

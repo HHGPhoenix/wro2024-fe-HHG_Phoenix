@@ -23,7 +23,7 @@ Cam = Camera(video_stream=True)
 Cam.start_processing()
 
 global ESPHoldDistance, ESPHoldSpeed
-ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1)
+ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1, StartSpeed=40)
 
 Utils.setupDataLog()
 
@@ -63,8 +63,9 @@ def HoldLane(Utils, CornerWaiTTime=1):
             if Sensor != 1:
                 Sensor = 1
                 Utils.LogInfo("Switched to Sensor 1")
-                Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
-                Utils.usb_communication.sendMessage("D25", Utils.ESPHoldDistance)
+                #Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D35", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("SPEED 50", Utils.ESPHoldSpeed)
                 
             newAngle = oldAngle - GyroCornerAngle
             if Utils.Gyro.angle < newAngle and time.time() > TIMEOUT:
@@ -79,12 +80,13 @@ def HoldLane(Utils, CornerWaiTTime=1):
                 oldAngle = newAngle
                 TIMEOUT = time.time() + CornerWaiTTime
                 
-        else:
+        elif direction == 1:
             if Sensor != 2:
                 Sensor = 2
                 Utils.LogInfo("Switched to Sensor 2")
-                Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
-                Utils.usb_communication.sendMessage("D25", Utils.ESPHoldDistance)
+                #Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D35", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("SPEED 50", Utils.ESPHoldSpeed)
             
             newAngle = oldAngle + GyroCornerAngle
             if Utils.Gyro.angle > newAngle and time.time() > TIMEOUT:

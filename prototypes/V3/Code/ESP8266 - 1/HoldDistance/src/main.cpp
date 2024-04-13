@@ -272,11 +272,19 @@ void loop()
 						{
 							firstCornerDetected = true;
 							Serial.println("Drive direction clockwise");
+							activeSensor = 1;
 						}
 						// read other sensor sometimes
-						if (edgeDetectionCounter == 4)
+						if (edgeDetectionCounter == 1)
 						{
 							distance2 = ultraschall2.read();
+
+							if (distance2 > distanceEdgeDetection)
+							{
+								firstCornerDetected = true;
+								Serial.println("Drive direction counterclockwise");
+								activeSensor = 2;
+							}
 						}
 						else
 						{
@@ -330,15 +338,17 @@ void loop()
 						{
 							firstCornerDetected = true;
 							Serial.println("Drive direction counterclockwise");
+							activeSensor = 2;
 						}
 						// read other sensor sometimes
-						if (edgeDetectionCounter == 4)
+						if (edgeDetectionCounter == 1)
 						{
 							distance1 = ultraschall1.read();
 							if (distance1 > distanceEdgeDetection)
 							{
 								firstCornerDetected = true;
 								Serial.println("Drive direction clockwise");
+								activeSensor = 1;
 							}
 						}
 						else
