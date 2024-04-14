@@ -405,6 +405,7 @@ class Camera():
         # Define the kernel for morphological operations
         self.kernel = np.ones((5, 5), np.uint8)
         self.desired_distance_wall = -1
+        self.block_distance = -1
         
         self.edge_distances = []
         self.avg_edge_distance = 0
@@ -534,30 +535,34 @@ class Camera():
                     # Return the average of the distances
                     apparent_height = np.mean(distances)
 
+                self.real_distance = 0
                 if apparent_height != 0:
                     # Calculate the distance to the boundary in the image plane
                     image_distance = (known_height_image * self.focal_length) / apparent_height
 
                     # Adjust for the camera angle
-                    real_distance = image_distance * self.distance_multiplier
-                    cv2.putText(binary, f"{round(real_distance * 100, 3)} cm", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (125, 125, 125), 4)
+                    self.real_distance = image_distance * self.distance_multiplier
+                    cv2.putText(binary, f"{round(self.real_distance * 100, 3)} cm", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (125, 125, 125), 4)
+                    break
                     
-                else:
-                    real_distance = 0
-                    #print(f"Line at angle {angle} degrees has zero apparent height.")
+                elif apparent_height == 0:
+                    self.real_distance = 0
+                    
         except:
-            real_distance = 0
+            self.real_distance = 0
             
-        real_distance = real_distance * 100
+        self.real_distance = self.real_distance * 100
                     
-        if real_distance != 0:
-            if real_distance > 50 and real_distance < 350:
+        if self.real_distance != 0:
+            if self.real_distance > 50 and self.real_distance < 350:
                 #print(self.edge_distances)
                 if len(self.edge_distances) > 5:
                     self.edge_distances.pop(0)
                     
-                self.edge_distances.append(round(real_distance, 3))
+                    
+                self.edge_distances.append(round(self.real_distance, 3))
                 self.avg_edge_distance = np.mean(self.edge_distances)
+                #print(self.avg_edge_distance)
                 
         
         return binary
@@ -597,6 +602,7 @@ class Camera():
         cv2.circle(frame, (640, 720), 10, (255, 0, 0), -1)
         cv2.putText(frame, f"{self.desired_distance_wall}", (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
         cv2.putText(frame, f"Freeze: {self.freeze}", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
+        cv2.putText(frame, f"Distance: {self.block_distance}", (700, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
         
         block_array = []
 
@@ -623,10 +629,11 @@ class Camera():
     
     def get_distance_to_block(self, block):
         # Calculate the distance to the block
-        image_distance = (self.focal_length * self.known_height) / block['h']
-        real_distance = image_distance * self.distance_multiplier
+        image_distance = (self.focal_length * self.known_height * cos(radians(self.camera_angle))) / block['h']
+        self.real_distance = image_distance * self.distance_multiplier
         
-        return real_distance * 100
+        self.block_distance = self.real_distance * 100
+        return self.real_distance * 100
         
         
     #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
