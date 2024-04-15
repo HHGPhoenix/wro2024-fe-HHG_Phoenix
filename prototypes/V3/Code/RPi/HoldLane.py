@@ -39,6 +39,12 @@ Utils.Speed = 40
 Utils.KP = 3.5
 Utils.ED = 125 #Edge detection distance in cm
 
+middledistance = 50
+coordinates_self = (640, 720) #x, y
+desired_distance_to_block_red = -700
+desired_distance_to_block_green = 700
+KP = 0.22
+DISTANCE_DIVIDER_VALUE = 0.8
 
 ##########################################################
 ##                                                      ##
@@ -63,16 +69,11 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
     
     old_desired_distance_wall = 50
     
-    coordinates_self = (640, 720) #x, y
-    middledistance = 50
     GyroCornerAngle = 70
 
     FreezeSize = 150
     FreezeY = 350
     FreezeBlock = False
-    KP = 0.22
-    desired_distance_to_block_red = -700
-    desired_distance_to_block_green = 700
     
     SensorFirstCornerChanged = False
     active_block_drive = False
@@ -129,7 +130,6 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                 Utils.Gyro.angle = Utils.Gyro.angle - 20
                 TIMEOUT = time.time() + LineWaitTime
                 
-        
         #get objects and calculate new distance
         if detect_new_block:
             block_array = Utils.Cam.block_array.copy()
@@ -145,101 +145,18 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
             if len(block_array) > 0 or active_block_drive:
                 #Utils.LogDebug(f"Lenght of block_array: {len(block_array)}")
                 #Sort blocks by size
-                
                 if not active_block_drive:
                     block_array.sort(key=lambda x: x['size'], reverse=True)
 
                     nextBlock = block_array[0]
                 
-                print(Utils.Cam.avg_edge_distance)
+                #print(Utils.Cam.avg_edge_distance)
                 if (Utils.Cam.avg_edge_distance < 200) and not active_block_drive:
-                    block_distance_to_wall = Utils.Cam.avg_edge_distance - block['distance']
-                    #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
-                    if direction == 1:
-                        if (90 < Utils.Cam.avg_edge_distance < 200) and nextBlock['x'] < 250 and nextBlock['y'] > 200:
-                            nextBlock['position'] = "1"
-                            BlockPos = corners + 1 if corners < 3 else 0
-                        elif 80 < block_distance_to_wall < 190:
-                            nextBlock['position'] = "3"
-                            BlockPos = corners
-                        elif 190 < block_distance_to_wall < 240: #or block_distance_to_wall < 80:
-                            nextBlock['position'] = "2"
-                            if abs(relative_angle) > 30:
-                                BlockPos = corners + 1 if corners < 3 else 0
-                            else:
-                                BlockPos = corners
-
-                        else:
-                            nextBlock['position'] = "0"
-                        
-                        if nextBlock['position'] != "0":
-                            active_block_drive = True
-                            Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
+                    active_block_drive = get_block_pos(nextBlock, direction, corners, relative_angle)
                             
-                    elif direction == 0:
-                        if (90 < Utils.Cam.avg_edge_distance < 180) and nextBlock['x'] > 800 and nextBlock['y'] > 200:
-                            nextBlock['position'] = "1"
-                            BlockPos = corners + 1 if corners < 3 else 0
-                        elif 80 < block_distance_to_wall < 190:
-                            nextBlock['position'] = "3"
-                            BlockPos = corners
-                        elif 190 < block_distance_to_wall < 240:# or block_distance_to_wall < 80:
-                            nextBlock['position'] = "2"
-                            if abs(relative_angle) > 40:
-                                BlockPos = corners + 1 if corners < 3 else 0
-                            else:
-                                BlockPos = corners
-                        else:
-                            nextBlock['position'] = "0"
-                        
-                        if nextBlock['position'] != "0":# and BlockPos not in Utils.blockPositions:
-                            active_block_drive = True
-                            Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
-                        
-                
-                # # check if a position was found
-                # if corners in Utils.blockPositions:
-                #     if Utils.blockPositions[corners]["position"] == "1" and Utils.blockPositions[corners]["color"] == "green":
-                #         Utils.LogInfo(f"Position 1 Green")
-                #         middledistance = 50
-                #         desired_distance_to_block_green = 700
-                #         KP = 0.25
-                #         FreezeBlock = True
-                        
-                #     else:
-                #         KP = 0.2
-                #         desired_distance_to_block_red = -700
-                #         desired_distance_to_block_green = 700
-                #         middledistance = 50
-                #         FreezeBlock = False
-                        
-                # if corners + 1 in Utils.blockPositions:
-                #     if Utils.blockPositions[corners + 1]["position"] == "1" and Utils.blockPositions[corners + 1]["color"] == "green":
-                #         Utils.LogInfo(f"Ignoring Position 1 Green")
-                #         middledistance = 70
-                #         desired_distance_to_block_green = 500
-                #         KP = 0.05
-                #         FreezeBlock = True
-                   
                 if active_block_drive:     
                     print(Utils.blockPositions)       
-                    next_corners = corners + 1 if corners < 3 else 0
-                    if next_corners in Utils.blockPositions:
-                        if Utils.blockPositions[next_corners]["position"] != "3" and Utils.blockPositions[next_corners]["color"] == "red":
-                            if not ESP_adjusted:
-                                Utils.LogInfo(f"Position 1 Red")
-                                Utils.usb_communication.sendMessage("S1", ESPHoldDistance)
-                                Utils.usb_communication.sendMessage("D35", ESPHoldDistance) 
-                                ESP_adjusted = True
-                            
-                            if Utils.Cam.avg_edge_distance < 90:
-                                Utils.LogWarning(f"Block too close to wall")
-                                Utils.usb_communication.sendMessage("S2", ESPHoldDistance)
-                                Utils.usb_communication.sendMessage("D50", ESPHoldDistance)
-                                active_block_drive = False
-                                ESP_adjusted = False
-                    
-
+                    active_block_drive, ESP_adjusted = drive_special_case(corners, active_block_drive, ESP_adjusted)
                     
                 elif (nextBlock['w'] > FreezeSize or nextBlock['y'] > FreezeY or old_desired_distance_wall < 15 or old_desired_distance_wall > 75) and not FreezeBlock:
                     detect_new_block = False
@@ -251,52 +168,7 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                     Utils.usb_communication.sendMessage("ANG90", ESPHoldDistance)
 
                 else:
-                    nextBlock['distancex'] = -(coordinates_self[0] - nextBlock['mx'])
-                    nextBlock['distancey'] = coordinates_self[1] - nextBlock['y']
-                    
-                    if nextBlock['color'] == "red":
-                        desired_distance_to_block = desired_distance_to_block_red
-                    elif nextBlock['color'] == "green":
-                        desired_distance_to_block = desired_distance_to_block_green
-                        
-                    distance_divider = (nextBlock['y'] / coordinates_self[1]) * 0.8
-                    
-                    # Calculation of desired distance to wall
-                    error = (desired_distance_to_block - nextBlock['distancex']) * distance_divider
-                    desired_distance_wall =  middledistance - error * KP
-                    desired_distance_wall = int(desired_distance_wall)
-                    Utils.Cam.desired_distance_wall = desired_distance_wall
-                    
-                    if desired_distance_wall < 15:
-                        desired_distance_wall =  15 
-                    elif desired_distance_wall > 85:
-                        desired_distance_wall = 85
-
-                    if desired_distance_wall > middledistance:
-                        desired_distance_wall_other_direction = (100 - desired_distance_wall)
-                        
-                        if Sensor != 1:
-                            Sensor = 1
-                            Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
-                            Utils.LogInfo(f"Switched to Sensor 1")
-                            
-                        #Send ESPHoldDistance new Distance
-                        if abs(desired_distance_wall_other_direction - old_desired_distance_wall) > 3:
-                            Utils.usb_communication.sendMessage(f"D{desired_distance_wall_other_direction}", ESPHoldDistance)
-                            Utils.LogInfo(f"New Distance {desired_distance_wall_other_direction}, Current Sensor: {Sensor}")
-                            old_desired_distance_wall = desired_distance_wall_other_direction
-                        
-                    else:
-                        
-                        if Sensor != 2:
-                            Sensor = 2
-                            Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
-                            Utils.LogInfo(f"Switched to Sensor 2")
-                            
-                        if abs(desired_distance_wall - old_desired_distance_wall) > 3:
-                            Utils.usb_communication.sendMessage(f"D{desired_distance_wall}", ESPHoldDistance)
-                            Utils.LogInfo(f"New Distance {desired_distance_wall}, Current Sensor: {Sensor}")
-                            old_desired_distance_wall = desired_distance_wall
+                    block_correction(nextBlock)
                         
             else:
                 if time.time() > Last_Esp_Command + 1:  
@@ -366,9 +238,128 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
         
         StopTime = time.time()
         #Utils.LogDebug(f"Time: {StopTime - StartTime}, block_array: {Utils.Cam.block_array}")
+        
+        
+# Get block position and save it in dictionary  
+def get_block_pos(block, direction, corners, relative_angle=0):
+    block_distance_to_wall = Utils.Cam.avg_edge_distance - block['distance']
+    #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
+    if direction == 0:
+        if (90 < Utils.Cam.avg_edge_distance < 180) and block['x'] > 800 and block['y'] > 200:
+            block['position'] = "1"
+            BlockPos = corners + 1 if corners < 3 else 0
+        elif 80 < block_distance_to_wall < 190:
+            block['position'] = "3"
+            BlockPos = corners
+        elif 190 < block_distance_to_wall < 240:# or block_distance_to_wall < 80:
+            block['position'] = "2"
+            if abs(relative_angle) > 40:
+                BlockPos = corners + 1 if corners < 3 else 0
+            else:
+                BlockPos = corners
+        else:
+            block['position'] = "0"
+        
+        if block['position'] != "0":# and BlockPos not in Utils.blockPositions:
+            active_block_drive = True
+            Utils.blockPositions.update({BlockPos: {"position": block['position'], "color": block['color']}})
+    
+    elif direction == 1:
+        if (90 < Utils.Cam.avg_edge_distance < 200) and block['x'] < 250 and block['y'] > 200:
+            block['position'] = "1"
+            BlockPos = corners + 1 if corners < 3 else 0
+        elif 80 < block_distance_to_wall < 190:
+            block['position'] = "3"
+            BlockPos = corners
+        elif 190 < block_distance_to_wall < 240: #or block_distance_to_wall < 80:
+            block['position'] = "2"
+            if abs(relative_angle) > 30:
+                BlockPos = corners + 1 if corners < 3 else 0
+            else:
+                BlockPos = corners
+
+        else:
+            block['position'] = "0"
+        
+        if block['position'] != "0":
+            active_block_drive = True
+            Utils.blockPositions.update({BlockPos: {"position": block['position'], "color": block['color']}})
+            
+    return active_block_drive
 
 
+# Correct to drive around specified block
+def block_correction(block):
+    block['distancex'] = -(coordinates_self[0] - block['mx'])
+    block['distancey'] = coordinates_self[1] - block['y']
+    
+    if block['color'] == "red":
+        desired_distance_to_block = desired_distance_to_block_red
+    elif block['color'] == "green":
+        desired_distance_to_block = desired_distance_to_block_green
+        
+    distance_divider = (block['y'] / coordinates_self[1]) * DISTANCE_DIVIDER_VALUE
+    
+    # Calculation of desired distance to wall
+    error = (desired_distance_to_block - block['distancex']) * distance_divider
+    desired_distance_wall =  middledistance - error * KP
+    desired_distance_wall = int(desired_distance_wall)
+    Utils.Cam.desired_distance_wall = desired_distance_wall
+    
+    if desired_distance_wall < 15:
+        desired_distance_wall =  15 
+    elif desired_distance_wall > 85:
+        desired_distance_wall = 85
 
+    if desired_distance_wall > middledistance:
+        desired_distance_wall_other_direction = (100 - desired_distance_wall)
+        
+        if Sensor != 1:
+            Sensor = 1
+            Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
+            Utils.LogInfo(f"Switched to Sensor 1")
+            
+        #Send ESPHoldDistance new Distance
+        if abs(desired_distance_wall_other_direction - old_desired_distance_wall) > 3:
+            Utils.usb_communication.sendMessage(f"D{desired_distance_wall_other_direction}", ESPHoldDistance)
+            Utils.LogInfo(f"New Distance {desired_distance_wall_other_direction}, Current Sensor: {Sensor}")
+            old_desired_distance_wall = desired_distance_wall_other_direction
+        
+    else:
+        
+        if Sensor != 2:
+            Sensor = 2
+            Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
+            Utils.LogInfo(f"Switched to Sensor 2")
+            
+        if abs(desired_distance_wall - old_desired_distance_wall) > 3:
+            Utils.usb_communication.sendMessage(f"D{desired_distance_wall}", ESPHoldDistance)
+            Utils.LogInfo(f"New Distance {desired_distance_wall}, Current Sensor: {Sensor}")
+            old_desired_distance_wall = desired_distance_wall
+            
+            
+# check for special case and adjust for it      
+def drive_special_case(corners, active_block_drive, ESP_adjusted):
+    next_corners = corners + 1 if corners < 3 else 0
+    if next_corners in Utils.blockPositions:
+        if Utils.blockPositions[next_corners]["position"] != "3" and Utils.blockPositions[next_corners]["color"] == "red":
+            if not ESP_adjusted:
+                Utils.LogInfo(f"Position 1 Red")
+                Utils.usb_communication.sendMessage("S1", ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D35", ESPHoldDistance) 
+                ESP_adjusted = True
+            
+            if Utils.Cam.avg_edge_distance < 90:
+                Utils.LogWarning(f"Block too close to wall")
+                Utils.usb_communication.sendMessage("S2", ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D50", ESPHoldDistance)
+                active_block_drive = False
+                ESP_adjusted = False
+                
+    return active_block_drive, ESP_adjusted
+    
+
+# Main function
 if __name__ == "__main__":
     try: 
         #start flask server if needed
