@@ -339,23 +339,68 @@ def block_correction(block):
             
             
 # check for special case and adjust for it      
-def drive_special_case(corners, active_block_drive, ESP_adjusted):
+def drive_special_case(corners, active_block_drive, ESP_adjusted, direction=0):
     next_corners = corners + 1 if corners < 3 else 0
     if next_corners in Utils.blockPositions:
-        if Utils.blockPositions[next_corners]["position"] != "3" and Utils.blockPositions[next_corners]["color"] == "red":
+        # outside on first or second position
+        if Utils.blockPositions[next_corners]["position"] != "3" and Utils.blockPositions[next_corners]["color"] == "red" and direction == 0:
             if not ESP_adjusted:
-                Utils.LogInfo(f"Position 1 Red")
+                Utils.LogInfo(f"Position 1 or 2 Red direction 0")
+                Utils.usb_communication.sendMessage("S2", ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D35", ESPHoldDistance) 
+                ESP_adjusted = True
+            
+            if Utils.Cam.avg_edge_distance < 90:
+                Utils.LogInfo(f"Stopped special case red 1 or 2 direction 0")
+                Utils.usb_communication.sendMessage("S1", ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D50", ESPHoldDistance)
+                active_block_drive = False
+                ESP_adjusted = False
+                
+        elif Utils.blockPositions[next_corners]["position"] != "3" and Utils.blockPositions[next_corners]["color"] == "green" and direction == 1:
+            if not ESP_adjusted:
+                Utils.LogInfo(f"Position 1 or 2 Green direction 1")
                 Utils.usb_communication.sendMessage("S1", ESPHoldDistance)
                 Utils.usb_communication.sendMessage("D35", ESPHoldDistance) 
                 ESP_adjusted = True
             
             if Utils.Cam.avg_edge_distance < 90:
-                Utils.LogWarning(f"Block too close to wall")
+                Utils.LogInfo(f"Stopped special case red 1 or 2 direction 1")
                 Utils.usb_communication.sendMessage("S2", ESPHoldDistance)
                 Utils.usb_communication.sendMessage("D50", ESPHoldDistance)
                 active_block_drive = False
                 ESP_adjusted = False
                 
+        
+        # inside on first or second position
+        elif Utils.blockPositions[next_corners]["position"] != "3" and Utils.blockPositions[next_corners]["color"] == "red" and direction == 1:
+            if not ESP_adjusted:
+                Utils.LogInfo(f"Position 1 or 2 Red direction 1")
+                Utils.usb_communication.sendMessage("S1", ESPHoldDistance)  
+                Utils.usb_communication.sendMessage("D35", ESPHoldDistance) 
+                ESP_adjusted = True
+            
+            if Utils.Cam.avg_edge_distance < 110:
+                Utils.LogInfo(f"Stopped special case red 1 or 2 direction 1")
+                Utils.usb_communication.sendMessage("S2", ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D50", ESPHoldDistance)
+                active_block_drive = False
+                ESP_adjusted = False
+                    
+        elif Utils.blockPositions[next_corners]["position"] != "3" and Utils.blockPositions[next_corners]["color"] == "green" and direction == 0:
+            if not ESP_adjusted:
+                Utils.LogInfo(f"Position 1 or 2 Green direction 0")
+                Utils.usb_communication.sendMessage("S2", ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D35", ESPHoldDistance) 
+                ESP_adjusted = True
+            
+            if Utils.Cam.avg_edge_distance < 110:
+                Utils.LogInfo(f"Stopped special case red 1 or 2 direction 0")
+                Utils.usb_communication.sendMessage("S1", ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D50", ESPHoldDistance)
+                active_block_drive = False
+                ESP_adjusted = False
+            
     return active_block_drive, ESP_adjusted
     
 
