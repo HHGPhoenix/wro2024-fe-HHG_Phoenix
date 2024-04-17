@@ -107,6 +107,7 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                     Utils.Display.write(f"Corner: {corners}", f"Round: {rounds}")
                     
                 oldAngle = newAngle
+                Utils.Gyro.angle = Utils.Gyro.angle + 20
                 TIMEOUT = time.time() + LineWaitTime
                 
         elif direction == 1:
@@ -149,14 +150,132 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                     block_array.sort(key=lambda x: x['size'], reverse=True)
 
                     nextBlock = block_array[0]
+                    
+                nextBlock["distance"] = Utils.Cam.get_distance_to_block(nextBlock)
                 
-                #print(Utils.Cam.avg_edge_distance)
-                if (Utils.Cam.avg_edge_distance < 200) and not active_block_drive:
-                    active_block_drive = get_block_pos(nextBlock, direction, corners, relative_angle)
+                print(nextBlock["distance"])
+                
+                if (Utils.Cam.avg_edge_distance < 200) and not active_block_drive and -10 < relative_angle < 40 and direction == 1:
+                    block_distance_to_wall = Utils.Cam.avg_edge_distance - nextBlock['distance']
+                    #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
+                    if (120 < Utils.Cam.avg_edge_distance < 180) and nextBlock['x'] < 300 and nextBlock['y'] > 200 and 90 < nextBlock["distance"] < 110:
+                        nextBlock['position'] = "1"
+                        BlockPos = corners + 1 if corners < 3 else 0
+                    elif 80 < block_distance_to_wall < 130 and nextBlock["distance"] < 80:
+                        nextBlock['position'] = "3"
+                        print("3")
+                        BlockPos = corners
+                    elif 130 < block_distance_to_wall < 180: #or block_distance_to_wall < 80:
+                        nextBlock['position'] = "2"
+                        if abs(relative_angle) > 30:
+                            BlockPos = corners + 1 if corners < 3 else 0
+                        else:
+                            BlockPos = corners
+
+                    else:
+                        nextBlock['position'] = "0"
+                    
+                    if nextBlock['position'] != "0" and nextBlock["position"] != "3":
+                        active_block_drive = True
+                        Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
+                    
+                    elif nextBlock['position'] != "0" and nextBlock["position"] == "3":# and BlockPos not in Utils.blockPositions:
+                        Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
                             
+                elif (Utils.Cam.avg_edge_distance < 200) and not active_block_drive and - 40 < relative_angle < 10 and direction == 0:
+                    block_distance_to_wall = Utils.Cam.avg_edge_distance - block['distance']
+                    #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
+                    if (120 < Utils.Cam.avg_edge_distance < 180) and nextBlock['x'] > 780 and nextBlock['y'] > 200 and 90 < nextBlock["distance"] < 110:
+                        nextBlock['position'] = "1"
+                        BlockPos = corners + 1 if corners < 3 else 0
+                    elif 80 < block_distance_to_wall < 130 and nextBlock["distance"] < 80:
+                        nextBlock['position'] = "3"
+                        BlockPos = corners
+                    elif 130 < block_distance_to_wall < 180:# or block_distance_to_wall < 80:
+                        nextBlock['position'] = "2"
+                        if abs(relative_angle) > 40:
+                            BlockPos = corners + 1 if corners < 3 else 0
+                        else:
+                            BlockPos = corners
+                    else:
+                        nextBlock['position'] = "0"
+                    
+                    if nextBlock['position'] != "0" and nextBlock["position"] != "3":
+                        active_block_drive = True
+                        Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
+                    
+                    elif nextBlock['position'] != "0" and nextBlock["position"] == "3":# and BlockPos not in Utils.blockPositions:
+                        Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
+                   
                 if active_block_drive:     
                     print(Utils.blockPositions)       
-                    active_block_drive, ESP_adjusted = drive_special_case(corners, active_block_drive, ESP_adjusted)
+                    next_corners = corners + 1 if corners < 3 else 0
+                    if next_corners in Utils.blockPositions:
+                        # outside on first or second position
+                        if Utils.blockPositions[next_corners]["position"] != "3" and Utils.blockPositions[next_corners]["color"] == "red" and direction == 1:
+                            if not ESP_adjusted:
+                                Utils.LogInfo(f"Position 1 or 2 Red direction 1")
+                                Utils.usb_communication.sendMessage("S1", ESPHoldDistance)
+                                Utils.usb_communication.sendMessage("D35", ESPHoldDistance) 
+                                ESP_adjusted = True
+                            
+                            if Utils.Cam.avg_edge_distance < 90:
+                                Utils.LogInfo(f"Stopped special case red 1 or 2 direction 1")
+                                Utils.usb_communication.sendMessage("S2", ESPHoldDistance)
+                                Utils.usb_communication.sendMessage("D40", ESPHoldDistance)
+                                desired_distance_wall = 40
+                                active_block_drive = False
+                                ESP_adjusted = False
+                                
+                        elif Utils.blockPositions[next_corners]["position"] != "3" and Utils.blockPositions[next_corners]["color"] == "green" and direction == 0:
+                            if not ESP_adjusted:
+                                Utils.LogInfo(f"Position 1 or 2 Green direction 0")
+                                Utils.usb_communication.sendMessage("S2", ESPHoldDistance)
+                                Utils.usb_communication.sendMessage("D35", ESPHoldDistance) 
+                                ESP_adjusted = True
+                            
+                            if Utils.Cam.avg_edge_distance < 95:
+                                Utils.LogInfo(f"Stopped special case green 1 or 2 direction 0")
+                                Utils.usb_communication.sendMessage("S1", ESPHoldDistance)
+                                Utils.usb_communication.sendMessage("D40", ESPHoldDistance)
+                                desired_distance_wall = 40
+                                active_block_drive = False
+                                ESP_adjusted = False
+                                
+                        
+                        # inside on first or second position
+                        elif Utils.blockPositions[next_corners]["position"] != "3" and Utils.blockPositions[next_corners]["color"] == "red" and direction == 0:
+                            if not ESP_adjusted:
+                                Utils.LogInfo(f"Position 1 or 2 Red direction 0")
+                                Utils.usb_communication.sendMessage("S2", ESPHoldDistance)  
+                                Utils.usb_communication.sendMessage("D35", ESPHoldDistance) 
+                                ESP_adjusted = True
+                            
+                            if Utils.Cam.avg_edge_distance < 160:
+                                Utils.LogInfo(f"Stopped special case red 1 or 2 direction 0")
+                                Utils.usb_communication.sendMessage("S1", ESPHoldDistance)
+                                Utils.usb_communication.sendMessage("D50", ESPHoldDistance)
+                                active_block_drive = False
+                                ESP_adjusted = False
+                                    
+                        elif Utils.blockPositions[next_corners]["position"] != "3" and Utils.blockPositions[next_corners]["color"] == "green" and direction == 1:
+                            if not ESP_adjusted:
+                                Utils.LogInfo(f"Position 1 or 2 Green direction 1")
+                                Utils.usb_communication.sendMessage("S1", ESPHoldDistance)
+                                Utils.usb_communication.sendMessage("D35", ESPHoldDistance) 
+                                ESP_adjusted = True
+                            
+                            if Utils.Cam.avg_edge_distance < 160:
+                                Utils.LogInfo(f"Stopped special case green 1 or 2 direction 1")
+                                Utils.usb_communication.sendMessage("S2", ESPHoldDistance)
+                                Utils.usb_communication.sendMessage("D50", ESPHoldDistance)
+                                active_block_drive = False
+                                ESP_adjusted = False
+                                
+                    elif corners in Utils.blockPositions:
+                        active_block_drive = False
+                    
+
                     
                 elif (nextBlock['w'] > FreezeSize or nextBlock['y'] > FreezeY or old_desired_distance_wall < 15 or old_desired_distance_wall > 75) and not FreezeBlock:
                     detect_new_block = False

@@ -255,9 +255,9 @@ void loop()
 					// Serial.println(correction);
 
 					//  limit correction to servo range
-					if (correction > 50)
+					if (correction > 55)
 					{
-						correction = 50;
+						correction = 55;
 					}
 					else if (correction < -60)
 					{
@@ -325,9 +325,9 @@ void loop()
 					{
 						correction = 60;
 					}
-					else if (correction < -50)
+					else if (correction < -55)
 					{
-						correction = -50;
+						correction = -55;
 					}
 
 					servo.write(ServoMiddlePosition + correction); // Set servo position
