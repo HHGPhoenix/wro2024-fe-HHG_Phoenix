@@ -37,7 +37,7 @@ async function updateData() {
         })
         .catch((error) => {
             console.error("Error:", error);
-            resetBlockVisuals();
+            //resetBlockVisuals();
         });
 }
 
