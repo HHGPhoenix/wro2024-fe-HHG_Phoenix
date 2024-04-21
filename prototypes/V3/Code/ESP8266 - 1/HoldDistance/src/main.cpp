@@ -16,7 +16,7 @@
 #define ServoPin 13	  // Servo Pin
 
 // Variables
-int KP = 1;						  // Proportional constant
+float KP = 1;						  // Proportional constant
 int maxDistanceCm = 200;		  // Max distance in cm to measure
 int desiredDistance = 50;		  // Desired distance in cm
 int commandedDistance = 50;		  // Distance in cm commanded by the Raspberry Pi
@@ -25,7 +25,9 @@ int smoothingSteps = 1;			  // smoothing multiplier for sensor values
 bool started = false;			  // switch between start and stop
 bool manual = false;			  // switch between manual and automatic mode
 bool firstCornerDetected = false; // special detection for drive direction
-int ServoMiddlePosition = 90;
+int ServoMiddlePosition = 105;
+int angle_right = 45;
+int angle_left = 55;
 int distanceEdgeDetection = -1; // distance in cm to detect an edge
 int edgeDetectionCounter = 0;
 float distance1 = 0;
@@ -47,6 +49,7 @@ void setup()
 	pinMode(InternalLed, OUTPUT);
 	digitalWrite(InternalLed, HIGH);
 	servo.attach(ServoPin);
+	servo.write(ServoMiddlePosition); // Set servo to middle position
 }
 
 void loop()
@@ -170,7 +173,7 @@ void loop()
 						int numberStart = 2; // Skip the "KP" characters
 						int numberLength = command.length();
 						String numberStr = command.substring(numberStart, numberLength);
-						KP = numberStr.toInt();
+						KP = numberStr.toFloat();
 						Serial.print("Received KP: ");
 						Serial.println(KP);
 					}
@@ -255,13 +258,13 @@ void loop()
 					// Serial.println(correction);
 
 					//  limit correction to servo range
-					if (correction > 55)
+					if (correction > angle_right)
 					{
-						correction = 55;
+						correction = angle_right;
 					}
-					else if (correction < -60)
+					else if (correction < -angle_left)
 					{
-						correction = -60;
+						correction = -angle_left;
 					}
 
 					servo.write(ServoMiddlePosition - correction); // Set servo position
@@ -321,13 +324,13 @@ void loop()
 					float correction = error * KP;
 
 					//  limit correction to servo range
-					if (correction > 60)
+					if (correction > angle_left)
 					{
-						correction = 60;
+						correction = angle_left;
 					}
-					else if (correction < -55)
+					else if (correction < -angle_right)
 					{
-						correction = -55;
+						correction = -angle_right;
 					}
 
 					servo.write(ServoMiddlePosition + correction); // Set servo position

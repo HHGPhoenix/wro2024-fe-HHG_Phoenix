@@ -393,14 +393,14 @@ class Camera():
         self.picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
         
         # Define the color ranges for green and red in HSV color space
-        self.lower_green = np.array([35, 60, 35])
-        self.upper_green = np.array([85, 255, 255])
+        self.lower_green = np.array([53, 130, 40])
+        self.upper_green = np.array([93, 220, 150])
 
-        self.lower_red1 = np.array([0, 200, 100])
-        self.upper_red1 = np.array([10, 255, 180])
+        self.lower_red1 = np.array([0, 160, 120])
+        self.upper_red1 = np.array([5, 220, 200])
 
-        self.lower_red2 = np.array([160, 200, 100])
-        self.upper_red2 = np.array([180, 255, 180])
+        self.lower_red2 = np.array([173, 160, 120])
+        self.upper_red2 = np.array([180, 220, 200])
 
         # Define the kernel for morphological operations
         self.kernel = np.ones((5, 5), np.uint8)
@@ -421,7 +421,7 @@ class Camera():
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # Threshold the grayscale image to get a binary image
-        _, binary = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY)
+        _, binary = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY)
         
         binary = cv2.dilate(binary, self.kernel, iterations=1)
 
@@ -599,10 +599,13 @@ class Camera():
         # Find contours in the red mask
         contours_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
+        print(f"middle hsv: {hsv[0, 360]}, inverted: {hsv[300, 1000]}")
+        
         cv2.circle(frame, (640, 720), 10, (255, 0, 0), -1)
         cv2.putText(frame, f"{self.desired_distance_wall}", (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
         cv2.putText(frame, f"Freeze: {self.freeze}", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
         cv2.putText(frame, f"Distance: {self.block_distance}", (700, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
+        cv2.circle(frame, (1000, 300), 10, (255, 0, 0), -1)
         
         block_array = []
 
