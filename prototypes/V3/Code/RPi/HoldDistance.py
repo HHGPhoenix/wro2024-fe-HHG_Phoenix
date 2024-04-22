@@ -23,7 +23,7 @@ Cam = Camera(video_stream=True)
 Cam.start_processing()
 
 global ESPHoldDistance, ESPHoldSpeed
-ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1, StartSpeed=40)
+ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1)
 
 Utils.setupDataLog()
 
@@ -35,9 +35,14 @@ Utils.setupDataLog()
 ##                                                      ##
 ##########################################################
 #Constants
-Utils.Speed = 50
-Utils.KP = 3.5
-Utils.ED = 125 #Edge detection distance in cm
+Utils.StartSpeed = 40
+Utils.Distance = 50
+Utils.Kp = 0.7
+Utils.Ed = 125 #Edge detection distance in cm
+Utils.StartSensor = 2
+Utils.Mm = 10
+Utils.AngR = 32
+Utils.AngL = 40
 
 
 ##########################################################
@@ -86,7 +91,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
                 Utils.LogInfo("Switched to Sensor 2")
                 #Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
                 Utils.usb_communication.sendMessage("D35", Utils.ESPHoldDistance)
-                Utils.usb_communication.sendMessage("SPEED 50", Utils.ESPHoldSpeed)
+                Utils.usb_communication.sendMessage("SPEED 60", Utils.ESPHoldSpeed)
             
             newAngle = oldAngle + GyroCornerAngle
             if Utils.Gyro.angle > newAngle and time.time() > TIMEOUT:

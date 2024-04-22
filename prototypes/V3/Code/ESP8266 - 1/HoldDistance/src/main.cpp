@@ -208,6 +208,36 @@ void loop()
 					{
 						Serial.println("HB");
 					}
+					else if (command.startsWith("ANGL")) 
+					{
+						int numberStart = 4; // Skip the "ANGL" characters
+						int numberLength = command.length();
+						String numberStr = command.substring(numberStart, numberLength);
+						angle_left = numberStr.toInt();
+
+						if (angle_left > 55)
+						{
+							angle_left = 55;
+						}
+
+						Serial.print("angle_left: ");
+						Serial.println(angle_left);
+					}
+					else if (command.startsWith("ANGR")) 
+					{
+						int numberStart = 4; // Skip the "ANGR" characters
+						int numberLength = command.length();
+						String numberStr = command.substring(numberStart, numberLength);
+						angle_right = numberStr.toInt();
+
+						if (angle_right > 45)
+						{
+							angle_right = 45;
+						}
+
+						Serial.print("angle_right: ");
+						Serial.println(angle_right);
+					}
 
 					// Serial.println(command);
 					command = "";
@@ -267,7 +297,7 @@ void loop()
 						correction = -angle_left;
 					}
 
-					servo.write(ServoMiddlePosition - correction); // Set servo position
+					servo.write(int(ServoMiddlePosition - correction)); // Set servo position
 
 					if (!firstCornerDetected && (distanceEdgeDetection > 0))
 					{
@@ -333,7 +363,7 @@ void loop()
 						correction = -angle_right;
 					}
 
-					servo.write(ServoMiddlePosition + correction); // Set servo position
+					servo.write(int(ServoMiddlePosition + correction)); // Set servo position
 
 					if (!firstCornerDetected && (distanceEdgeDetection > 0))
 					{
