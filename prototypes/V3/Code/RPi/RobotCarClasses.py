@@ -47,7 +47,7 @@ class CustomException(Exception):
 #A class that has some necessary tools for calculating, usw.
 class Utility:
     #Transfer data so it can be used in other classes
-    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Buzzer1=None, StartSpeed=50, Cam=None):
+    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Buzzer1=None, Cam=None):
         self.setupLog()
         
         self.usb_communication = USBCommunication(self)
@@ -57,7 +57,10 @@ class Utility:
         self.Display = self.I2C_communication.Display
         self.ADC = self.I2C_communication.ADC
         self.Gyro = self.I2C_communication.Gyro
+        
         self.Cam = Cam
+        if self.Cam is not None:
+            self.Cam.video_writer = None
         
         self.Farbsensor = Farbsensor
         self.StartButton = StartButton
@@ -72,7 +75,14 @@ class Utility:
         
         self.blockPositions = {}
         
-        self.StartSpeed = StartSpeed
+        self.StartSpeed = None
+        self.StartSensor = None
+        self.Distance = None
+        self.Kp = None
+        self.Ed = None
+        self.Mm = None
+        self.AngR = None
+        self.AngL = None
         
         return self.ESPHoldDistance, self.ESPHoldSpeed
         
@@ -83,6 +93,10 @@ class Utility:
 
         self.I2C_communication.stop_threads()
         self.StopButton.stop_StopButton()
+        
+        if self.Cam is not None:
+            if self.Cam.video_writer is not None:
+                self.Cam.video_writer.release()
 
         #Stop Nodemcu's
         self.usb_communication.sendMessage("STOP", self.ESPHoldDistance)
@@ -136,12 +150,14 @@ class Utility:
                 self.usb_communication.startNodeMCUs()
                 self.Gyro.GyroStart = True
 
-                self.usb_communication.sendMessage(f"D {50}", self.ESPHoldDistance)
-                self.usb_communication.sendMessage(f"KP {2}", self.ESPHoldDistance)
-                self.usb_communication.sendMessage(f"ED {125}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"D {self.Distance}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"KP {self.Kp}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"ED {self.Ed}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"SPEED {self.StartSpeed}", self.ESPHoldSpeed)
-                self.usb_communication.sendMessage(f"MM {10}", self.ESPHoldDistance)
-                self.usb_communication.sendMessage(f"S{2}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"MM {self.Mm}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"S{self.StartSensor}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"ANGR {self.AngR}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"ANGL {self.AngL}", self.ESPHoldDistance)
                 
                 self.StartTime = time.time()
                 self.LogDebug(f"Run started: {time.time()}")
@@ -599,13 +615,13 @@ class Camera():
         # Find contours in the red mask
         contours_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
-        print(f"middle hsv: {hsv[0, 360]}, inverted: {hsv[300, 1000]}")
+        #print(f"middle hsv: {hsv[0, 360]}, inverted: {hsv[300, 1000]}")
         
         cv2.circle(frame, (640, 720), 10, (255, 0, 0), -1)
         cv2.putText(frame, f"{self.desired_distance_wall}", (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
         cv2.putText(frame, f"Freeze: {self.freeze}", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
         cv2.putText(frame, f"Distance: {self.block_distance}", (700, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 4)
-        cv2.circle(frame, (1000, 300), 10, (255, 0, 0), -1)
+        #cv2.circle(frame, (1000, 300), 10, (255, 0, 0), -1)
         
         block_array = []
 
@@ -641,13 +657,23 @@ class Camera():
         
     #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
     def process_blocks(self):
+        self.video_writer = None
+
         while True:
             StartTime = time.time()
             self.block_array, self.frame, frameraw = self.get_coordinates()
             StopTime = time.time()
             #print(f"Time needed: {StopTime - StartTime}")
             frame = self.get_edges(frameraw)
-     
+
+            if self.video_writer is None:
+                # Create a VideoWriter object to save the frames as an mp4 file
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                self.video_writer = cv2.VideoWriter('output.mp4', fourcc, 20, (frameraw.shape[1], frameraw.shape[0]), True)
+
+            # Write the frame to the video file
+            self.video_writer.write(frameraw)
+    
           
     #Start a new thread for processing the camera stream          
     def start_processing(self):
