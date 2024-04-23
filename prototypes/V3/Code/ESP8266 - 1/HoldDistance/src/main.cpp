@@ -34,6 +34,16 @@ float distance1 = 0;
 int distance1counter = 0;
 float distance2 = 0;
 int distance2counter = 0;
+const int numReadings = 10; // number of readings to keep track of
+float readings[numReadings]; // the readings from the analog input
+int readIndex = 0; // the index of the current reading
+float total = 0; // the running total
+float average = 0; // the average
+const int numReadings2 = 10; // number of readings to keep track of
+float readings2[numReadings2]; // the readings from the analog input
+int readIndex2 = 0; // the index of the current reading
+float total2 = 0; // the running total
+float average2 = 0; // the average
 String command;
 char c;
 
@@ -121,7 +131,7 @@ void loop()
 
 					started = true; // Start the main loop
 				}
-				
+
 				// Identity response
 				else if (command == "IDENT")
 				{
@@ -308,21 +318,37 @@ void loop()
 					float error = desiredDistance - distance1;
 					float correction = error * KP;
 
-					// Serial.print("correction: ");
-					// Serial.println(correction);
+					// subtract the last reading:
+					total = total - readings[readIndex];
+					// read from the sensor:
+					readings[readIndex] = correction;
+					// add the reading to the total:
+					total = total + readings[readIndex];
+					// advance to the next position in the array:
+					readIndex = readIndex + 1;
 
-					//  limit correction to servo range
-					if (correction > angle_right)
-					{
-						correction = angle_right;
+					// if we're at the end of the array...
+					if (readIndex >= numReadings) {
+					// ...wrap around to the beginning:
+						readIndex = 0;
 					}
-					else if (correction < -angle_left)
+
+					// calculate the average:
+					average = total / numReadings;
+					// send it to the computer as ASCII digits
+
+					// limit correction to servo range
+					if (average > angle_right)
 					{
-						correction = -angle_left;
+						average = angle_right;
+					}
+					else if (average < -angle_left)
+					{
+						average = -angle_left;
 					}
 
-					servo.write(int(ServoMiddlePosition - correction)); // Set servo position
-
+					servo.write(int(ServoMiddlePosition - average)); // Set servo position
+  
 					if (!firstCornerDetected && (distanceEdgeDetection > 0))
 					{
 						if (distance1 > distanceEdgeDetection)
@@ -377,17 +403,34 @@ void loop()
 					float error = desiredDistance - distance2;
 					float correction = error * KP;
 
-					//  limit correction to servo range
-					if (correction > angle_left)
-					{
-						correction = angle_left;
-					}
-					else if (correction < -angle_right)
-					{
-						correction = -angle_right;
+					// subtract the last reading:
+					total2 = total2 - readings2[readIndex2];
+					// read from the sensor:
+					readings2[readIndex2] = correction;
+					// add the reading to the total:
+					total2 = total2 + readings2[readIndex2];
+					// advance to the next position in the array:
+					readIndex2 = readIndex2 + 1;
+
+					// if we're at the end of the array...
+					if (readIndex2 >= numReadings2) {
+						readIndex2 = 0;
 					}
 
-					servo.write(int(ServoMiddlePosition + correction)); // Set servo position
+					// calculate the average:
+					average2 = total2 / numReadings2;
+
+					// limit correction to servo range
+					if (average2 > angle_left)
+					{
+						average2 = angle_left;
+					}
+					else if (average2 < -angle_right)
+					{
+						average2 = -angle_right;
+					}
+
+    				servo.write(int(ServoMiddlePosition + average2)); // Set servo position
 
 					if (!firstCornerDetected && (distanceEdgeDetection > 0))
 					{
