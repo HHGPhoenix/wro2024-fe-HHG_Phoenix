@@ -71,9 +71,32 @@ void loop()
 
 					firstCornerDetected = false; // Reset corner detection
 
+					distance1 = 0;
+					distance2 = 0;
+					int timeoutcounter = 0;
+
 					// Check for start in small section
-					distance1 = ultraschall1.read();
-					distance2 = ultraschall2.read();
+					while (distance1 == 0)
+					{
+						distance1 = ultraschall1.read();
+						timeoutcounter++;
+						if (timeoutcounter > 20)
+						{
+							break;
+						}
+					}
+
+					timeoutcounter = 0;
+					while (distance2 == 0)
+					{
+						distance2 = ultraschall2.read();
+						timeoutcounter++;
+						if (timeoutcounter > 40)
+						{
+							break;
+						}
+					}
+
 					// Check if both sensors read a valid value
 					if (distance1 > 0 && distance2 > 0)
 					{
@@ -98,6 +121,7 @@ void loop()
 
 					started = true; // Start the main loop
 				}
+				
 				// Identity response
 				else if (command == "IDENT")
 				{
