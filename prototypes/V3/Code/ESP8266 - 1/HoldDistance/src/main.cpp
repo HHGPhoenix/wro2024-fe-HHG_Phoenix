@@ -34,12 +34,12 @@ float distance1 = 0;
 int distance1counter = 0;
 float distance2 = 0;
 int distance2counter = 0;
-const int numReadings = 10; // number of readings to keep track of
+const int numReadings = 5; // number of readings to keep track of
 float readings[numReadings]; // the readings from the analog input
 int readIndex = 0; // the index of the current reading
 float total = 0; // the running total
 float average = 0; // the average
-const int numReadings2 = 10; // number of readings to keep track of
+const int numReadings2 = 5; // number of readings to keep track of
 float readings2[numReadings2]; // the readings from the analog input
 int readIndex2 = 0; // the index of the current reading
 float total2 = 0; // the running total
