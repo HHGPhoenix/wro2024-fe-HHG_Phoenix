@@ -97,11 +97,6 @@ class Utility:
         if self.Cam is not None:
             if self.Cam.video_writer is not None:
                 self.Cam.video_writer.release()
-
-        #Stop Nodemcu's
-        self.usb_communication.sendMessage("STOP", self.ESPHoldDistance)
-        time.sleep(0.1)
-        self.usb_communication.sendMessage("STOP", self.ESPHoldSpeed)
         
         #self.StopNodemcus()
         
@@ -171,6 +166,11 @@ class Utility:
     def StopRun(self):
         self.StopTime = time.time()
         self.LogDebug(f"Run ended: {self.StopTime}")
+        
+        #Stop Nodemcu's
+        self.usb_communication.sendMessage("STOP", self.ESPHoldDistance)
+        time.sleep(0.1)
+        self.usb_communication.sendMessage("STOP", self.ESPHoldSpeed)
         
         if self.StartTime:
             seconds = round(self.StopTime - self.StartTime, 2)

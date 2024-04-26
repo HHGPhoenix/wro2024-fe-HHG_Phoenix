@@ -23,7 +23,7 @@ Buzzer1 = Buzzer(12, Utils)
 Cam = Camera(video_stream=True)
 
 global ESPHoldDistance, ESPHoldSpeed
-ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1, 50, Cam)
+ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1, Cam)
 
 Utils.setupDataLog()
 
@@ -35,9 +35,14 @@ Utils.setupDataLog()
 ##                                                      ##
 ##########################################################
 #Constants
-Utils.Speed = 40
-Utils.KP = 3.5
-Utils.ED = 125 #Edge detection distance in cm
+Utils.StartSpeed = 60
+Utils.Distance = 50
+Utils.Kp = 0.7
+Utils.Ed = 125 #Edge detection distance in cm
+Utils.StartSensor = 2
+Utils.Mm = 10
+Utils.AngR = 40
+Utils.AngL = 50
 
 
 ##########################################################
@@ -164,7 +169,7 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                 if (Utils.Cam.avg_edge_distance < 200) and not active_block_drive and -10 < relative_angle < 40 and direction == 1:
                     #block_distance_to_wall = Utils.Cam.avg_edge_distance - nextBlock['distance']
                     #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
-                    if (120 < Utils.Cam.avg_edge_distance < 180) and nextBlock['x'] < 300 and nextBlock['y'] > 200 and 90 < nextBlock["distance"] < 110:
+                    if (120 < Utils.Cam.avg_edge_distance < 180) and nextBlock['x'] < 300 and nextBlock['y'] > 200 and 70 < nextBlock["distance"] < 110:
                         nextBlock['position'] = "1"
                         BlockPos = corners + 1 if corners < 3 else 0
                     elif 80 < block_distance_to_wall < 130 and nextBlock["distance"] < 80:
@@ -190,7 +195,7 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                             
                 elif (Utils.Cam.avg_edge_distance < 200) and not active_block_drive and - 40 < relative_angle < 10 and direction == 0:
                     #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
-                    if (120 < Utils.Cam.avg_edge_distance < 180) and nextBlock['x'] > 780 and nextBlock['y'] > 200 and 90 < nextBlock["distance"] < 110:
+                    if (120 < Utils.Cam.avg_edge_distance < 180) and nextBlock['x'] > 780 and nextBlock['y'] > 200 and 70 < nextBlock["distance"] < 110:
                         nextBlock['position'] = "1"
                         BlockPos = corners + 1 if corners < 3 else 0
                     elif 80 < block_distance_to_wall < 130 and nextBlock["distance"] < 80:

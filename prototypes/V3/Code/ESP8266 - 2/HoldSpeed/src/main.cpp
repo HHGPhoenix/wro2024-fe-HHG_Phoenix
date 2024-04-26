@@ -100,10 +100,16 @@ void loop() {
       // check for stop command
       if (command == "STOP") {
         Serial.println("Received STOP command. Performing action...");
-        digitalWrite(InternalLed, HIGH);
-        speedSensor.reset();
+
+        // try to brake the motor
+        motor.backward();
+        motor.setSpeed(255);
+        delay(500);
         motor.setSpeed(0);
         motor.stop();
+
+        digitalWrite(InternalLed, HIGH);
+        speedSensor.reset();
         started = false;
       } 
       // check for speed command
