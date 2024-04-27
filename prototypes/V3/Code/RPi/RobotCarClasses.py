@@ -83,6 +83,8 @@ class Utility:
         self.Mm = None
         self.AngR = None
         self.AngL = None
+        self.corners = 0
+        self.relative_angle = 0
         
         return self.ESPHoldDistance, self.ESPHoldSpeed
         
@@ -115,7 +117,7 @@ class Utility:
     #Do some init and wait until StartButton is pressed
     def StartRun(self):
         #clear console
-        os.system('cls' if os.name=='nt' else 'clear')
+        #os.system('cls' if os.name=='nt' else 'clear')
         
         if self.Cam:
             pCam = mp.Process(target=self.Cam.start_processing())
@@ -228,7 +230,7 @@ class Utility:
 
     #Log Sensor values
     def LogData(self):
-        self.datalogger.debug(f"Farbsensor; {0};  CPU; {psutil.cpu_percent()}; RAM; {psutil.virtual_memory().percent}; CPUTemp; {CPUTemperature().temperature}; Voltage; {self.ADC.voltage}")
+        self.datalogger.debug(f"Angle: {self.relative_angle}, corners: {self.corners}")
     
     
     #Stop the DataLogger Process
@@ -394,13 +396,14 @@ class Buzzer(Utility):
 
 #A class for detecting red and green blocks in the camera stream           
 class Camera():
-    def __init__(self, video_stream=False, video_source=0):
+    def __init__(self, video_stream=False, video_source=0, Utils=None):
         # Variable initialization
         self.freeze = False
         self.frame = None
         self.frame_lock = threading.Lock()
         self.video_stream = video_stream
         self.picam2 = Picamera2()
+        self.Utils = Utils
         
         # Configure and start the camera
         config = self.picam2.create_still_configuration(main={"size": (1280, 720)}, raw={"size": (1280, 720)}, controls={"FrameRate": 34})
@@ -546,21 +549,22 @@ class Camera():
 
                 self.real_distance = 0
                 if avg_ycoord_bottom != 0:
-                    self.real_distance = avg_ycoord_bottom / 100
-                    cv2.putText(binary, f"{round(self.real_distance * 100, 3)} cm", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (125, 125, 125), 4)
+                    self.real_distance =  7193 * (avg_ycoord_bottom ** -0.917)
+                    
+                    
+                    cv2.putText(binary, f"{round(self.real_distance, 3)} cm", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (125, 125, 125), 4)
                     
                     break
                     
                 elif avg_ycoord_bottom == 0:
                     self.real_distance = 0 
                     
-        except:
+        except Exception as e:
+            print(e)
             self.real_distance = 0
-            
-        self.real_distance = self.real_distance * 100
                     
         if self.real_distance != 0:
-            if self.real_distance > 0 and self.real_distance < 350:
+            if self.real_distance > 50 and self.real_distance < 300:
                 #print(self.edge_distances)
                 if len(self.edge_distances) > 5:
                     self.edge_distances.pop(0)
@@ -649,10 +653,10 @@ class Camera():
 
         while True:
             StartTime = time.time()
-            self.block_array, self.frame, frameraw = self.get_coordinates()
+            self.block_array, frame, frameraw = self.get_coordinates()
             StopTime = time.time()
             #print(f"Time needed: {StopTime - StartTime}")
-            frame = self.get_edges(frameraw)
+            self.frame = self.get_edges(frameraw)
 
             if self.video_writer is None:
                 # Create a VideoWriter object to save the frames as an mp4 file
@@ -661,6 +665,7 @@ class Camera():
 
             # Write the frame to the video file
             self.video_writer.write(frameraw)
+            self.Utils.LogData()
     
           
     #Start a new thread for processing the camera stream          
