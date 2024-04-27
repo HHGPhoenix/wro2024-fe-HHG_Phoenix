@@ -20,7 +20,7 @@ StopButton = Button(6, Utils)
 
 Buzzer1 = Buzzer(12, Utils)
 
-Cam = Camera(video_stream=True)
+Cam = Camera(video_stream=True, Utils=Utils)
 
 global ESPHoldDistance, ESPHoldSpeed
 ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1, Cam)
@@ -138,6 +138,9 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                 oldAngle = newAngle
                 Utils.Gyro.angle = Utils.Gyro.angle - 20
                 TIMEOUT = time.time() + LineWaitTime
+                
+        Utils.corners = corners
+        Utils.relative_angle = relative_angle
                 
         
         #get objects and calculate new distance
@@ -502,8 +505,6 @@ def HoldLane(Utils, YCutOffTop=0, YCutOffBottom=-1, SIZE=0, LineWaitTime=1, Gyro
                     Utils.SensorDistance1 = float(response.split(":")[1].strip())
                 if "SD2:" in responses:
                     Utils.SensorDistance2 = float(response.split(":")[1].strip())
-        
-        Utils.LogData()
         
         StopTime = time.time()
         #Utils.LogDebug(f"Time: {StopTime - StartTime}, block_array: {Utils.Cam.block_array}")

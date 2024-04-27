@@ -19,7 +19,7 @@ StopButton = Button(6, Utils)
 
 Buzzer1 = Buzzer(12, Utils)
 
-Cam = Camera(video_stream=True)
+Cam = Camera(video_stream=True, Utils=Utils)
 Cam.start_processing()
 
 global ESPHoldDistance, ESPHoldSpeed
@@ -68,9 +68,9 @@ def HoldLane(Utils, CornerWaiTTime=1):
             if Sensor != 1:
                 Sensor = 1
                 Utils.LogInfo("Switched to Sensor 1")
-                #Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
                 Utils.usb_communication.sendMessage("D35", Utils.ESPHoldDistance)
-                Utils.usb_communication.sendMessage("SPEED 50", Utils.ESPHoldSpeed)
+                Utils.usb_communication.sendMessage("SPEED 90", Utils.ESPHoldSpeed)
                 
             newAngle = oldAngle - GyroCornerAngle
             if Utils.Gyro.angle < newAngle and time.time() > TIMEOUT:
@@ -89,7 +89,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
             if Sensor != 2:
                 Sensor = 2
                 Utils.LogInfo("Switched to Sensor 2")
-                #Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
                 Utils.usb_communication.sendMessage("D35", Utils.ESPHoldDistance)
                 Utils.usb_communication.sendMessage("SPEED 90", Utils.ESPHoldSpeed)
             
@@ -109,6 +109,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
                     
         responses = Utils.usb_communication.getResponses(ESPHoldDistance)
         if (responses != None):
+            # print(responses)
             for response in responses:
                 if "Drive direction counterclockwise" in responses:
                     direction = 1
