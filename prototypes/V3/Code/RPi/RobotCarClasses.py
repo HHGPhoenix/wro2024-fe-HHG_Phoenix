@@ -409,13 +409,13 @@ class Camera():
         self.picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
         
         # Define the color ranges for green and red in HSV color space
-        self.lower_green = np.array([53, 130, 40])
+        self.lower_green = np.array([53, 100, 40])
         self.upper_green = np.array([93, 220, 150])
 
         self.lower_red1 = np.array([0, 160, 120])
         self.upper_red1 = np.array([5, 220, 200])
 
-        self.lower_red2 = np.array([173, 160, 120])
+        self.lower_red2 = np.array([173, 160, 100])
         self.upper_red2 = np.array([180, 220, 200])
 
         # Define the kernel for morphological operations
@@ -433,11 +433,13 @@ class Camera():
         
         
     def get_edges(self, frame):
+        frame = frame[250:500, 300:980]
+        
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # Threshold the grayscale image to get a binary image
-        _, binary = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY)
+        _, binary = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY)
         
         binary = cv2.dilate(binary, self.kernel, iterations=1)
 
@@ -498,10 +500,13 @@ class Camera():
                 slope = model.coef_[0]
                 intercept = model.intercept_
 
+                # Flatten the array
+                x_flat = x.flatten()
+                
                 # Calculate the start and end points of the line
-                x1 = int(min(x))
+                x1 = int(min(x_flat))
                 y1 = int(slope * x1 + intercept)
-                x2 = int(max(x))
+                x2 = int(max(x_flat))
                 y2 = int(slope * x2 + intercept)
 
                 # Calculate the angle of the line
@@ -525,44 +530,29 @@ class Camera():
                 # Draw the line
                 cv2.line(binary, (x1, y1), (x2, y2), (125, 125, 125), 4)
             
-            known_height_image = self.known_height * cos(radians(self.camera_angle))
-
             for angle, lines in lines_by_angle.items():
-                apparent_height = 0
+                avg_ycoord_bottom = 0
+                
                 if len(lines) > 1:
-                    num_points = 30
-                    # Calculate the x and y increments for each point along the lines
-                    y_increment_left = (lines[1][0][1] - lines[0][0][1]) / num_points
-                    y_increment_right = (lines[1][1][1] - lines[0][1][1]) / num_points
-
-                    distances = []
-                    # Loop through each point along the lines
-                    for i in range(num_points):
-                        # Calculate the y coordinates of the points on the left and right lines
-                        y_left = lines[0][0][1] + i * y_increment_left
-                        y_right = lines[1][0][1] + i * y_increment_right
-
-                        # Calculate the y distance between the points on the left and right lines
-                        distance = abs(y_left - y_right)
-
-                        # Add the distance to the list
-                        distances.append(distance)
-
-                    # Return the average of the distances
-                    apparent_height = np.mean(distances)
+                    avg_ycoord_1 = (lines[0][0][1] + lines[0][1][1]) / 2
+                    avg_ycoord_2 = (lines[1][0][1] + lines[1][1][1]) / 2
+                    
+                    if avg_ycoord_1 > avg_ycoord_2:
+                        avg_ycoord_bottom = avg_ycoord_1
+                    else:
+                        avg_ycoord_bottom = avg_ycoord_2   
+                else:
+                    avg_ycoord_bottom = (lines[0][0][1] + lines[0][1][1]) / 2
 
                 self.real_distance = 0
-                if apparent_height != 0:
-                    # Calculate the distance to the boundary in the image plane
-                    image_distance = (known_height_image * self.focal_length) / apparent_height
-
-                    # Adjust for the camera angle
-                    self.real_distance = image_distance * self.distance_multiplier
+                if avg_ycoord_bottom != 0:
+                    self.real_distance = avg_ycoord_bottom / 100
                     cv2.putText(binary, f"{round(self.real_distance * 100, 3)} cm", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (125, 125, 125), 4)
+                    
                     break
                     
-                elif apparent_height == 0:
-                    self.real_distance = 0
+                elif avg_ycoord_bottom == 0:
+                    self.real_distance = 0 
                     
         except:
             self.real_distance = 0
@@ -570,16 +560,14 @@ class Camera():
         self.real_distance = self.real_distance * 100
                     
         if self.real_distance != 0:
-            if self.real_distance > 50 and self.real_distance < 350:
+            if self.real_distance > 0 and self.real_distance < 350:
                 #print(self.edge_distances)
                 if len(self.edge_distances) > 5:
                     self.edge_distances.pop(0)
                     
-                    
                 self.edge_distances.append(round(self.real_distance, 3))
                 self.avg_edge_distance = np.mean(self.edge_distances)
-                #print(self.avg_edge_distance)
-                
+                #print(self.avg_edge_distance)   
         
         return binary
     
@@ -591,9 +579,9 @@ class Camera():
         frameraw = cv2.cvtColor(frameraw, cv2.COLOR_BGR2RGB)
         frame = frameraw.copy()
         
-        frameraw = frameraw[150:, :]
-        
-        
+        # cutoff frames
+        frame = frame[250:, :]
+
         # Convert the image from BGR to HSV
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
