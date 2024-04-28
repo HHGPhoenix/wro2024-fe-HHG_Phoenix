@@ -422,7 +422,7 @@ class Camera():
         self.upper_red2 = np.array([180, 220, 200])
 
         # Define the kernel for morphological operations
-        self.kernel = np.ones((5, 5), np.uint8)
+        self.kernel = np.ones((7, 7), np.uint8)
         self.desired_distance_wall = -1
         self.block_distance = -1
         
@@ -440,11 +440,13 @@ class Camera():
         
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        gray = cv2.dilate(gray, self.kernel, iterations=1)
 
         # Threshold the grayscale image to get a binary image
-        _, binary = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY)
+        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 1001, 30)
         
-        binary = cv2.dilate(binary, self.kernel, iterations=1)
+        binary = cv2.dilate(binary, self.kernel, iterations=2)
 
        # Perform Canny edge detection
         edges = cv2.Canny(binary, 50, 120, apertureSize=3)
