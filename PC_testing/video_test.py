@@ -36,7 +36,7 @@ class Camera():
         self.upper_red2 = np.array([180, 220, 200])
 
         # Define the kernel for morphological operations
-        self.kernel = np.ones((5, 5), np.uint8)
+        self.kernel = np.ones((7, 7), np.uint8)
         self.desired_distance_wall = -1
         self.block_distance = -1
         
@@ -50,13 +50,18 @@ class Camera():
         
         
     def get_edges(self, frame):
+        frame = frame[100:500, 300:980]
+        
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        gray = cv2.dilate(gray, self.kernel, iterations=1)
 
         # Threshold the grayscale image to get a binary image
-        _, binary = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY)
+        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 1001, 30)
         
-        binary = cv2.dilate(binary, self.kernel, iterations=1)
+        binary = cv2.dilate(binary, self.kernel, iterations=2)
+        
 
        # Perform Canny edge detection
         edges = cv2.Canny(binary, 50, 120, apertureSize=3)
@@ -144,55 +149,44 @@ class Camera():
 
                 # Draw the line
                 cv2.line(binary, (x1, y1), (x2, y2), (125, 125, 125), 4)
-            
-            known_height_image = self.known_height * cos(radians(self.camera_angle))
-
-            for angle, lines in lines_by_angle.items():
-                avg_ycoord_bottom = 0
                 
-                if len(lines) > 1:
-                    avg_ycoord_1 = (lines[0][0][1] + lines[0][1][1]) / 2
-                    avg_ycoord_2 = (lines[1][0][1] + lines[1][1][1]) / 2
-                    
-                    if avg_ycoord_1 > avg_ycoord_2:
-                        avg_ycoord_bottom = avg_ycoord_1
-                    else:
-                        avg_ycoord_bottom = avg_ycoord_2
-                        
-                else:
-                    avg_ycoord_bottom = (lines[0][0][1] + lines[0][1][1]) / 2
-
-                self.real_distance = 0
-                if avg_ycoord_bottom != 0:
-                    # Calculate the distance to the boundary in the image plane
-                    image_distance = (known_height_image * self.focal_length) / avg_ycoord_bottom
-
-                    # Adjust for the camera angle
-                    self.real_distance = image_distance * self.distance_multiplier
-                    self.real_distance = avg_ycoord_bottom / 100
-                    cv2.putText(binary, f"{round(self.real_distance * 100, 3)} cm", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (125, 125, 125), 4)
-                    
-                    break
-                    
-                elif avg_ycoord_bottom == 0:
-                    self.real_distance = 0 
-                    
-        except:
-            self.real_distance = 0
+            lines_by_angle = {abs(k): v for k, v in sorted(lines_by_angle.items(), key=lambda item: abs(item[0]))}
             
-        self.real_distance = self.real_distance * 100
+            lines = lines_by_angle[list(lines_by_angle.keys())[0]]
+            avg_ycoord_bottom = 0
+            
+            if len(lines) > 1:
+                avg_ycoord_1 = (lines[0][0][1] + lines[0][1][1]) / 2
+                avg_ycoord_2 = (lines[1][0][1] + lines[1][1][1]) / 2
+                
+                if avg_ycoord_1 > avg_ycoord_2:
+                    avg_ycoord_bottom = avg_ycoord_1
+                else:
+                    avg_ycoord_bottom = avg_ycoord_2   
+            else:
+                avg_ycoord_bottom = (lines[0][0][1] + lines[0][1][1]) / 2
+
+            self.real_distance = 0
+            if avg_ycoord_bottom != 0:
+                self.real_distance =  7193 * (avg_ycoord_bottom ** -0.917)
+                
+                cv2.putText(binary, f"{round(self.real_distance, 3)} cm", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (125, 125, 125), 4)
+                
+            elif avg_ycoord_bottom == 0:
+                self.real_distance = 0 
+                    
+        except Exception as e:
+            self.real_distance = 0
                     
         if self.real_distance != 0:
-            if self.real_distance > 0 and self.real_distance < 350:
+            if self.real_distance > 50 and self.real_distance < 220:
                 #print(self.edge_distances)
                 if len(self.edge_distances) > 5:
                     self.edge_distances.pop(0)
                     
-                    
                 self.edge_distances.append(round(self.real_distance, 3))
                 self.avg_edge_distance = np.mean(self.edge_distances)
-                #print(self.avg_edge_distance)
-                
+                #print(self.avg_edge_distance)   
         
         return binary
     
@@ -201,14 +195,13 @@ class Camera():
     def get_coordinates(self):
         #frameraw = self.picam2.capture_array()
         ret, frameraw = self.cap.read()
-        
-        
+    
         #frameraw = cv2.cvtColor(frameraw, cv2.COLOR_RGB2BGR)
         frame = frameraw.copy()
         
         frame = frame[100:, :]
         
-        frameraw = frameraw[100:500, 300:980]
+        #frameraw = frameraw[100:500, 300:980]
         #frameraw = frameraw[150:, :]
         
         
@@ -277,10 +270,12 @@ class Camera():
         self.video_writer = None
         self.blockPositions = {}
 
-        video_path = r"C:\Users\felix\Downloads\Videos Runs\alles Licht, Fenster auf, keine Blöcke.mp4"
+        video_path = r"C:\Users\felix\Downloads\Videos Runs\alles Licht, fenster zu, Blöcke, kein Filter.mp4"
         self.cap = cv2.VideoCapture(video_path)
 
         self.avg_edge_distance_values = []
+        self.distance_next_block = -1
+        self.avg_brightness_values = []  # Initialize the list for average brightness values
 
         freeze = False  # Variable to control whether the video and plotting are frozen
         show_binary = False  # Variable to control whether the binary or normal frame is shown
@@ -288,27 +283,43 @@ class Camera():
         def plot_data():
             plt.ion()  # Turn on interactive mode
             fig, ax = plt.subplots(figsize=(10, 5))  # Create a figure and an axes with specified size
-            line, = ax.plot([], [])  # Initialize a line object
-            cursor = mplcursors.cursor(line, hover=True)  # Enable the cursor
-
+            line1, = ax.plot([], [], label='avg_edge_distance')  # Initialize a line object for avg_edge_distance
+            line2, = ax.plot([], [], label='distance_next_block')  # Initialize a line object for distance_next_block
+            line3, = ax.plot([], [], label='avg_brightness')  # Initialize a line object for avg_brightness
+            cursor = mplcursors.cursor([line1, line2], hover=True)  # Enable the cursor for both lines
+        
+            self.distance_next_block_values = []  # Initialize the list for distance_next_block values
+        
             while True:
                 if not freeze:  # Only update the plot if the video and plotting are not frozen
-                    # Append the avg_edge_distance to the list
+                    # Append the avg_edge_distance and distance_next_block to their respective lists
                     self.avg_edge_distance_values.append(self.avg_edge_distance)
-
+                    self.distance_next_block_values.append(self.distance_next_block)
+        
                     # Update the plot
                     ax.clear()  # Clear the axes
-                    line.set_ydata(self.avg_edge_distance_values)  # Update the y-data of the line
-                    line.set_xdata(range(len(self.avg_edge_distance_values)))  # Update the x-data of the line
-                    ax.add_line(line)  # Add the line to the axes
+                    line1.set_ydata(self.avg_edge_distance_values)  # Update the y-data of the line for avg_edge_distance
+                    line1.set_xdata(range(len(self.avg_edge_distance_values)))  # Update the x-data of the line for avg_edge_distance
+                    
+                    line2.set_ydata(self.distance_next_block_values)  # Update the y-data of the line for distance_next_block
+                    line2.set_xdata(range(len(self.distance_next_block_values)))  # Update the x-data of the line for distance_next_block
+                    
+                    line3.set_ydata(self.avg_brightness_values)  # Update the y-data of the line for avg_brightness
+                    line3.set_xdata(range(len(self.avg_brightness_values)))  # Update the x-data of the line for avg_brightness
+                    
+                    ax.add_line(line1)  # Add the line for avg_edge_distance to the axes
+                    ax.add_line(line2)  # Add the line for distance_next_block to the axes
+                    ax.add_line(line3)  # Add the line for avg_brightness to the axes
+                    
                     ax.set_ylim([0, 300])  # Set the limits of the y-axis
                     ax.relim()  # Recompute the data limits
                     ax.autoscale_view()  # Rescale the view
-
+                    ax.legend()  # Add a legend
+        
                     cursor.connect("add", lambda sel: sel.annotation.set_text(
                         'Point {}, Y={}'.format(sel.index, sel.target[1])
                     ))  # Update the annotation for each data point
-
+        
                     plt.draw()  # Redraw the figure
                     plt.pause(0.01)
 
@@ -331,12 +342,16 @@ class Camera():
                     
                     self.calculate_block_positions()
                     
-                    time.sleep(0.04)
+                    time.sleep(0.06)
 
                     StopTime = time.time()
                     framebinary = self.get_edges(frameraw)
 
                     self.frame = framebinary if show_binary else frame  # Show the binary frame if show_binary is True, otherwise show the normal frame
+                    
+                    avg_brightness = np.mean(framebinary)  # Calculate the average brightness of the frame
+                    self.avg_brightness_values.append(avg_brightness)  # Append the average brightness to the list
+                    
                     cv2.imshow("Video", self.frame)
 
         finally:
@@ -415,20 +430,22 @@ class Camera():
                 
             nextBlock["distance"] = self.get_distance_to_block(nextBlock)
             
+            self.distance_next_block = nextBlock["distance"]
+            
             #print(nextBlock["distance"])
             block_distance_to_wall = self.avg_edge_distance - nextBlock['distance']
             if (self.avg_edge_distance < 200) and not active_block_drive and -10 < relative_angle < 40 and direction == 1:
                 print(f"avg_edge_distance: {self.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
                 #block_distance_to_wall = self.avg_edge_distance - nextBlock['distance']
                 #Utils.LogInfo(f"avg_edge_distance: {self.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
-                if (120 < self.avg_edge_distance < 180) and nextBlock['x'] < 300 and 70 < nextBlock["distance"] < 110:
+                if (120 < self.avg_edge_distance < 180) and nextBlock['x'] < 300 and 45 < nextBlock["distance"] < 110:
                     nextBlock['position'] = "1"
                     BlockPos = corners + 1 if corners < 3 else 0
-                elif 80 < block_distance_to_wall < 130 and nextBlock["distance"] < 80:
+                elif 80 < block_distance_to_wall < 130 and 40 < nextBlock["distance"] < 80:
                     nextBlock['position'] = "3"
                     #print("3")
                     BlockPos = corners
-                elif 30 < block_distance_to_wall < 60 and nextBlock["distance"] < 80: #or block_distance_to_wall < 80:
+                elif 30 < block_distance_to_wall < 80 and 40 < nextBlock["distance"] < 80: #or block_distance_to_wall < 80:
                     nextBlock['position'] = "2"
                     if abs(relative_angle) > 30:
                         BlockPos = corners + 1 if corners < 3 else 0
@@ -468,6 +485,9 @@ class Camera():
                 
                 elif nextBlock['position'] != "0" and nextBlock["position"] == "3":# and BlockPos not in self.blockPositions:
                     self.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
+                    
+        else:
+            self.distance_next_block = -1
             
             
 if __name__ == '__main__':
