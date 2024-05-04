@@ -144,7 +144,6 @@ def HoldLane(Utils, CornerWaitTime=1):
                 
                 
                 if (Utils.Cam.avg_edge_distance < 200) and -10 < relative_angle < 40 and direction == 1:
-                    #block_distance_to_wall = Utils.Cam.avg_edge_distance - nextBlock['distance']
                     #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
                     if (120 < Utils.Cam.avg_edge_distance < 150) and nextBlock['x'] < 300 and 50 < nextBlock["distance"] < 110:
                         nextBlock['position'] = "1"
@@ -252,6 +251,7 @@ def HoldLane(Utils, CornerWaitTime=1):
                         block_wide_corner = False
                 
         # print(Utils.Cam.avg_edge_distance)
+
         if 100 < Utils.Cam.avg_edge_distance < 150 and abs(relative_angle) < 15 and timelastcorner + 1 < time.time() and not block_wide_corner:
             print("Drive wide around corner", Utils.Cam.avg_edge_distance)
             if not ESPAdjustedCorner:
@@ -277,9 +277,9 @@ def HoldLane(Utils, CornerWaitTime=1):
                     
                     
         responses = Utils.usb_communication.getResponses(ESPHoldDistance)
-        if (responses != None):
+        if responses != None:
             # print(responses)
-            for response in responses:
+            for _ in responses:
                 if "Drive direction counterclockwise" in responses:
                     direction = 1
                 if "Drive direction clockwise" in responses:
@@ -301,7 +301,7 @@ if __name__ == "__main__":
             
             @app.route('/')
             def index():
-                return render_template('index.html')
+                return render_template('videofeed.html')
 
 
             @app.route('/video_feed')

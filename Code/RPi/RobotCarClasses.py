@@ -556,8 +556,7 @@ class Camera():
                 elif avg_ycoord_bottom == 0:
                     self.real_distance = 0 
                     
-        except Exception as e:
-            print(e)
+        except TypeError:
             self.real_distance = 0
                     
         if self.real_distance != 0:

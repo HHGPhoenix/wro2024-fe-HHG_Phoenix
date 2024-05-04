@@ -2,6 +2,7 @@ import time
 from RobotCarClasses import *
 from threading import Thread
 import traceback
+from flask import Flask, render_template, Response, jsonify
 
 
 ##########################################################
@@ -139,7 +140,7 @@ if __name__ == "__main__":
             
             @app.route('/')
             def index():
-                return render_template('index.html')
+                return render_template('videofeed.html')
 
 
             @app.route('/video_feed')
