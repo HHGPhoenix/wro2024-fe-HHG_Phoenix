@@ -15,7 +15,8 @@ from USB_communication_handler import USBCommunication
 from I2C_handler import I2Ccommunication
 from sklearn.linear_model import LinearRegression
 from math import tan, radians, cos, atan, degrees
-
+import json
+# import platform
 
 
 ##########################################################
@@ -140,10 +141,15 @@ class Utility:
         self.Buzzer1.buzz(1000, 80, 0.1)
         time.sleep(0.1)
         self.Buzzer1.buzz(1000, 80, 0.1)
+
+        bypassIsEnabled = self.check_for_key_json('/tmp/StartupBypass.json', 'enable_startup_bypass')
         
         while self.running and self.waiting:
             time.sleep(0.1)
-            if self.StartButton.state() == 1:
+            if self.StartButton.state() == 1 or bypassIsEnabled:
+
+                if bypassIsEnabled:
+                    time.sleep(1)
         
                 self.usb_communication.startNodeMCUs()
                 self.Gyro.GyroStart = True
@@ -310,8 +316,48 @@ class Utility:
     #Collect data from the sensors
     def data_feed(self):
         return {"D1": self.SensorDistance1, "D2": self.SensorDistance2, "angle": self.Gyro.angle, "voltage": self.ADC.voltage, "cpu_usage": psutil.cpu_percent(), "ram_usage": psutil.virtual_memory().percent}
-        
-        
+
+    
+    ############################################################
+    
+    def check_for_key_json(self, json_file_path, key):
+        file_path = os.path.join(os.getcwd(), json_file_path)
+        if not os.path.exists(file_path):
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, 'w') as file:
+                json.dump({key: 'False'}, file)
+        else:
+            with open(file_path, 'r+') as file:
+                data = json.load(file)
+                if key not in data:
+                    data[key] = 'False'
+                    file.seek(0)
+                    json.dump(data, file)
+                    file.truncate()
+                elif not data:
+                    file.seek(0)
+                    json.dump({key: 'False'}, file)
+                    file.truncate()
+                elif data.get(key) == 'True':
+                    return True
+        return False
+    
+
+    def change_key_json(self, json_file_path, key, value):
+        file_path = os.path.join(os.getcwd(), json_file_path)
+        if not os.path.exists(file_path):
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, 'w') as file:
+                json.dump({key: value}, file)
+        else:
+            with open(file_path, 'r+') as file:
+                data = json.load(file)
+                data[key] = value
+                file.seek(0)
+                json.dump(data, file)
+                file.truncate()
+
+
 #A class for reading a Button; A Button that instantly stops the program if pressed            
 class Button(Utility):
     def __init__(self, SignalPin, Utils):
@@ -321,8 +367,18 @@ class Button(Utility):
         
         #GPIO setup
         self.button_line = chip.get_line(SignalPin)
-        self.button_line.request(consumer='Button', type=gpiod.LINE_REQ_DIR_IN, flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP)
-        
+        try:
+            self.button_line.request(consumer='Button', type=gpiod.LINE_REQ_DIR_IN, flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP)
+        except OSError:
+            # if platform.system() == 'Linux':
+            self.Utils.change_key_json('/tmp/StartupBypass.json', 'enable_startup_bypass', 'True')
+
+            time.sleep(1)
+
+            # restart the rpi (linux)
+            os.system('sudo reboot')
+
+
         all_lines.append(self.button_line)
         
     
