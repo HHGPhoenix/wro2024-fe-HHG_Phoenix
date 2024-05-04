@@ -162,11 +162,15 @@ class Utility:
                 self.usb_communication.sendMessage(f"S{self.StartSensor}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"ANGR {self.AngR}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"ANGL {self.AngL}", self.ESPHoldDistance)
+
+                timeTime = time.time()
                 
-                self.StartTime = time.time()
-                self.LogDebug(f"Run started: {time.time()}")
-                self.Display.write("Run started:", f"{time.time()}")  
-                self.Buzzer1.buzz(1000, 80, 0.1)  
+
+                self.StartTime = timeTime
+                self.LogDebug(f"Run started: {timeTime}")
+                self.Display.write("Run started:", f"{timeTime}")  
+                self.Buzzer1.buzz(1000, 80, 0.1) 
+
                 
                 self.waiting = False
                 
