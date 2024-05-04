@@ -16,7 +16,7 @@
 #define ServoPin 13	  // Servo Pin
 
 // Variables
-float KP = 1;						  // Proportional constant
+float KP = 1;					  // Proportional constant
 int maxDistanceCm = 200;		  // Max distance in cm to measure
 int desiredDistance = 50;		  // Desired distance in cm
 int commandedDistance = 50;		  // Distance in cm commanded by the Raspberry Pi
@@ -34,16 +34,16 @@ float distance1 = 0;
 int distance1counter = 0;
 float distance2 = 0;
 int distance2counter = 0;
-const int numReadings = 5; // number of readings to keep track of
-float readings[numReadings]; // the readings from the analog input
-int readIndex = 0; // the index of the current reading
-float total = 0; // the running total
-float average = 0; // the average
-const int numReadings2 = 5; // number of readings to keep track of
+const int numReadings = 5;	   // number of readings to keep track of
+float readings[numReadings];   // the readings from the analog input
+int readIndex = 0;			   // the index of the current reading
+float total = 0;			   // the running total
+float average = 0;			   // the average
+const int numReadings2 = 5;	   // number of readings to keep track of
 float readings2[numReadings2]; // the readings from the analog input
-int readIndex2 = 0; // the index of the current reading
-float total2 = 0; // the running total
-float average2 = 0; // the average
+int readIndex2 = 0;			   // the index of the current reading
+float total2 = 0;			   // the running total
+float average2 = 0;			   // the average
 String command;
 char c;
 
@@ -241,7 +241,7 @@ void loop()
 					{
 						Serial.println("HB");
 					}
-					else if (command.startsWith("ANGL")) 
+					else if (command.startsWith("ANGL"))
 					{
 						int numberStart = 4; // Skip the "ANGL" characters
 						int numberLength = command.length();
@@ -256,7 +256,7 @@ void loop()
 						Serial.print("angle_left: ");
 						Serial.println(angle_left);
 					}
-					else if (command.startsWith("ANGR")) 
+					else if (command.startsWith("ANGR"))
 					{
 						int numberStart = 4; // Skip the "ANGR" characters
 						int numberLength = command.length();
@@ -286,8 +286,8 @@ void loop()
 			{
 				distance1 = ultraschall1.read(); // get distance in cm
 
-				//Serial.print("D1: ");
-				//Serial.println(distance1);
+				// Serial.print("D1: ");
+				// Serial.println(distance1);
 
 				if (commandedDistance > 0)
 				{
@@ -327,8 +327,9 @@ void loop()
 					readIndex = readIndex + 1;
 
 					// if we're at the end of the array...
-					if (readIndex >= numReadings) {
-					// ...wrap around to the beginning:
+					if (readIndex >= numReadings)
+					{
+						// ...wrap around to the beginning:
 						readIndex = 0;
 					}
 
@@ -347,7 +348,7 @@ void loop()
 					}
 
 					servo.write(int(ServoMiddlePosition - average)); // Set servo position
-  
+
 					if (!firstCornerDetected && (distanceEdgeDetection > 0))
 					{
 						if (distance1 > distanceEdgeDetection)
@@ -412,7 +413,8 @@ void loop()
 					readIndex2 = readIndex2 + 1;
 
 					// if we're at the end of the array...
-					if (readIndex2 >= numReadings2) {
+					if (readIndex2 >= numReadings2)
+					{
 						readIndex2 = 0;
 					}
 
@@ -429,7 +431,7 @@ void loop()
 						average2 = -angle_right;
 					}
 
-    				servo.write(int(ServoMiddlePosition + average2)); // Set servo position
+					servo.write(int(ServoMiddlePosition + average2)); // Set servo position
 
 					if (!firstCornerDetected && (distanceEdgeDetection > 0))
 					{
