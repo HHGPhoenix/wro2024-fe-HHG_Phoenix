@@ -166,7 +166,7 @@ class Utility:
                 self.StartTime = time.time()
                 self.LogDebug(f"Run started: {time.time()}")
                 self.Display.write("Run started:", f"{time.time()}")  
-                self.Buzzer1.buzz(1000, 80, 0.1) 
+                self.Buzzer1.buzz(1000, 80, 0.1)  
                 
                 self.waiting = False
                 
@@ -196,19 +196,6 @@ class Utility:
             else:
                 self.LogDebug(f"{seconds} second(s) needed")
                 self.Display.write("Time needed:", f"{seconds}s")
-            
-                #self.Utils.LogError time needed
-                minutes = seconds // 60
-                hours = minutes // 60
-                if hours > 0:
-                    self.LogDebug(f"{hours} hour(s), {minutes % 60} minute(s), {seconds % 60} second(s) needed")
-                    self.Display.write("Time needed:", f"{hours}h {minutes % 60}m {seconds % 60}s")
-                elif minutes > 0:
-                    self.LogDebug(f"{minutes} minute(s), {seconds % 60} second(s) needed")
-                    self.Display.write("Time needed:", f"{minutes}m {seconds % 60}s")
-                else:
-                    self.LogDebug(f"{seconds} second(s) needed")
-                    self.Display.write("Time needed:", f"{seconds}s")
                 
             self.stop_run_callable = False
             self.cleanup()
@@ -705,10 +692,10 @@ class Camera():
 
         while True:
             StartTime = time.time()
-            self.block_array, frame, frameraw = self.get_coordinates()
+            self.block_array, self.frame, frameraw = self.get_coordinates()
             StopTime = time.time()
             #print(f"Time needed: {StopTime - StartTime}")
-            self.frame = self.get_edges(frameraw)
+            frame = self.get_edges(frameraw)
 
             if self.video_writer is None:
                 # Create a VideoWriter object to save the frames as an mp4 file
