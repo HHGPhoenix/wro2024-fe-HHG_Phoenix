@@ -373,6 +373,10 @@ class Button(Utility):
             # if platform.system() == 'Linux':
             # self.Utils.change_key_json('/tmp/StartupBypass.json', 'enable_startup_bypass', 'True')
 
+            print("!!!! REBOOT !!!!")
+            print("OS Error in Button class")
+            print("!!!! REBOOT !!!!")
+
             time.sleep(1)
 
             # restart the rpi (linux)
