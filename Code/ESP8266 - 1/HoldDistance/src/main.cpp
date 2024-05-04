@@ -55,7 +55,7 @@ Servo servo;
 
 void setup()
 {
-	Serial.begin(1000000); // Start serial communication
+	Serial.begin(921600); // Start serial communication
 	pinMode(InternalLed, OUTPUT);
 	digitalWrite(InternalLed, HIGH);
 	servo.attach(ServoPin);
@@ -70,7 +70,6 @@ void loop()
 		while (Serial.available() > 0)
 		{
 			c = Serial.read();
-			// Serial.println(c);
 			if (c == '\n')
 			{
 				if (command == "START")

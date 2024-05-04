@@ -183,12 +183,12 @@ class USBCommunication:
 
         if len(usb_devices) != 2: # Maybe use Constant instead of 2
             self.Utils.LogError(f"Could not find both NodeMCUs: {usb_devices}")
-            self.StopRun()
+            self.Utils.StopRun()
             return
             
         #Identify both NodeMCUs
         for device in usb_devices:
-            ESP = serial.Serial(device, baudrate=1000000, timeout=1)
+            ESP = serial.Serial(device, baudrate=921600, timeout=1)
             ESP.write(f"IDENT\n".encode())
             time.sleep(0.1)
             
@@ -204,13 +204,13 @@ class USBCommunication:
 
             if "HoldDistance" in responseDecoded:
                 ESP.close()
-                self.EspHoldDistance = serial.Serial(device,baudrate=1000000,timeout=1)
+                self.EspHoldDistance = serial.Serial(device,baudrate=921600,timeout=1)
             elif "HoldSpeed" in responseDecoded:
                 ESP.close()
-                self.EspHoldSpeed = serial.Serial(device,baudrate=1000000,timeout=1)  
+                self.EspHoldSpeed = serial.Serial(device,baudrate=921600,timeout=1)  
             else:
                 self.Utils.LogError(f"Could not identify NodeMCU on: {device}")
-                self.StopRun()
+                self.Utils.StopRun()
             
             time.sleep(0.1)
 
