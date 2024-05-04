@@ -1,19 +1,18 @@
 <!DOCTYPE html>
 <html>
     <body>
-        <video id="videoPlayer" src="/video_feed" autoplay></video>
+        <img id="videoPlayer" src="/video_feed" />
         <script>
-            var player = document.getElementById("videoPlayer");
+            var player = document.getElementById('videoPlayer');
 
-            player.addEventListener("error", function () {
+            player.onerror = function () {
                 console.log(
-                    "Video player encountered an error. Attempting to resume..."
+                    'Video player encountered an error. Attempting to resume...'
                 );
                 setTimeout(function () {
-                    player.load();
-                    player.play();
+                    player.src = '/video_feed?' + new Date().getTime();
                 }, 5000);
-            });
+            };
         </script>
     </body>
 </html>
