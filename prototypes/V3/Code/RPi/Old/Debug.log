@@ -1,6 +1,0 @@
-2023-10-24 16:52:35,139 - Log - DEBUG - Waiting for Button to be pressed...
-2023-10-24 16:52:48,512 - Log - DEBUG - Run started: 1698159168.5120106
-2023-10-24 16:53:00,666 - Log - ERROR - StopButton pressed
-2023-10-24 16:53:00,677 - Log - DEBUG - Run ended: 1698159180.6779387
-2023-10-24 16:53:00,694 - Log - DEBUG - 26.6 second(s) needed
-2023-10-24 16:53:00,699 - Log - DEBUG - Started cleanup
