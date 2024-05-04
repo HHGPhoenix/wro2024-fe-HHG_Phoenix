@@ -371,7 +371,7 @@ class Button(Utility):
             self.button_line.request(consumer='Button', type=gpiod.LINE_REQ_DIR_IN, flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP)
         except OSError:
             # if platform.system() == 'Linux':
-            self.Utils.change_key_json('/tmp/StartupBypass.json', 'enable_startup_bypass', 'True')
+            # self.Utils.change_key_json('/tmp/StartupBypass.json', 'enable_startup_bypass', 'True')
 
             time.sleep(1)
 
