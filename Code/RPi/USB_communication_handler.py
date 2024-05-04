@@ -36,16 +36,16 @@ class USBCommunication:
         
     def handleHeartbeat(self):
         self.sendMessage("H", self.EspHoldSpeed)
-        time.sleep(0.01)
+        # time.sleep(0.1)
         responseHoldSpeed = self.getResponses(self.EspHoldSpeed, "HBProcess")
         if responseHoldSpeed == False:
             self.HoldSpeedCounter += 1
             self.Utils.LogWarning(f"NodeMCU for HoldSpeed is not responding to heartbeat: '{responseHoldSpeed}' x{self.HoldSpeedCounter}")
-            
+
         time.sleep(0.1)
 
         self.sendMessage("H", self.EspHoldDistance)
-        time.sleep(0.01)
+        # time.sleep(0.1)
         responseHoldDistance = self.getResponses("HoldDistance", "HBProcess")
         if responseHoldDistance == False:
             self.HoldDistanceCounter += 1
