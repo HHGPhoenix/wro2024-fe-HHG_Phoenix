@@ -2,7 +2,7 @@ import time
 from RobotCarClasses import *
 from threading import Thread
 import traceback
-
+from flask import Flask, render_template, Response, jsonify
 
 ##########################################################
 ##                                                      ##
@@ -36,7 +36,7 @@ Utils.setupDataLog()
 Utils.StartSpeed = 60
 Utils.Distance = 50
 Utils.Kp = 0.7
-Utils.Ed = 125 #Edge detection distance in cm
+Utils.Ed = 125 # Edge detection distance in cm
 Utils.StartSensor = 2
 Utils.Mm = 10
 Utils.AngR = 40
@@ -48,10 +48,10 @@ Utils.AngL = 50
 ##                     Functions                        ##
 ##                                                      ##
 ##########################################################
-def HoldLane(Utils, CornerWaiTTime=1):
+def HoldLane(Utils, CornerWaitTime=1):
     #Variables
     TIMEOUT = 0
-    corners = 0
+    corner = 0
     rounds = 0
     direction = -1
     oldAngle = 0
@@ -83,17 +83,17 @@ def HoldLane(Utils, CornerWaiTTime=1):
             relative_angle = Utils.Gyro.angle - oldAngle 
             newAngle = oldAngle - GyroCornerAngle
             if Utils.Gyro.angle < newAngle and time.time() > TIMEOUT:
-                corners = corners + 1
-                Utils.LogDebug(f"Corner: {corners}")
-                Utils.Display.write(f"Corner: {corners}")
-                if corners == 4:
-                    corners = 0
+                corner = corner + 1
+                Utils.LogDebug(f"Corner: {corner}")
+                Utils.Display.write(f"Corner: {corner}")
+                if corner == 4:
+                    corner = 0
                     rounds = rounds + 1
-                    Utils.Display.write(f"Corner: {corners}", f"Round: {rounds}")
+                    Utils.Display.write(f"Corner: {corner}", f"Round: {rounds}")
                     
                 oldAngle = newAngle
                 Utils.Gyro.angle = Utils.Gyro.angle + 20
-                TIMEOUT = time.time() + CornerWaiTTime
+                TIMEOUT = time.time() + CornerWaitTime
                 
         elif direction == 1:
             if Sensor != 2:
@@ -105,28 +105,28 @@ def HoldLane(Utils, CornerWaiTTime=1):
             relative_angle = Utils.Gyro.angle - oldAngle
             newAngle = oldAngle + GyroCornerAngle
             if Utils.Gyro.angle > newAngle and time.time() > TIMEOUT:
-                corners = corners + 1
+                corner = corner + 1
                 timelastcorner = time.time()
-                Utils.LogDebug(f"Corner: {corners}")
-                if corners == 4:
-                    corners = 0
+                Utils.LogDebug(f"Corner: {corner}")
+                if corner == 4:
+                    corner = 0
                     rounds = rounds + 1
         
                 oldAngle = newAngle
                 Utils.Gyro.angle = Utils.Gyro.angle - 20
-                TIMEOUT = time.time() + CornerWaiTTime
+                TIMEOUT = time.time() + CornerWaitTime
                 
         # Drive wide around corners
         #get objects and calculate new distance
         if detect_new_block:
             block_array = Utils.Cam.block_array.copy()
-            if len(block_array) > 0:
+            # if len(block_array) > 0:
                 #Delete blocks not meeting requirements
-                for block in block_array:
-                    if block['y'] > YCutOffTop and block["size"] > SIZE:
-                        pass
-                    else:
-                        block_array.remove(block)
+            for block in block_array:
+                if block['y'] > YCutOffTop and block["size"] > SIZE:
+                    pass
+                else:
+                    block_array.remove(block)
                     
             #print(block_array)
             if len(block_array) > 0:
@@ -140,7 +140,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
                 
                 #print(nextBlock["distance"])
                 block_distance_to_wall = Utils.Cam.avg_edge_distance - nextBlock['distance']
-                Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
+                Utils.LogDebug(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
                 
                 
                 if (Utils.Cam.avg_edge_distance < 200) and -10 < relative_angle < 40 and direction == 1:
@@ -148,7 +148,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
                     #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
                     if (120 < Utils.Cam.avg_edge_distance < 150) and nextBlock['x'] < 300 and 50 < nextBlock["distance"] < 110:
                         nextBlock['position'] = "1"
-                        BlockPos = corners + 1 if corners < 3 else 0
+                        BlockPos = corner + 1 if corner < 3 else 0
                         
                         
                     # elif 80 < block_distance_to_wall < 130 and nextBlock["distance"] < 80:
@@ -165,54 +165,80 @@ def HoldLane(Utils, CornerWaiTTime=1):
                     else:
                         nextBlock['position'] = "0"
                     
-                    if nextBlock['position'] != "0" and nextBlock["position"] != "3":
-                        Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
-                    
-                    elif nextBlock['position'] != "0" and nextBlock["position"] == "3":# and BlockPos not in Utils.blockPositions:
+                    if nextBlock['position'] != "0":
                         Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
                             
                 elif (Utils.Cam.avg_edge_distance < 200) and - 40 < relative_angle < 10 and direction == 0:
                     #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
                     if (120 < Utils.Cam.avg_edge_distance < 180) and nextBlock['x'] > 780 and nextBlock['y'] > 200 and 70 < nextBlock["distance"] < 110:
                         nextBlock['position'] = "1"
-                        BlockPos = corners + 1 if corners < 3 else 0
+                        BlockPos = corner + 1 if corner < 3 else 0
                     elif 80 < block_distance_to_wall < 130 and nextBlock["distance"] < 80:
                         nextBlock['position'] = "3"
-                        BlockPos = corners
+                        BlockPos = corner
                     elif 130 < block_distance_to_wall < 180 and nextBlock["distance"] < 80:# or block_distance_to_wall < 80:
                         nextBlock['position'] = "2"
                         if abs(relative_angle) > 40:
-                            BlockPos = corners + 1 if corners < 3 else 0
+                            BlockPos = corner + 1 if corner < 3 else 0
                         else:
-                            BlockPos = corners
+                            BlockPos = corner
                     else:
                         nextBlock['position'] = "0"
                     
-                    if nextBlock['position'] != "0" and nextBlock["position"] != "3":
-                        active_block_drive = True
-                        Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
-                    
-                    elif nextBlock['position'] != "0" and nextBlock["position"] == "3":# and BlockPos not in Utils.blockPositions:
+                    if nextBlock['position'] != "0":
                         Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
         
-        next_corners = corners + 1 if corners < 3 else 0
+        
+        next_corner = corner + 1 if corner < 3 else 0
             
-        if corners in Utils.blockPositions:
+        if corner in Utils.blockPositions:
             if direction == 0:
-                pass
-            elif direction == 1:
-                if Utils.blockPositions[corners]["color"] == "red":
+                if Utils.blockPositions[corner]["color"] == "green":
                     if not ESPAdjustedCorner:
                         Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
                         Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
                         ESPAdjustedCorner = True
                         block_wide_corner = False
-        
-        if next_corners in Utils.blockPositions:
-            if direction == 0:
-                pass
+                        
+                elif Utils.blockPositions[corner]["color"] == "red":
+                    if not ESPAdjustedCorner:
+                        Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
+                        Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
+                        ESPAdjustedCorner = True
+                        block_wide_corner = False
+                        
             elif direction == 1:
-                if Utils.blockPositions[next_corners]["position"] == "1" and Utils.blockPositions[next_corners]["color"] == "red":
+                if Utils.blockPositions[corner]["color"] == "red":
+                    if not ESPAdjustedCorner:
+                        Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
+                        Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+                        ESPAdjustedCorner = True
+                        block_wide_corner = False
+                        
+                elif Utils.blockPositions[corner]["color"] == "green":
+                    if not ESPAdjustedCorner:
+                        Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
+                        Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
+                        ESPAdjustedCorner = True
+                        block_wide_corner = False
+        
+        if next_corner in Utils.blockPositions:
+            if direction == 0:
+                if Utils.blockPositions[next_corner]["position"] == "1" and Utils.blockPositions[next_corner]["color"] == "green":
+                    if not ESPAdjusted and 65 < Utils.Cam.avg_edge_distance < 150:
+                        Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+                        Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
+                        ESPAdjusted = True
+                        block_wide_corner = True
+                        
+                    elif ESPAdjusted and Utils.Cam.avg_edge_distance < 65:
+                        Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+                        Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+                        ESPAdjusted = False
+                        block_wide_corner = False
+                        
+            elif direction == 1:
+                if Utils.blockPositions[next_corner]["position"] == "1" and Utils.blockPositions[next_corner]["color"] == "red":
                     if not ESPAdjusted and 65 < Utils.Cam.avg_edge_distance < 150:
                         Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
                         Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
