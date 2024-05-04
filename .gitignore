@@ -1,3 +1,4 @@
 
 *.log
 .vscode/settings.json
+/tmp
