@@ -98,7 +98,8 @@ class Utility:
         
         if self.Cam is not None:
             if self.Cam.video_writer is not None:
-                self.Cam.video_writer.release()
+                #self.Cam.video_writer.release()
+                pass
         
         #self.StopNodemcus()
         
@@ -221,12 +222,6 @@ class Utility:
         fh = logging.FileHandler("/tmp/DataLog.log", 'w')
         fh.setLevel(logging.DEBUG)
         self.datalogger.addHandler(fh)
-
-        #Start Process to log data while the program is running
-        self.DataLoggerStop = 0
-        PDataLogger = mp.Process(target=self.LogData)
-        PDataLogger.start()
-            
 
     #Log Sensor values
     def LogData(self):
