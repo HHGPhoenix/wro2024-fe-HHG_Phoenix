@@ -14,13 +14,16 @@
 
 // Variables
 int slots = 14;
-int kp = 5;
+int kp = 3;
 int standing = 0;
 int lastspeed = 0;
 float desiredSpeed = 0;
 float Speed = 0;
 float previousError = 0;
-float kd = 0.5;
+float kd = 0.8;
+float lastoutput = 0;
+String command = "";
+char c = 0;
 
 bool started = false;
 bool turned = false;
@@ -55,11 +58,12 @@ void holdSpeed()
 	}
 	else
 	{
-		motor.backward();
+		// motor.backward();
 	}
 	motor.setSpeed(abs(output));
 
 	previousError = error;
+	lastoutput = output;
 }
 
 void setup()
@@ -74,110 +78,123 @@ void loop()
 	// Wait for the "START" command
 	if (!started)
 	{
-		if (Serial.available() > 0)
+		// command checker
+		while (Serial.available() > 0)
 		{
-			String command = Serial.readStringUntil('\n');
-			if (command == "START")
+			c = Serial.read();
+			if (c == '\n')
 			{
-				Serial.println("Received START command. Performing action...");
-				digitalWrite(InternalLed, LOW);
-				motor.setSpeed(255);
-				motor.forward();
-				delay(100);
-				speedSensor.begin();
-				turned = false;
-				started = true;
-			}
-			// Identity response
-			else if (command == "IDENT")
-			{
-				Serial.println("HoldSpeed");
-			}
-			// heartbeat response
-			else if (command == "H")
-			{
-				Serial.println("HB");
-			}
+				if (command == "START")
+				{
+					Serial.println("Received START command. Performing action...");
+					digitalWrite(InternalLed, LOW);
+					motor.setSpeed(255);
+					motor.forward();
+					delay(100);
+					speedSensor.begin();
+					turned = false;
+					started = true;
+				}
+				// Identity response
+				else if (command == "IDENT")
+				{
+					Serial.println("HoldSpeed");
+				}
+				// heartbeat response
+				else if (command == "H")
+				{
+					Serial.println("HB");
+				}
 
-			delay(10);
+				command = "";
+			}
+			else
+			{
+				command += c;
+			}
 		}
 	}
 
 	if (started)
 	{
 		// command checker
-		if (Serial.available() > 0)
+		while (Serial.available() > 0)
 		{
-			String command = Serial.readStringUntil('\n');
-
-			// check for stop command
-			if (command == "STOP")
+			c = Serial.read();
+			if (c == '\n')
 			{
-				Serial.println("Received STOP command. Performing action...");
-
-				// try to brake the motor
-				motor.backward();
-				motor.setSpeed(255);
-				delay(500);
-				motor.setSpeed(0);
-				motor.stop();
-
-				digitalWrite(InternalLed, HIGH);
-				speedSensor.reset();
-				started = false;
-			}
-			// check for speed command
-			else if (command.startsWith("SPEED"))
-			{
-				int numberStart = 5;
-				int numberLength = command.length();
-				String numberStr = command.substring(numberStart, numberLength);
-				Speed = numberStr.toInt();
-				if (Speed < 0)
+				// check for stop command
+				if (command == "STOP")
 				{
-					forward = false;
+					Serial.println("Received STOP command. Performing action...");
+
+					// try to brake the motor
+					motor.backward();
+					motor.setSpeed(255);
+					delay(500);
+					motor.setSpeed(0);
+					motor.stop();
+
+					digitalWrite(InternalLed, HIGH);
+					speedSensor.reset();
+					started = false;
 				}
-				else
+				// check for speed command
+				else if (command.startsWith("SPEED"))
 				{
-					forward = true;
+					int numberStart = 5;
+					int numberLength = command.length();
+					String numberStr = command.substring(numberStart, numberLength);
+					Speed = numberStr.toInt();
+					if (Speed < 0)
+					{
+						forward = false;
+					}
+					else
+					{
+						forward = true;
+					}
+
+					desiredSpeed = Speed;
+
+					Serial.print("Received SPEED: ");
+					Serial.println(desiredSpeed);
+				}
+				// check for KP command
+				else if (command.startsWith("KP"))
+				{
+					int numberStart = 2;
+					int numberLength = command.length();
+					String numberStr = command.substring(numberStart, numberLength);
+					kp = numberStr.toInt();
+
+					Serial.print("Received KP: ");
+					Serial.println(kp);
+				}
+				// check for KD command
+				else if (command.startsWith("KD"))
+				{
+					int numberStart = 2;
+					int numberLength = command.length();
+					String numberStr = command.substring(numberStart, numberLength);
+					kd = numberStr.toInt();
+
+					Serial.print("Received KD: ");
+					Serial.println(kd);
+				}
+				// heartbeat response
+				else if (command == "H")
+				{
+					Serial.println("HB");
 				}
 
-				desiredSpeed = Speed;
-
-				Serial.print("Received SPEED: ");
-				Serial.println(desiredSpeed);
+				command = "";
 			}
-			// check for KP command
-			else if (command.startsWith("KP"))
+			else
 			{
-				int numberStart = 2;
-				int numberLength = command.length();
-				String numberStr = command.substring(numberStart, numberLength);
-				kp = numberStr.toInt();
-
-				Serial.print("Received KP: ");
-				Serial.println(kp);
+				command += c;
 			}
-			// check for KD command
-			else if (command.startsWith("KD"))
-			{
-				int numberStart = 2;
-				int numberLength = command.length();
-				String numberStr = command.substring(numberStart, numberLength);
-				kd = numberStr.toInt();
-
-				Serial.print("Received KD: ");
-				Serial.println(kd);
-			}
-			// heartbeat response
-			else if (command == "H")
-			{
-				Serial.println("HB");
-			}
+			holdSpeed();
 		}
-
-		holdSpeed();
-
-		delay(5);
 	}
 }
