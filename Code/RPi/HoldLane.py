@@ -33,7 +33,7 @@ Utils.setupDataLog()
 ##                                                      ##
 ##########################################################
 #Constants
-Utils.StartSpeed = 80
+Utils.StartSpeed = 140
 Utils.Distance = 50
 Utils.Kp = 0.7
 Utils.Ed = 125 # Edge detection distance in cm

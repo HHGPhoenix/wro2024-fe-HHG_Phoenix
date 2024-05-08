@@ -32,7 +32,11 @@ void LM393SpeedSensor::getRPM()
 
     if (delayTime >= 0)
     {
-        instance->rps = (14 / delayTime * 1000);
+        // Calculate RPM using the formula: RPM = (60 / T) * 1000
+        // T is the time taken for one revolution in milliseconds
+        // In this case, T = delayTime
+        // The factor of 30 is used to account for the number of teeth on the gear
+        instance->rps = (15 / delayTime * 1000);
         prevTime = currentTime;
     }
 }
