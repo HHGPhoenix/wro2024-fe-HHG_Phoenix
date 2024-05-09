@@ -490,7 +490,7 @@ class Camera():
         gray = cv2.dilate(gray, self.kernel, iterations=1)
 
         # Threshold the grayscale image to get a binary image
-        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 1001, 30)
+        binary = cv2.threshold(gray, 80, 255, cv2.THRESH_BINARY)[1]
         
         binary = cv2.dilate(binary, self.kernel, iterations=2)
 
