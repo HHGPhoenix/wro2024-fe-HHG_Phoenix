@@ -36,7 +36,7 @@ Utils.setupDataLog()
 ##                                                      ##
 ##########################################################
 #Constants
-Utils.StartSpeed = 40
+Utils.StartSpeed = 100
 Utils.Distance = 50
 Utils.Kp = 0.7
 Utils.Ed = 125 #Edge detection distance in cm
@@ -71,7 +71,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
                 Utils.LogInfo("Switched to Sensor 1")
                 Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
                 Utils.usb_communication.sendMessage("D35", Utils.ESPHoldDistance)
-                Utils.usb_communication.sendMessage("SPEED 90", Utils.ESPHoldSpeed)
+                Utils.usb_communication.sendMessage("SPEED 180", Utils.ESPHoldSpeed)
                 
             newAngle = oldAngle - GyroCornerAngle
             if Utils.Gyro.angle < newAngle and time.time() > TIMEOUT:

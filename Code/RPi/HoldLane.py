@@ -33,13 +33,13 @@ Utils.setupDataLog()
 ##                                                      ##
 ##########################################################
 #Constants
-Utils.StartSpeed = 140
+Utils.StartSpeed = 90
 Utils.Distance = 50
 Utils.Kp = 0.7
 Utils.Ed = 125 # Edge detection distance in cm
 Utils.StartSensor = 2
 Utils.Mm = 10
-Utils.AngR = 40
+Utils.AngR = 45
 Utils.AngL = 50
 
 
@@ -140,7 +140,7 @@ def HoldLane(Utils, CornerWaitTime=1):
                 
                 #print(nextBlock["distance"])
                 block_distance_to_wall = Utils.Cam.avg_edge_distance - nextBlock['distance']
-                Utils.LogDebug(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
+                # Utils.LogDebug(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
                 
                 
                 if (Utils.Cam.avg_edge_distance < 200) and -10 < relative_angle < 40 and direction == 1:
@@ -236,6 +236,19 @@ def HoldLane(Utils, CornerWaitTime=1):
                         ESPAdjusted = False
                         block_wide_corner = False
                         
+                elif Utils.blockPositions[next_corner]["position"] == "1" and Utils.blockPositions[next_corner]["color"] == "red":
+                    if not ESPAdjusted and 130 < Utils.Cam.avg_edge_distance < 180:
+                        Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+                        Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+                        ESPAdjusted = True
+                        block_wide_corner = True
+                        
+                    elif ESPAdjusted and Utils.Cam.avg_edge_distance < 130:
+                        Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+                        Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+                        ESPAdjusted = False
+                        block_wide_corner = False
+                        
             elif direction == 1:
                 if Utils.blockPositions[next_corner]["position"] == "1" and Utils.blockPositions[next_corner]["color"] == "red":
                     if not ESPAdjusted and 65 < Utils.Cam.avg_edge_distance < 150:
@@ -252,7 +265,7 @@ def HoldLane(Utils, CornerWaitTime=1):
                 
         # print(Utils.Cam.avg_edge_distance)
 
-        if 100 < Utils.Cam.avg_edge_distance < 150 and abs(relative_angle) < 15 and timelastcorner + 1 < time.time() and not block_wide_corner:
+        if 100 < Utils.Cam.avg_edge_distance < 150 and abs(relative_angle) < 20 and timelastcorner + 1 < time.time() and not block_wide_corner:
             print("Drive wide around corner", Utils.Cam.avg_edge_distance)
             if not ESPAdjustedCorner:
                 if direction == 0:
