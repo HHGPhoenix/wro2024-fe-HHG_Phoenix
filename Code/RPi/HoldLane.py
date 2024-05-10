@@ -33,7 +33,7 @@ Utils.setupDataLog()
 ##                                                      ##
 ##########################################################
 #Constants
-Utils.StartSpeed = 90
+Utils.StartSpeed = 120
 Utils.Distance = 50
 Utils.Kp = 0.7
 Utils.Ed = 125 # Edge detection distance in cm
@@ -84,6 +84,7 @@ def HoldLane(Utils, CornerWaitTime=1):
             newAngle = oldAngle - GyroCornerAngle
             if Utils.Gyro.angle < newAngle and time.time() > TIMEOUT:
                 corner = corner + 1
+                timelastcorner = time.time()
                 Utils.LogDebug(f"Corner: {corner}")
                 Utils.Display.write(f"Corner: {corner}")
                 if corner == 4:
@@ -169,18 +170,20 @@ def HoldLane(Utils, CornerWaitTime=1):
                             
                 elif (Utils.Cam.avg_edge_distance < 200) and - 40 < relative_angle < 10 and direction == 0:
                     #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
-                    if (120 < Utils.Cam.avg_edge_distance < 180) and nextBlock['x'] > 780 and nextBlock['y'] > 200 and 70 < nextBlock["distance"] < 110:
+                    if (120 < Utils.Cam.avg_edge_distance < 180) and nextBlock['x'] > 980 and 70 < nextBlock["distance"] < 110:
                         nextBlock['position'] = "1"
                         BlockPos = corner + 1 if corner < 3 else 0
-                    elif 80 < block_distance_to_wall < 130 and nextBlock["distance"] < 80:
-                        nextBlock['position'] = "3"
-                        BlockPos = corner
-                    elif 130 < block_distance_to_wall < 180 and nextBlock["distance"] < 80:# or block_distance_to_wall < 80:
-                        nextBlock['position'] = "2"
-                        if abs(relative_angle) > 40:
-                            BlockPos = corner + 1 if corner < 3 else 0
-                        else:
-                            BlockPos = corner
+                        
+                        
+                    # elif 80 < block_distance_to_wall < 130 and nextBlock["distance"] < 80:
+                    #     nextBlock['position'] = "3"
+                    #     BlockPos = corner
+                    # elif 130 < block_distance_to_wall < 180 and nextBlock["distance"] < 80:# or block_distance_to_wall < 80:
+                    #     nextBlock['position'] = "2"
+                    #     if abs(relative_angle) > 40:
+                    #         BlockPos = corner + 1 if corner < 3 else 0
+                    #     else:
+                    #         BlockPos = corner
                     else:
                         nextBlock['position'] = "0"
                     
@@ -188,95 +191,96 @@ def HoldLane(Utils, CornerWaitTime=1):
                         Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
         
         
-        next_corner = corner + 1 if corner < 3 else 0
+        # next_corner = corner + 1 if corner < 3 else 0
             
-        if corner in Utils.blockPositions:
-            if direction == 0:
-                if Utils.blockPositions[corner]["color"] == "green":
-                    if not ESPAdjustedCorner:
-                        Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
-                        Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
-                        ESPAdjustedCorner = True
-                        block_wide_corner = False
+        # if corner in Utils.blockPositions:
+        #     if direction == 0:
+        #         if Utils.blockPositions[corner]["color"] == "green":
+        #             if not ESPAdjustedCorner:
+        #                 Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
+        #                 Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+        #                 ESPAdjustedCorner = True
+        #                 block_wide_corner = False
                         
-                elif Utils.blockPositions[corner]["color"] == "red":
-                    if not ESPAdjustedCorner:
-                        Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
-                        Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
-                        ESPAdjustedCorner = True
-                        block_wide_corner = False
+        #         elif Utils.blockPositions[corner]["color"] == "red":
+        #             if not ESPAdjustedCorner:
+        #                 Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
+        #                 Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
+        #                 ESPAdjustedCorner = True
+        #                 block_wide_corner = False
                         
-            elif direction == 1:
-                if Utils.blockPositions[corner]["color"] == "red":
-                    if not ESPAdjustedCorner:
-                        Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
-                        Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
-                        ESPAdjustedCorner = True
-                        block_wide_corner = False
+        #     elif direction == 1:
+        #         if Utils.blockPositions[corner]["color"] == "red":
+        #             if not ESPAdjustedCorner:
+        #                 Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
+        #                 Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+        #                 ESPAdjustedCorner = True
+        #                 block_wide_corner = False
                         
-                elif Utils.blockPositions[corner]["color"] == "green":
-                    if not ESPAdjustedCorner:
-                        Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
-                        Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
-                        ESPAdjustedCorner = True
-                        block_wide_corner = False
+        #         elif Utils.blockPositions[corner]["color"] == "green":
+        #             if not ESPAdjustedCorner:
+        #                 Utils.usb_communication.sendMessage("D 30", Utils.ESPHoldDistance)
+        #                 Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
+        #                 ESPAdjustedCorner = True
+        #                 block_wide_corner = False
         
-        if next_corner in Utils.blockPositions:
-            if direction == 0:
-                if Utils.blockPositions[next_corner]["position"] == "1" and Utils.blockPositions[next_corner]["color"] == "green":
-                    if not ESPAdjusted and 65 < Utils.Cam.avg_edge_distance < 150:
-                        Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
-                        Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
-                        ESPAdjusted = True
-                        block_wide_corner = True
+        # if next_corner in Utils.blockPositions:
+        #     if direction == 0:
+        #         if Utils.blockPositions[next_corner]["position"] == "1" and Utils.blockPositions[next_corner]["color"] == "green":
+        #             if not ESPAdjusted and 65 < Utils.Cam.avg_edge_distance < 150:
+        #                 Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+        #                 Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
+        #                 ESPAdjusted = True
+        #                 block_wide_corner = True
                         
-                    elif ESPAdjusted and Utils.Cam.avg_edge_distance < 65:
-                        Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
-                        Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
-                        ESPAdjusted = False
-                        block_wide_corner = False
+        #             elif ESPAdjusted and Utils.Cam.avg_edge_distance < 65:
+        #                 Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+        #                 Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+        #                 ESPAdjusted = False
+        #                 block_wide_corner = False
                         
-                elif Utils.blockPositions[next_corner]["position"] == "1" and Utils.blockPositions[next_corner]["color"] == "red":
-                    if not ESPAdjusted and 130 < Utils.Cam.avg_edge_distance < 180:
-                        Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
-                        Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
-                        ESPAdjusted = True
-                        block_wide_corner = True
+        #         elif Utils.blockPositions[next_corner]["position"] == "1" and Utils.blockPositions[next_corner]["color"] == "red":
+        #             if not ESPAdjusted and 130 < Utils.Cam.avg_edge_distance < 180:
+        #                 Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+        #                 Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+        #                 ESPAdjusted = True
+        #                 block_wide_corner = True
                         
-                    elif ESPAdjusted and Utils.Cam.avg_edge_distance < 130:
-                        Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
-                        Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
-                        ESPAdjusted = False
-                        block_wide_corner = False
+        #             elif ESPAdjusted and Utils.Cam.avg_edge_distance < 130:
+        #                 Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+        #                 Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+        #                 ESPAdjusted = False
+        #                 block_wide_corner = False
                         
-            elif direction == 1:
-                if Utils.blockPositions[next_corner]["position"] == "1" and Utils.blockPositions[next_corner]["color"] == "red":
-                    if not ESPAdjusted and 65 < Utils.Cam.avg_edge_distance < 150:
-                        Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
-                        Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
-                        ESPAdjusted = True
-                        block_wide_corner = True
+        #     elif direction == 1:
+        #         if Utils.blockPositions[next_corner]["position"] == "1" and Utils.blockPositions[next_corner]["color"] == "red":
+        #             if not ESPAdjusted and 65 < Utils.Cam.avg_edge_distance < 150:
+        #                 Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+        #                 Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+        #                 ESPAdjusted = True
+        #                 block_wide_corner = True
                         
-                    elif ESPAdjusted and Utils.Cam.avg_edge_distance < 65:
-                        Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
-                        Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
-                        ESPAdjusted = False
-                        block_wide_corner = False
+        #             elif ESPAdjusted and Utils.Cam.avg_edge_distance < 65:
+        #                 Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+        #                 Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
+        #                 ESPAdjusted = False
+        #                 block_wide_corner = False
                 
         # print(Utils.Cam.avg_edge_distance)
-
-        if 100 < Utils.Cam.avg_edge_distance < 150 and abs(relative_angle) < 20 and timelastcorner + 1 < time.time() and not block_wide_corner:
-            print("Drive wide around corner", Utils.Cam.avg_edge_distance)
+        if direction == 1 and 100 < Utils.Cam.avg_edge_distance < 150 and -15 < relative_angle < 50 and timelastcorner + 2 < time.time() and not block_wide_corner:
             if not ESPAdjustedCorner:
-                if direction == 0:
-                    Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
-                    Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
-                    ESPAdjustedCorner = True
-                elif direction == 1:
-                    Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
-                    Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
-                    ESPAdjustedCorner = True
-                    
+                print("wide corner")
+                Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
+                ESPAdjustedCorner = True
+                
+        elif direction == 0 and 100 < Utils.Cam.avg_edge_distance < 150 and -50 < relative_angle < 15 and timelastcorner + 2 < time.time() and block_wide_corner:
+            if not ESPAdjustedCorner:
+                print("wide corner")
+                Utils.usb_communication.sendMessage("D 50", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
+                ESPAdjustedCorner = True
+                
         elif Utils.Cam.avg_edge_distance < 100:
             if ESPAdjustedCorner:
                 if direction == 0:
