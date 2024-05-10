@@ -129,11 +129,14 @@ void loop()
 				Serial.println("Received STOP command. Performing action...");
 
 				// try to brake the motor
-				motor.setSpeed(255);
-				motor.backward();
-				delay(500);
+				if (desiredSpeed > 160)
+				{
+					motor.setSpeed(255);
+					motor.backward();
+					delay(500);
+				}
 				motor.setSpeed(0);
-				motor.stop();
+				motor.backward();
 
 				digitalWrite(InternalLed, HIGH);
 				speedSensor.reset();
@@ -189,7 +192,10 @@ void loop()
 			}
 		}
 
-		holdSpeed();
+		if (started)
+		{
+			holdSpeed();
+		}
 
 		delay(5);
 	}
