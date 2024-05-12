@@ -25,7 +25,7 @@ int smoothingSteps = 1;			  // smoothing multiplier for sensor values
 bool started = false;			  // switch between start and stop
 bool manual = false;			  // switch between manual and automatic mode
 bool firstCornerDetected = false; // special detection for drive direction
-int ServoMiddlePosition = 105;
+int ServoMiddlePosition = 80;
 int angle_right = 45;
 int angle_left = 55;
 int distanceEdgeDetection = -1; // distance in cm to detect an edge
@@ -89,7 +89,7 @@ void loop()
 					{
 						distance1 = ultraschall1.read();
 						timeoutcounter++;
-						if (timeoutcounter > 20)
+						if (timeoutcounter > 5)
 						{
 							break;
 						}
@@ -100,7 +100,7 @@ void loop()
 					{
 						distance2 = ultraschall2.read();
 						timeoutcounter++;
-						if (timeoutcounter > 40)
+						if (timeoutcounter > 5)
 						{
 							break;
 						}
