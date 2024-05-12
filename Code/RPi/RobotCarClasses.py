@@ -93,13 +93,15 @@ class Utility:
     #Cleanup after the run is finished or an error occured
     def cleanup(self):
         self.LogDebug("Started cleanup")
-
+        
+        StartTime = time.time()
         self.I2C_communication.stop_threads()
+        
         self.StopButton.stop_StopButton()
         
         if self.Cam is not None:
             if self.Cam.video_writer is not None:
-                #self.Cam.video_writer.release()
+                self.Cam.video_writer.release()
                 pass
         
         #self.StopNodemcus()
@@ -110,6 +112,9 @@ class Utility:
         #Clear all used lines
         for line in all_lines:
             line.release()
+            
+        StopTime = time.time()
+        self.LogDebug(f"Time needed for I2C cleanup: {StopTime - StartTime}")
         
         self.running = False
         self.usb_communication.closeNodeMCUs()
