@@ -82,8 +82,8 @@ void loop()
 
 					distance1 = 0;
 					distance2 = 0;
+					
 					int timeoutcounter = 0;
-
 					// Check for start in small section
 					while (distance1 == 0)
 					{
