@@ -167,13 +167,13 @@ class AnalogDigitalConverter():
             self.voltage = self.chan.voltage * 4.395
     
     
-#A class for reading a TCS34725 ColorSensor         
+# A class for reading a TCS34725 ColorSensor         
 class ColorSensor():
     def __init__(self):
-        #Variable init
+        # Variable init
         self.color_rgb, self.color_temperature, self.lux = 0, 0, 0
         
-        #Colorsensor init
+        # Colorsensor init
         i2c = board.I2C()
         self.sensor = adafruit_tcs34725.TCS34725(i2c)
         
@@ -183,11 +183,12 @@ class ColorSensor():
         #Write sensor data to variables
         while self.threadStop == 0:
             self.color_temperature = self.sensor.color_temperature
-            #self.color_rgb = self.sensor.color_rgb_bytes
-            #self.lux = self.sensor.lux
+            # print(self.color_temperature)
+            # self.color_rgb = self.sensor.color_rgb_bytes
+            # self.lux = self.sensor.lux
         
     
-    #Stop the thread for reading the sensor   
+    # Stop the thread for reading the sensor   
     def stop_measurement(self):
         self.sensor.active = False
         self.threadStop = 1

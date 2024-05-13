@@ -1,4 +1,4 @@
-from I2C_classes import DisplayOled, Gyroscope, AnalogDigitalConverter
+from I2C_classes import DisplayOled, Gyroscope, AnalogDigitalConverter, ColorSensor
 import threading
 
 class I2Ccommunication:
@@ -8,6 +8,7 @@ class I2Ccommunication:
         self.Display = DisplayOled(self.Utils)
         self.ADC = AnalogDigitalConverter()
         self.Gyro = Gyroscope()
+        self.ColorSensor = ColorSensor()
     
         
     def start_threads(self):
@@ -22,8 +23,13 @@ class I2Ccommunication:
         self.ADC.threadStop = 0
         tADC = threading.Thread(target=self.ADC.read, daemon=True)
         tADC.start()
+        
+        self.ColorSensor.threadStop = 0
+        tColor = threading.Thread(target=self.ColorSensor.read, daemon=True)
+        tColor.start()
     
     def stop_threads(self):
         self.Display.threadStop = 1
         self.Gyro.threadStop = 1
         self.ADC.threadStop = 1
+        self.ColorSensor.threadStop = 1
