@@ -58,6 +58,7 @@ class Utility:
         self.Display = self.I2C_communication.Display
         self.ADC = self.I2C_communication.ADC
         self.Gyro = self.I2C_communication.Gyro
+        self.ColorSensor = self.I2C_communication.ColorSensor
         
         self.Cam = Cam
         if self.Cam is not None:
@@ -227,7 +228,7 @@ class Utility:
 
     #Log Sensor values
     def LogData(self):
-        self.datalogger.debug(f"Angle: {self.relative_angle}, corners: {self.corners}")
+        self.datalogger.debug(f"Angle: {self.relative_angle}, corners: {self.corners}, ColorTemperature: {self.ColorSensor.color_temperature}")
     
     
     #Stop the DataLogger Process
