@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 values = {"ColorTemperature": []}
 
 # Open the log file and read lines
-with open(r'D:\Developement\wro2024-fe-HHG_Phoenix\Code\RPi\DataLog.log', 'r') as file:
+with open(r'C:\Users\Admin\OneDrive\Dokumente\GitHub\wro2024-fe-HHG_Phoenix\Code\RPi\DataLog.log', 'r') as file:
     for line in file:
         # Split the line into parts
         parts = line.strip().split(', ')

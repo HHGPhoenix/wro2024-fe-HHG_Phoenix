@@ -226,20 +226,6 @@ class USBCommunication:
         for ESP in [self.EspHoldDistance, self.EspHoldSpeed]:
             self.sendMessage("START", ESP)
             time.sleep(0.2)
-            waitingForResponse = True
-            responseTimeout = time.time() + 5 # 5 seconds timeout
-
-            while waitingForResponse:
-                response = self.getResponses(ESP)
-                if "Received START command. Performing action..." in response:
-                    waitingForResponse = False
-                elif time.time() > responseTimeout:
-                    self.Utils.LogError("No response from NodeMCU")
-                else:
-                    time.sleep(0.01)
-
-            time.sleep(0.1)
-          
             
     #Stop both NodeMCUs and wait for responses
     def stopNodeMCUs(self):

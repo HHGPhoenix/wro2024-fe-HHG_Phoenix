@@ -488,15 +488,14 @@ class Camera():
         
         
     def get_edges(self, frame):
-        frame = frame[250:500, 300:980]
+        frame = frame[250:, 300:980]
         
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
         gray = cv2.dilate(gray, self.kernel, iterations=1)
-
         # Threshold the grayscale image to get a binary image
-        binary = cv2.threshold(gray, 80, 255, cv2.THRESH_BINARY)[1]
+        binary = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY)[1]
         
         binary = cv2.dilate(binary, self.kernel, iterations=2)
 
@@ -706,18 +705,18 @@ class Camera():
 
         while True:
             StartTime = time.time()
-            self.block_array, self.frame, frameraw = self.get_coordinates()
+            self.block_array, frame, frameraw = self.get_coordinates()
             StopTime = time.time()
             #print(f"Time needed: {StopTime - StartTime}")
-            frame = self.get_edges(frameraw)
+            self.frame = self.get_edges(frameraw)
 
-            if self.video_writer is None:
-                # Create a VideoWriter object to save the frames as an mp4 file
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                self.video_writer = cv2.VideoWriter('output.mp4', fourcc, 20, (frameraw.shape[1], frameraw.shape[0]), True)
+            # if self.video_writer is None:
+            #     # Create a VideoWriter object to save the frames as an mp4 file
+            #     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            #     self.video_writer = cv2.VideoWriter('output.mp4', fourcc, 20, (frameraw.shape[1], frameraw.shape[0]), True)
 
-            # Write the frame to the video file
-            self.video_writer.write(frameraw)
+            # # Write the frame to the video file
+            # self.video_writer.write(frameraw)
             self.Utils.LogData()
     
           
