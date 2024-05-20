@@ -151,20 +151,20 @@ def HoldLane(Utils, CornerWaitTime=1):
                 #print(nextBlock["distance"])
                 block_distance_to_wall = Utils.Cam.avg_edge_distance - nextBlock['distance']
                 Utils.LogDebug(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
+                next_corner = corner + 1 if corner < 3 else 0
                 
                 
                 if (Utils.Cam.avg_edge_distance < 220) and -15 < relative_angle < 40 and direction == 1:
                     #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
-                    if (120 < Utils.Cam.avg_edge_distance < 150) and nextBlock['x'] < 300 and 40 < nextBlock["distance"] < 90 and timelastcorner + 1.5 < time.time():
+                    if (120 < Utils.Cam.avg_edge_distance < 150) and nextBlock['x'] < 300 and 40 < nextBlock["distance"] < 90 and timelastcorner + 1.5 < time.time() and next_corner not in Utils.blockPositions:
                         nextBlock['position'] = "1"
-                        BlockPos = corner + 1 if corner < 3 else 0
+                        BlockPos = next_corner
                                                 
-                    elif 85 < block_distance_to_wall < 110 and 45 < nextBlock["distance"] < 70 and timelastcorner + 1.5 < time.time():
+                    elif 85 < block_distance_to_wall < 110 and 45 < nextBlock["distance"] < 70 and timelastcorner + 1.5 < time.time() and corner not in Utils.blockPositions:
                         nextBlock['position'] = "3"
-                        #print("3")
                         BlockPos = corner
                         
-                    elif (120 < block_distance_to_wall < 170 or 10 < block_distance_to_wall < 35) and 30 < nextBlock["distance"] < 140:
+                    elif corner not in Utils.blockPositions:
                         nextBlock['position'] = "2"
                         BlockPos = corner
 
@@ -180,24 +180,19 @@ def HoldLane(Utils, CornerWaitTime=1):
                         nextBlock['position'] = "1"
                         BlockPos = corner + 1 if corner < 3 else 0
                         
+                    elif 85 < block_distance_to_wall < 110 and 45 < nextBlock["distance"] < 70 and timelastcorner + 1.5 < time.time() and corner not in Utils.blockPositions:
+                        nextBlock['position'] = "3"
+                        BlockPos = corner
                         
-                    # elif 80 < block_distance_to_wall < 130 and nextBlock["distance"] < 80:
-                    #     nextBlock['position'] = "3"
-                    #     BlockPos = corner
-                    # elif 130 < block_distance_to_wall < 180 and nextBlock["distance"] < 80:# or block_distance_to_wall < 80:
-                    #     nextBlock['position'] = "2"
-                    #     if abs(relative_angle) > 40:
-                    #         BlockPos = corner + 1 if corner < 3 else 0
-                    #     else:
-                    #         BlockPos = corner
+                    elif corner not in Utils.blockPositions:
+                        nextBlock['position'] = "2"
+                        BlockPos = corner
+
                     else:
                         nextBlock['position'] = "0"
                     
                     if nextBlock['position'] != "0":
                         Utils.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
-        
-        
-        next_corner = corner + 1 if corner < 3 else 0
             
         if corner in Utils.blockPositions:
             if direction == 0:
