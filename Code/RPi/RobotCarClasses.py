@@ -705,10 +705,10 @@ class Camera():
 
         while True:
             StartTime = time.time()
-            self.block_array, frame, frameraw = self.get_coordinates()
+            self.block_array, self.frame, frameraw = self.get_coordinates()
             StopTime = time.time()
             #print(f"Time needed: {StopTime - StartTime}")
-            self.frame = self.get_edges(frameraw)
+            frame = self.get_edges(frameraw)
 
             # if self.video_writer is None:
             #     # Create a VideoWriter object to save the frames as an mp4 file
