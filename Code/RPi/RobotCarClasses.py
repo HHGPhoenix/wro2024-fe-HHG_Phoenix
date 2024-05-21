@@ -113,6 +113,7 @@ class Utility:
         #Clear all used lines
         for line in all_lines:
             line.release()
+        time.sleep(0.2)
             
         StopTime = time.time()
         self.LogDebug(f"Time needed for I2C cleanup: {StopTime - StartTime}")
@@ -379,7 +380,6 @@ class Button(Utility):
             # restart the rpi (linux)
             os.system('sudo reboot')
 
-
         all_lines.append(self.button_line)
         
     
@@ -616,7 +616,7 @@ class Camera():
             self.real_distance = 0
                     
         if self.real_distance != 0:
-            if self.real_distance > 40 and self.real_distance < 300:
+            if self.real_distance > 30 and self.real_distance < 300:
                 #print(self.edge_distances)
                 if len(self.edge_distances) > 5:
                     self.edge_distances.pop(0)
@@ -705,10 +705,22 @@ class Camera():
 
         while True:
             StartTime = time.time()
-            self.block_array, self.frame, frameraw = self.get_coordinates()
+            self.block_array, framenormal, frameraw = self.get_coordinates()
             StopTime = time.time()
             #print(f"Time needed: {StopTime - StartTime}")
-            frame = self.get_edges(frameraw)
+            framebinary = self.get_edges(frameraw)
+
+            # Convert binary image to 3-channel image
+            framebinary_3ch = np.stack((framebinary,)*3, axis=-1)
+            
+            # Get the shape of the framenormal
+            height, width, _ = framenormal.shape
+            
+            # Resize framebinary_3ch to match the width of framenormal
+            framebinary_3ch_resized = cv2.resize(framebinary_3ch, (width, framebinary_3ch.shape[0]))
+            
+            # Now you can concatenate them
+            self.frame = np.concatenate((framenormal, framebinary_3ch_resized), axis=0)
 
             # if self.video_writer is None:
             #     # Create a VideoWriter object to save the frames as an mp4 file
