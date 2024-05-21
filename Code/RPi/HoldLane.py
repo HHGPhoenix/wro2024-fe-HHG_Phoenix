@@ -6,7 +6,7 @@ from flask import Flask, render_template, Response, jsonify
 
 ##########################################################
 ##                                                      ##
-##        Sensor / Class Initalization                  ##
+##        self.Sensor / Class Initalization                  ##
 ##                                                      ##
 ##########################################################    
 Utils = Utility()
@@ -186,32 +186,57 @@ class HoldLane():
             self.desired_distance_wall =  10 
         elif self.desired_distance_wall > 90:
             self.desired_distance_wall = 90
+            
 
         if self.desired_distance_wall > self.middledistance:
+            if self.direction == 1 and not (-10 < self.relative_angle < 50):
+                if self.Sensor != 2:
+                    self.Sensor = 2
+                    self.Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
+                    self.Utils.LogInfo(f"Switched to self.Sensor 2")
+                    
+                if abs(self.desired_distance_wall - old_desired_distance_wall) > 3:
+                    self.Utils.usb_communication.sendMessage(f"D{self.desired_distance_wall}", ESPHoldDistance)
+                    self.Utils.LogInfo(f"New Distance {self.desired_distance_wall}, Current self.Sensor: {self.Sensor}")
+                    old_desired_distance_wall = self.desired_distance_wall
+                return
+                
             desired_distance_wall_other_direction = (100 - self.desired_distance_wall)
             
-            if Sensor != 1:
-                Sensor = 1
+            if self.Sensor != 1:
+                self.Sensor = 1
                 self.Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
-                self.Utils.LogInfo(f"Switched to Sensor 1")
+                self.Utils.LogInfo(f"Switched to self.Sensor 1")
                 
             #Send ESPHoldDistance new Distance
             if abs(desired_distance_wall_other_direction - old_desired_distance_wall) > 3:
                 self.Utils.usb_communication.sendMessage(f"D{desired_distance_wall_other_direction}", ESPHoldDistance)
-                self.Utils.LogInfo(f"New Distance {desired_distance_wall_other_direction}, Current Sensor: {Sensor}")
+                self.Utils.LogInfo(f"New Distance {desired_distance_wall_other_direction}, Current self.Sensor: {self.Sensor}")
                 old_desired_distance_wall = desired_distance_wall_other_direction
             
         else:
-            if Sensor != 2:
-                Sensor = 2
+            if self.direction == 0 and not (10 > self.relative_angle > -50):
+                if self.Sensor != 1:
+                    self.Sensor = 1
+                    self.Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
+                    self.Utils.LogInfo(f"Switched to self.Sensor 1")
+                    
+                if abs(self.desired_distance_wall - old_desired_distance_wall) > 3:
+                    self.Utils.usb_communication.sendMessage(f"D{self.desired_distance_wall}", ESPHoldDistance)
+                    self.Utils.LogInfo(f"New Distance {self.desired_distance_wall}, Current self.Sensor: {self.Sensor}")
+                    old_desired_distance_wall = self.desired_distance_wall
+                return
+            
+            if self.Sensor != 2:
+                self.Sensor = 2
                 self.Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
-                self.Utils.LogInfo(f"Switched to Sensor 2")
+                self.Utils.LogInfo(f"Switched to self.Sensor 2")
                 
             if abs(self.desired_distance_wall - old_desired_distance_wall) > 3:
                 self.Utils.usb_communication.sendMessage(f"D{self.desired_distance_wall}", ESPHoldDistance)
-                self.Utils.LogInfo(f"New Distance {self.desired_distance_wall}, Current Sensor: {Sensor}")
+                self.Utils.LogInfo(f"New Distance {self.desired_distance_wall}, Current self.Sensor: {self.Sensor}")
                 old_desired_distance_wall = self.desired_distance_wall
-        
+
         
     def detectBlockPos(self):
         if (self.Utils.Cam.avg_edge_distance < 220) and -15 < self.relative_angle < 40 and self.direction == 1:
@@ -403,7 +428,7 @@ class HoldLane():
             if self.Sensor != 1 and not self.ESPAdjusted and not self.ESPAdjustedCorner:
                 self.Sensor = 1
                 self.desired_distance_wall = 50
-                self.Utils.LogInfo("Switched to Sensor 1")
+                self.Utils.LogInfo("Switched to self.Sensor 1")
                 self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
                 self.Utils.usb_communication.sendMessage("D 50", self.Utils.ESPHoldDistance)
             
@@ -428,7 +453,7 @@ class HoldLane():
             if self.Sensor != 2 and not self.ESPAdjusted and not self.ESPAdjustedCorner:
                 self.Sensor = 2
                 self.desired_distance_wall = 50
-                self.Utils.LogInfo("Switched to Sensor 2")
+                self.Utils.LogInfo("Switched to self.Sensor 2")
                 self.Utils.usb_communication.sendMessage("S2", self.Utils.ESPHoldDistance)
                 self.Utils.usb_communication.sendMessage("D 50", self.Utils.ESPHoldDistance)
             
