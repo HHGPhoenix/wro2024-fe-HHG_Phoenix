@@ -132,7 +132,7 @@ class HoldLane():
                 self.nextCornerCases()
             
             # Drive to the middle of the lane
-            if smooth_to_middle:
+            if self.smooth_to_middle:
                 if smoothing_counter >= 10:
                     if self.desired_distance_wall > 52:
                         self.desired_distance_wall = self.desired_distance_wall - 4
@@ -142,7 +142,7 @@ class HoldLane():
                         
                     else:
                         self.desired_distance_wall = 50
-                        smooth_to_middle = False
+                        self.smooth_to_middle = False
                         
                     smoothing_counter = 0
                     self.Utils.usb_communication.sendMessage(f"D {self.desired_distance_wall}", self.Utils.ESPHoldDistance)
@@ -400,8 +400,8 @@ class HoldLane():
                     
     def cornerStuff(self):
         if self.direction == 0:
-            if Sensor != 1 and not self.ESPAdjusted and not self.ESPAdjustedCorner:
-                Sensor = 1
+            if self.Sensor != 1 and not self.ESPAdjusted and not self.ESPAdjustedCorner:
+                self.Sensor = 1
                 self.desired_distance_wall = 50
                 self.Utils.LogInfo("Switched to Sensor 1")
                 self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
@@ -425,8 +425,8 @@ class HoldLane():
                 TIMEOUT = time.time() + self.CornerWaitTime
                 
         elif self.direction == 1:
-            if Sensor != 2:
-                Sensor = 2
+            if self.Sensor != 2 and not self.ESPAdjusted and not self.ESPAdjustedCorner:
+                self.Sensor = 2
                 self.desired_distance_wall = 50
                 self.Utils.LogInfo("Switched to Sensor 2")
                 self.Utils.usb_communication.sendMessage("S2", self.Utils.ESPHoldDistance)

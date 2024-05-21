@@ -113,6 +113,7 @@ class Utility:
         #Clear all used lines
         for line in all_lines:
             line.release()
+        time.sleep(0.2)
             
         StopTime = time.time()
         self.LogDebug(f"Time needed for I2C cleanup: {StopTime - StartTime}")
@@ -378,7 +379,6 @@ class Button(Utility):
 
             # restart the rpi (linux)
             os.system('sudo reboot')
-
 
         all_lines.append(self.button_line)
         
