@@ -455,6 +455,8 @@ class HoldLane():
 ##                                                      ##
 ##########################################################
 if __name__ == "__main__":
+    Holdlane = HoldLane(Utils)
+    
     try:
         #start flask server if needed
         if Cam.video_stream:
@@ -487,8 +489,8 @@ if __name__ == "__main__":
             server_thread.start()
                 
         Utils.StartRun()
-        HoldLane(Utils)
-    
+        Holdlane.avoidBlocks()
+        
     except:
         Utils.LogError(traceback.format_exc())
         
