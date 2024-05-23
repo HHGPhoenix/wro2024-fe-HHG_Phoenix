@@ -619,7 +619,7 @@ class Camera():
         if self.real_distance != 0:
             if self.real_distance > 30 and self.real_distance < 300:
                 #print(self.edge_distances)
-                if len(self.edge_distances) > 5:
+                if len(self.edge_distances) > 3:
                     self.edge_distances.pop(0)
                     
                 self.edge_distances.append(round(self.real_distance, 3))
