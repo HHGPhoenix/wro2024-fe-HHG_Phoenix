@@ -17,11 +17,10 @@
 
 // Variables
 float KP = 1;					  // Proportional constant
-int maxDistanceCm = 200;		  // Max distance in cm to measure
-int desiredDistance = 50;		  // Desired distance in cm
+float desiredDistance = 50;		  // Desired distance in cm
 int commandedDistance = 50;		  // Distance in cm commanded by the Raspberry Pi
 int activeSensor = 0;			  // select sensor 1 or 2
-int smoothingSteps = 1;			  // smoothing multiplier for sensor values
+float smoothingSteps = 1;		  // smoothing multiplier for sensor values
 bool started = false;			  // switch between start and stop
 bool manual = false;			  // switch between manual and automatic mode
 bool firstCornerDetected = false; // special detection for drive direction
@@ -82,7 +81,7 @@ void loop()
 
 					distance1 = 0;
 					distance2 = 0;
-					
+
 					int timeoutcounter = 0;
 					// Check for start in small section
 					while (distance1 == 0)
@@ -232,7 +231,7 @@ void loop()
 						int numberStart = 2; // Skip the "SM" characters
 						int numberLength = command.length();
 						String numberStr = command.substring(numberStart, numberLength);
-						smoothingSteps = numberStr.toInt();
+						smoothingSteps = numberStr.toFloat();
 						Serial.print("Received smoothing multiplier: ");
 						Serial.println(smoothingSteps);
 					}
@@ -291,11 +290,11 @@ void loop()
 
 				if (commandedDistance > 0)
 				{
-					if (desiredDistance > (commandedDistance + smoothingSteps - 1))
+					if (desiredDistance > (commandedDistance + smoothingSteps - smoothingSteps / 2))
 					{
 						desiredDistance = desiredDistance - smoothingSteps;
 					}
-					else if (desiredDistance < (commandedDistance - smoothingSteps + 1))
+					else if (desiredDistance < (commandedDistance - smoothingSteps + smoothingSteps / 2))
 					{
 						desiredDistance = desiredDistance + smoothingSteps;
 					}
@@ -304,6 +303,9 @@ void loop()
 						desiredDistance = commandedDistance;
 					}
 				}
+
+				Serial.print("desiredDistance: ");
+				Serial.println(desiredDistance);
 
 				// Serial.print("commandedDistance: ");
 				// Serial.println(commandedDistance);

@@ -6,7 +6,7 @@ from flask import Flask, render_template, Response, jsonify
 
 ##########################################################
 ##                                                      ##
-##        self.Sensor / Class Initalization                  ##
+##        self.Sensor / Class Initalization             ##
 ##                                                      ##
 ##########################################################    
 Utils = Utility()
