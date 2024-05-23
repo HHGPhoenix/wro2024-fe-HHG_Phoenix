@@ -452,7 +452,8 @@ class Camera():
         # Variable initialization
         self.freeze = False
         self.frame = None
-        self.frame_lock = threading.Lock()
+        self.frame_lock_1 = threading.Lock()
+        self.frame_lock_2 = threading.Lock()
         self.video_stream = video_stream
         self.picam2 = Picamera2()
         self.Utils = Utils
@@ -698,29 +699,18 @@ class Camera():
         self.block_distance = self.real_distance * 100
         return self.real_distance * 100
         
-        
-    #Functrion running in a new thread that constantly updates the coordinates of the blocks in the camera stream
+         
+    # Function running in a new thread that constantly updates the coordinates of the blocks in the camera stream
     def process_blocks(self):
         self.video_writer = None
+        self.frames = [None, None]
 
         while True:
-            StartTime = time.time()
             self.block_array, framenormal, frameraw = self.get_coordinates()
-            StopTime = time.time()
-            #print(f"Time needed: {StopTime - StartTime}")
             framebinary = self.get_edges(frameraw)
 
-            # Convert binary image to 3-channel image
-            framebinary_3ch = np.stack((framebinary,)*3, axis=-1)
-            
-            # Get the shape of the framenormal
-            height, width, _ = framenormal.shape
-            
-            # Resize framebinary_3ch to match the width of framenormal
-            framebinary_3ch_resized = cv2.resize(framebinary_3ch, (width, framebinary_3ch.shape[0]))
-            
-            # Now you can concatenate them
-            self.frame = np.concatenate((framenormal, framebinary_3ch_resized), axis=0)
+            self.frames[0] = framenormal
+            self.frames[1] = framebinary
 
             # if self.video_writer is None:
             #     # Create a VideoWriter object to save the frames as an mp4 file
@@ -730,24 +720,41 @@ class Camera():
             # # Write the frame to the video file
             # self.video_writer.write(frameraw)
             self.Utils.LogData()
-    
-          
-    #Start a new thread for processing the camera stream          
+
+
+    # Start a new thread for processing the camera stream
     def start_processing(self):
         thread = threading.Thread(target=self.process_blocks)
         thread.daemon = False
         thread.start()
-      
         
-    #Generate the frames for the webstream
-    def video_frames(self):
+    def compress_frame(self, frame):
+        dimensions = len(frame.shape)
+        if dimensions == 3:
+            height, width, _ = frame.shape
+        elif dimensions == 2:
+            height, width = frame.shape
+        else:
+            raise ValueError(f"Unexpected number of dimensions in frame: {dimensions}")
+        new_height = 180
+        new_width = int(new_height * width / height)
+        frame = cv2.resize(frame, (new_width, new_height))
+        return frame
+
+
+    # Generate the frames for the webstream
+    def video_frames(self, frame_type):
         if self.video_stream:
             while True:
-                with self.frame_lock:
-                    if self.frame is not None:
-                        (flag, encodedImage) = cv2.imencode(".jpg", self.frame)
+                if frame_type == 'type1' and self.frames[0] is not None:
+                    with self.frame_lock_1:
+                        frame = self.compress_frame(self.frames[0])
+                        (flag, encodedImage) = cv2.imencode(".jpg", frame)
                         yield (b'--frame\r\n'
-                                b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
-                    else:
+                            b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
+                elif frame_type == 'type2' and self.frames[1] is not None:
+                    with self.frame_lock_2:
+                        frame = self.compress_frame(self.frames[1])
+                        (flag, encodedImage) = cv2.imencode(".jpg", frame)
                         yield (b'--frame\r\n'
-                                b'Content-Type: image/jpeg\r\n\r\n' + b'\r\n')
+                            b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')

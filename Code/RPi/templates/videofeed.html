@@ -1,6 +1,72 @@
 <!DOCTYPE html>
 <html>
+    <head>
+        <title>Video Feed Monitor</title>
+        <script>
+            function checkFeedStatus(
+                feedId,
+                statusEndpoint,
+                endpoint,
+                hasFailedOnce
+            ) {
+                const timeout = new Promise((resolve, reject) => {
+                    let id = setTimeout(() => {
+                        clearTimeout(id);
+                        reject("Request timed out");
+                    }, 5000); // 5 second timeout
+                });
+
+                const fetchRequest = fetch(statusEndpoint)
+                    .then((response) => {
+                        if (!response.ok) {
+                            throw new Error("Network response was not ok");
+                        }
+                        if (hasFailedOnce) {
+                            document.getElementById(feedId).src = endpoint; // Reload the feed if the response is ok and has failed once before
+                        }
+                    })
+                    .catch((error) => {
+                        console.log(`Feed ${feedId} is unresponsive: ${error}`);
+                        // Retry after a delay if the feed is unresponsive
+                        setTimeout(() => {
+                            checkFeedStatus(
+                                feedId,
+                                statusEndpoint,
+                                endpoint,
+                                true
+                            ); // Set hasFailedOnce to true
+                        }, 1000); // Retry after 5 seconds
+                    });
+
+                return Promise.race([fetchRequest, timeout]);
+            }
+
+            async function monitorFeeds() {
+                checkFeedStatus(
+                    "videoFeed1",
+                    "/status",
+                    "/video_feed_1",
+                    false
+                );
+                checkFeedStatus(
+                    "videoFeed2",
+                    "/status",
+                    "/video_feed_2",
+                    false
+                );
+
+                // Repeat the check every 10 seconds
+                setTimeout(monitorFeeds, 2000);
+            }
+
+            // Start monitoring the feeds when the page loads
+            window.onload = function () {
+                monitorFeeds();
+            };
+        </script>
+    </head>
     <body>
-        <img src="/video_feed" />
+        <img id="videoFeed1" src="/video_feed_1" />
+        <img id="videoFeed2" src="/video_feed_2" />
     </body>
 </html>

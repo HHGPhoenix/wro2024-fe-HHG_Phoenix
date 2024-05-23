@@ -507,11 +507,20 @@ if __name__ == "__main__":
                 return render_template('videofeed.html')
 
 
-            @app.route('/video_feed')
-            def video_feed():
-                return Response(Cam.video_frames(),
+            @app.route('/video_feed_1')
+            def video_feed_1():
+                return Response(Cam.video_frames("type1"),
                                 mimetype='multipart/x-mixed-replace; boundary=frame')
                 
+            @app.route('/video_feed_2')
+            def video_feed_2():
+                return Response(Cam.video_frames("type2"),
+                                mimetype='multipart/x-mixed-replace; boundary=frame')
+                
+            @app.route('/status')
+            def status():
+                return Response("Running", mimetype='text/plain')
+                                
             @app.route('/data_feed')
             def data_feed():
                 return jsonify(Utils.data_feed())
