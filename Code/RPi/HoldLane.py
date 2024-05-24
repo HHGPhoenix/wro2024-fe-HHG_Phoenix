@@ -311,6 +311,27 @@ class HoldLane():
                     
         elif self.nextBlock2:
             print("nextBlock2" + self.nextBlock2)
+            if (self.Utils.Cam.avg_edge_distance < 220) and -15 < self.relative_angle < 40 and self.direction == 1:
+                #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['x']: {self.nextBlock['x']}, self.nextBlock['y']: {self.nextBlock['y']}")
+                self.nextBlock['position'] = "0"
+                if (120 < self.Utils.Cam.avg_edge_distance < 150) and self.nextBlock['x'] < 300 and 50 < self.nextBlock["distance"] < 90 and self.timelastcorner + 1.5 < time.time(): # and next_corner not in Utils.blockPositions:
+                    self.nextBlock['position'] = "1"
+                    BlockPos = self.next_corner
+
+                if self.nextBlock['position'] != "0":
+                    self.Utils.blockPositions.update({BlockPos: {"position": self.nextBlock['position'], "color": self.nextBlock['color']}})
+                        
+            elif (self.Utils.Cam.avg_edge_distance < 200) and -35 < self.relative_angle < 5 and self.direction == 0:
+                # Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['x']: {self.nextBlock['x']}, self.nextBlock['y']: {self.nextBlock['y']}")
+                if (120 < self.Utils.Cam.avg_edge_distance < 150) and self.nextBlock['x'] > 980 and 70 < self.nextBlock["distance"] < 110:
+                    self.nextBlock['position'] = "1"
+                    BlockPos = self.corner + 1 if self.corner < 3 else 0
+
+                else:
+                    self.nextBlock['position'] = "0"
+                
+                if self.nextBlock['position'] != "0":
+                    self.Utils.blockPositions.update({BlockPos: {"position": self.nextBlock['position'], "color": self.nextBlock['color']}})
                 
                 
     def currentCornerCases(self):
