@@ -16,36 +16,38 @@
 #define ServoPin 13	  // Servo Pin
 
 // Variables
-float KP = 1;					  // Proportional constant
-float desiredDistance = 50;		  // Desired distance in cm
-int commandedDistance = 50;		  // Distance in cm commanded by the Raspberry Pi
-int activeSensor = 0;			  // select sensor 1 or 2
-float smoothingSteps = 1;		  // smoothing multiplier for sensor values
-int timeoutcounter = 0;			  // counter for timeout of sensors
-bool started = false;			  // switch between start and stop
-bool manual = false;			  // switch between manual and automatic mode
-bool firstCornerDetected = false; // special detection for drive direction
-int ServoMiddlePosition = 80;	  // middle position of the servo
-int angle_right = 45;			  // max angle to the right
-int angle_left = 55;			  // max angle to the left
-int distanceEdgeDetection = -1;	  // distance in cm to detect an edge
-int edgeDetectionCounter = 0;	  // counter for edge detection
-float distance1 = 0;			  // distance sensor 1
-int distance1counter = 0;		  // counter for distance sensor 1
-float distance2 = 0;			  // distance sensor 2
-int distance2counter = 0;		  // counter for distance sensor 2
-const int numReadings = 5;		  // number of readings to keep track of
-float readings[numReadings];	  // the readings from the analog input
-int readIndex = 0;				  // the index of the current reading
-float total = 0;				  // the running total
-float average = 0;				  // the average
-const int numReadings2 = 5;		  // number of readings to keep track of
-float readings2[numReadings2];	  // the readings from the analog input
-int readIndex2 = 0;				  // the index of the current reading
-float total2 = 0;				  // the running total
-float average2 = 0;				  // the average
-String command;					  // command string
-char c;							  // character for command string
+float KP = 1;						 // Proportional constant
+float desiredDistance = 50;			 // Desired distance in cm
+int commandedDistance = 50;			 // Distance in cm commanded by the Raspberry Pi
+int activeSensor = 0;				 // select sensor 1 or 2
+float smoothingSteps = 1;			 // smoothing multiplier for sensor values
+int timeoutcounter = 0;				 // counter for timeout of sensors
+bool started = false;				 // switch between start and stop
+bool manual = false;				 // switch between manual and automatic mode
+bool firstCornerDetected = false;	 // special detection for drive direction
+int ServoMiddlePosition = 80;		 // middle position of the servo
+int angle_right = 45;				 // max angle to the right
+int angle_left = 55;				 // max angle to the left
+int distanceEdgeDetection = -1;		 // distance in cm to detect an edge
+int edgeDetectionCounter = 0;		 // counter for edge detection
+float distance1 = 0;				 // distance sensor 1
+int distance1counter = 0;			 // counter for distance sensor 1
+float distance2 = 0;				 // distance sensor 2
+int distance2counter = 0;			 // counter for distance sensor 2
+const int numReadings = 3;			 // number of readings to keep track of
+float readings[numReadings] = {0};	 // initialize all elements to 0
+int readIndex = 0;					 // the index of the current reading
+float total = 0;					 // the running total
+float average = 0;					 // the average
+const int numReadings2 = 3;			 // number of readings to keep track of
+float readings2[numReadings2] = {0}; // the readings from the analog input
+int readIndex2 = 0;					 // the index of the current reading
+float total2 = 0;					 // the running total
+float average2 = 0;					 // the average
+String command;						 // command string
+char c;								 // character for command string
+float lastError = 0;				 // last error for PD
+float KD = 0.5;						 // Derivative constant
 
 // Ultrasonic setup
 Ultrasonic ultraschall1(TrigPin1, EchoPin1, 100000); // Trigger Pin, Echo Pin
@@ -210,6 +212,15 @@ void loop()
 						Serial.print("Received KP: ");
 						Serial.println(KP);
 					}
+					else if (command.startsWith("KD"))
+					{
+						int numberStart = 2; // Skip the "KD" characters
+						int numberLength = command.length();
+						String numberStr = command.substring(numberStart, numberLength);
+						KD = numberStr.toFloat();
+						Serial.print("Received KD: ");
+						Serial.println(KD);
+					}
 					// check for manual mode
 					else if (command == "MANUAL")
 					{
@@ -305,8 +316,8 @@ void loop()
 					}
 				}
 
-				Serial.print("desiredDistance: ");
-				Serial.println(desiredDistance);
+				// Serial.print("desiredDistance: ");
+				// Serial.println(desiredDistance);
 
 				// Serial.print("commandedDistance: ");
 				// Serial.println(commandedDistance);
@@ -318,7 +329,10 @@ void loop()
 				{
 					// calculate error and correction
 					float error = desiredDistance - distance1;
-					float correction = error * KP;
+					float derivative = error - lastError;
+					float correction = error * KP + derivative * KD;
+
+					lastError = error;
 
 					// subtract the last reading:
 					total = total - readings[readIndex];
@@ -404,7 +418,10 @@ void loop()
 				{
 					// calculate error and correction
 					float error = desiredDistance - distance2;
-					float correction = error * KP;
+					float derivative = error - lastError;
+					float correction = error * KP + derivative * KD;
+
+					lastError = error;
 
 					// subtract the last reading:
 					total2 = total2 - readings2[readIndex2];

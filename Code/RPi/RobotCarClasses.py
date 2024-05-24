@@ -81,6 +81,7 @@ class Utility:
         self.StartSensor = None
         self.Distance = None
         self.Kp = None
+        self.Kd = None
         self.Ed = None
         self.Mm = None
         self.AngR = None
@@ -163,6 +164,7 @@ class Utility:
 
                 self.usb_communication.sendMessage(f"D {self.Distance}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"KP {self.Kp}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"KD {self.Kd}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"ED {self.Ed}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"SPEED {self.StartSpeed}", self.ESPHoldSpeed)
                 self.usb_communication.sendMessage(f"MM {self.Mm}", self.ESPHoldDistance)
