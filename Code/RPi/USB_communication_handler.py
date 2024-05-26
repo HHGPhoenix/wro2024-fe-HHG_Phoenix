@@ -223,9 +223,8 @@ class USBCommunication:
     #Start both NodeMCUs and wait for responses
     def startNodeMCUs(self):
         #Start both NodeMCUs
-        for ESP in [self.EspHoldDistance, self.EspHoldSpeed]:
-            self.sendMessage("START", ESP)
-            time.sleep(0.2)
+        self.sendMessage(f"START {self.Utils.startMode}", self.EspHoldDistance)
+        self.sendMessage("START", self.EspHoldSpeed)
             
     #Stop both NodeMCUs and wait for responses
     def stopNodeMCUs(self):

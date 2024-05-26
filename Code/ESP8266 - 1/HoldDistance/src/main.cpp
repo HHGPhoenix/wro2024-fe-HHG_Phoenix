@@ -74,58 +74,66 @@ void loop()
 			c = Serial.read();
 			if (c == '\n')
 			{
-				if (command == "START")
+				if (command.startsWith("START"))
 				{
-					Serial.println("Received START command. Performing action..."); // Feedback for Raspberry Pi
-					servo.write(ServoMiddlePosition);								// Reset servo position
-					digitalWrite(InternalLed, LOW);									// Turn on the internal LED
+					int numberStart = 5; // Skip the "START" characters
+					int numberLength = command.length();
+					String numberStr = command.substring(numberStart, numberLength);
+					int startMode = numberStr.toInt();
+
+					Serial.println("Received START command. Performing action... "); // Feedback for Raspberry Pi
+					servo.write(ServoMiddlePosition);								 // Reset servo position
+					digitalWrite(InternalLed, LOW);									 // Turn on the internal LED
 
 					firstCornerDetected = false; // Reset corner detection
 
 					distance1 = 0;
 					distance2 = 0;
 
-					timeoutcounter = 0;
-					// Check for start in small section
-					while (distance1 == 0)
+					if (startMode == 1)
 					{
-						distance1 = ultraschall1.read();
-						timeoutcounter++;
-						if (timeoutcounter > 5)
+						timeoutcounter = 0;
+						// Check for start in small section
+						while (distance1 == 0)
 						{
-							break;
-						}
-					}
-
-					timeoutcounter = 0;
-					while (distance2 == 0)
-					{
-						distance2 = ultraschall2.read();
-						timeoutcounter++;
-						if (timeoutcounter > 5)
-						{
-							break;
-						}
-					}
-
-					// Check if both sensors read a valid value
-					if (distance1 > 0 && distance2 > 0)
-					{
-						// Check if the difference between the two sensors is greater than 5 cm
-						if (abs(distance1 - distance2) > 10)
-						{
-							// Determine the drive direction based on the small section
-							if (distance1 < distance2)
+							distance1 = ultraschall1.read();
+							timeoutcounter++;
+							if (timeoutcounter > 5)
 							{
-								firstCornerDetected = true;
-								delay(500);
-								Serial.println("Drive direction clockwise");
+								break;
 							}
-							else
+						}
+
+						timeoutcounter = 0;
+						while (distance2 == 0)
+						{
+							distance2 = ultraschall2.read();
+							timeoutcounter++;
+							if (timeoutcounter > 5)
 							{
-								firstCornerDetected = true;
-								delay(500);
-								Serial.println("Drive direction counterclockwise");
+								break;
+							}
+						}
+
+						// Check if both sensors read a valid value
+						if (distance1 > 0 && distance2 > 0)
+						{
+							// Check if the difference between the two sensors is greater than 5 cm
+							if (abs(distance1 - distance2) > 10)
+							{
+								// Determine the drive direction based on the small section
+								if (distance1 < distance2)
+								{
+									firstCornerDetected = true;
+									delay(500);
+									Serial.println("Drive direction clockwise");
+								}
+								else
+								{
+									firstCornerDetected = true;
+									delay(500);
+									Serial.println("Drive direction counterclockwise");
+								}
 							}
 						}
 					}
@@ -295,188 +303,201 @@ void loop()
 			// Hold specified distance with specified sensor
 			if (activeSensor == 1)
 			{
-				distance1 = ultraschall1.read(); // get distance in cm
-
-				// Serial.print("D1: ");
-				// Serial.println(distance1);
-
-				if (commandedDistance > 0)
+				if (commandedDistance != 0)
 				{
-					if (desiredDistance > (commandedDistance + smoothingSteps - smoothingSteps / 2))
+					distance1 = ultraschall1.read(); // get distance in cm
+
+					// Serial.print("D1: ");
+					// Serial.println(distance1);
+
+					if (commandedDistance > 0)
 					{
-						desiredDistance = desiredDistance - smoothingSteps;
-					}
-					else if (desiredDistance < (commandedDistance - smoothingSteps + smoothingSteps / 2))
-					{
-						desiredDistance = desiredDistance + smoothingSteps;
-					}
-					else
-					{
-						desiredDistance = commandedDistance;
-					}
-				}
-
-				// Serial.print("desiredDistance: ");
-				// Serial.println(desiredDistance);
-
-				// Serial.print("commandedDistance: ");
-				// Serial.println(commandedDistance);
-
-				// Serial.print("desiredDistance: ");
-				// Serial.println(desiredDistance);
-
-				if (distance1 > 0)
-				{
-					// calculate error and correction
-					float error = desiredDistance - distance1;
-					float derivative = error - lastError;
-					float correction = error * KP + derivative * KD;
-
-					lastError = error;
-
-					// subtract the last reading:
-					total = total - readings[readIndex];
-					// read from the sensor:
-					readings[readIndex] = correction;
-					// add the reading to the total:
-					total = total + readings[readIndex];
-					// advance to the next position in the array:
-					readIndex = readIndex + 1;
-
-					// if we're at the end of the array...
-					if (readIndex >= numReadings)
-					{
-						// ...wrap around to the beginning:
-						readIndex = 0;
-					}
-
-					// calculate the average:
-					average = total / numReadings;
-					// send it to the computer as ASCII digits
-
-					// limit correction to servo range
-					if (average > angle_right)
-					{
-						average = angle_right;
-					}
-					else if (average < -angle_left)
-					{
-						average = -angle_left;
-					}
-
-					servo.write(int(ServoMiddlePosition - average)); // Set servo position
-
-					if (!firstCornerDetected && (distanceEdgeDetection > 0))
-					{
-						if (distance1 > distanceEdgeDetection)
+						if (desiredDistance > (commandedDistance + smoothingSteps - smoothingSteps / 2))
 						{
-							firstCornerDetected = true;
-							Serial.println("Drive direction clockwise");
-							activeSensor = 1;
+							desiredDistance = desiredDistance - smoothingSteps;
 						}
-						// read other sensor sometimes
-						if (edgeDetectionCounter == 1)
+						else if (desiredDistance < (commandedDistance - smoothingSteps + smoothingSteps / 2))
 						{
-							distance2 = ultraschall2.read();
-
-							if (distance2 > distanceEdgeDetection)
-							{
-								firstCornerDetected = true;
-								Serial.println("Drive direction counterclockwise");
-								activeSensor = 2;
-							}
+							desiredDistance = desiredDistance + smoothingSteps;
 						}
 						else
 						{
-							edgeDetectionCounter++;
+							desiredDistance = commandedDistance;
 						}
 					}
-				}
-				delay(10); // wait so the loop isn't too fast
-			}
-			else if (activeSensor == 2)
-			{
-				distance2 = ultraschall2.read();
 
-				if (commandedDistance > 0)
-				{
-					if (desiredDistance > (commandedDistance + smoothingSteps - smoothingSteps / 2))
+					// Serial.print("desiredDistance: ");
+					// Serial.println(desiredDistance);
+
+					// Serial.print("commandedDistance: ");
+					// Serial.println(commandedDistance);
+
+					// Serial.print("desiredDistance: ");
+					// Serial.println(desiredDistance);
+
+					if (distance1 > 0)
 					{
-						desiredDistance = desiredDistance - smoothingSteps;
-					}
-					else if (desiredDistance < (commandedDistance - smoothingSteps + smoothingSteps / 2))
-					{
-						desiredDistance = desiredDistance + smoothingSteps;
-					}
-					else
-					{
-						desiredDistance = commandedDistance;
-					}
-				}
+						// calculate error and correction
+						float error = desiredDistance - distance1;
+						float derivative = error - lastError;
+						float correction = error * KP + derivative * KD;
 
-				if (distance2 > 0)
-				{
-					// calculate error and correction
-					float error = desiredDistance - distance2;
-					float derivative = error - lastError;
-					float correction = error * KP + derivative * KD;
+						lastError = error;
 
-					lastError = error;
+						// subtract the last reading:
+						total = total - readings[readIndex];
+						// read from the sensor:
+						readings[readIndex] = correction;
+						// add the reading to the total:
+						total = total + readings[readIndex];
+						// advance to the next position in the array:
+						readIndex = readIndex + 1;
 
-					// subtract the last reading:
-					total2 = total2 - readings2[readIndex2];
-					// read from the sensor:
-					readings2[readIndex2] = correction;
-					// add the reading to the total:
-					total2 = total2 + readings2[readIndex2];
-					// advance to the next position in the array:
-					readIndex2 = readIndex2 + 1;
-
-					// if we're at the end of the array...
-					if (readIndex2 >= numReadings2)
-					{
-						readIndex2 = 0;
-					}
-
-					// calculate the average:
-					average2 = total2 / numReadings2;
-
-					// limit correction to servo range
-					if (average2 > angle_left)
-					{
-						average2 = angle_left;
-					}
-					else if (average2 < -angle_right)
-					{
-						average2 = -angle_right;
-					}
-
-					servo.write(int(ServoMiddlePosition + average2)); // Set servo position
-
-					if (!firstCornerDetected && (distanceEdgeDetection > 0))
-					{
-						if (distance2 > distanceEdgeDetection)
+						// if we're at the end of the array...
+						if (readIndex >= numReadings)
 						{
-							firstCornerDetected = true;
-							Serial.println("Drive direction counterclockwise");
-							activeSensor = 2;
+							// ...wrap around to the beginning:
+							readIndex = 0;
 						}
-						// read other sensor sometimes
-						if (edgeDetectionCounter == 1)
+
+						// calculate the average:
+						average = total / numReadings;
+						// send it to the computer as ASCII digits
+
+						// limit correction to servo range
+						if (average > angle_right)
 						{
-							distance1 = ultraschall1.read();
+							average = angle_right;
+						}
+						else if (average < -angle_left)
+						{
+							average = -angle_left;
+						}
+
+						servo.write(int(ServoMiddlePosition - average)); // Set servo position
+
+						if (!firstCornerDetected && (distanceEdgeDetection > 0))
+						{
 							if (distance1 > distanceEdgeDetection)
 							{
 								firstCornerDetected = true;
 								Serial.println("Drive direction clockwise");
 								activeSensor = 1;
 							}
+							// read other sensor sometimes
+							if (edgeDetectionCounter == 1)
+							{
+								distance2 = ultraschall2.read();
+
+								if (distance2 > distanceEdgeDetection)
+								{
+									firstCornerDetected = true;
+									Serial.println("Drive direction counterclockwise");
+									activeSensor = 2;
+								}
+							}
+							else
+							{
+								edgeDetectionCounter++;
+							}
+						}
+					}
+				}
+				else
+				{
+					servo.write(ServoMiddlePosition + angle_left);
+				}
+				delay(10); // wait so the loop isn't too fast
+			}
+			else if (activeSensor == 2)
+			{
+				if (commandedDistance != 0)
+				{
+					distance2 = ultraschall2.read();
+
+					if (commandedDistance > 0)
+					{
+						if (desiredDistance > (commandedDistance + smoothingSteps - smoothingSteps / 2))
+						{
+							desiredDistance = desiredDistance - smoothingSteps;
+						}
+						else if (desiredDistance < (commandedDistance - smoothingSteps + smoothingSteps / 2))
+						{
+							desiredDistance = desiredDistance + smoothingSteps;
 						}
 						else
 						{
-							edgeDetectionCounter++;
+							desiredDistance = commandedDistance;
 						}
 					}
+
+					if (distance2 > 0)
+					{
+						// calculate error and correction
+						float error = desiredDistance - distance2;
+						float derivative = error - lastError;
+						float correction = error * KP + derivative * KD;
+
+						lastError = error;
+
+						// subtract the last reading:
+						total2 = total2 - readings2[readIndex2];
+						// read from the sensor:
+						readings2[readIndex2] = correction;
+						// add the reading to the total:
+						total2 = total2 + readings2[readIndex2];
+						// advance to the next position in the array:
+						readIndex2 = readIndex2 + 1;
+
+						// if we're at the end of the array...
+						if (readIndex2 >= numReadings2)
+						{
+							readIndex2 = 0;
+						}
+
+						// calculate the average:
+						average2 = total2 / numReadings2;
+
+						// limit correction to servo range
+						if (average2 > angle_left)
+						{
+							average2 = angle_left;
+						}
+						else if (average2 < -angle_right)
+						{
+							average2 = -angle_right;
+						}
+						servo.write(int(ServoMiddlePosition + average2)); // Set servo position
+
+						if (!firstCornerDetected && (distanceEdgeDetection > 0))
+						{
+							if (distance2 > distanceEdgeDetection)
+							{
+								firstCornerDetected = true;
+								Serial.println("Drive direction counterclockwise");
+								activeSensor = 2;
+							}
+							// read other sensor sometimes
+							if (edgeDetectionCounter == 1)
+							{
+								distance1 = ultraschall1.read();
+								if (distance1 > distanceEdgeDetection)
+								{
+									firstCornerDetected = true;
+									Serial.println("Drive direction clockwise");
+									activeSensor = 1;
+								}
+							}
+							else
+							{
+								edgeDetectionCounter++;
+							}
+						}
+					}
+				}
+				else
+				{
+					servo.write(ServoMiddlePosition - angle_right);
 				}
 				delay(10); // wait so the loop isn't too fast
 			}

@@ -44,6 +44,7 @@ Utils.StartSensor = 2
 Utils.Mm = 10
 Utils.AngR = 32
 Utils.AngL = 40
+Utils.startMode = 1
 
 
 ##########################################################

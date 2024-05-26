@@ -86,6 +86,7 @@ class Utility:
         self.Mm = None
         self.AngR = None
         self.AngL = None
+        self.startMode = None
         self.corners = 0
         self.relative_angle = 0
         
