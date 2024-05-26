@@ -67,6 +67,7 @@ class HoldLane():
         self.CornerWaitTime = 1
         self.nextBlock = None
         self.block_distance_to_wall = 0
+        self.before_safety_state = [self.Sensor, self.desired_distance_wall]
         
         self.timelastcorner = 0
         self.timelastgreenpos1 = 0
@@ -91,7 +92,8 @@ class HoldLane():
         self.desired_distance_to_block_red = -650
         self.desired_distance_to_block_green = 650
         self.old_desired_distance_wall = 50
-        
+
+
     def avoidBlocks(self):
         #Hold Lane
         while self.Utils.running and self.rounds < 3:
@@ -561,6 +563,8 @@ class HoldLane():
                 
     def avoid_sharp_angle(self):
         if self.direction == 0 and self.relative_angle < -45:
+            self.before_safety_state = [self.Sensor, self.desired_distance_wall]
+            
             if self.Sensor == 1:
                 new_distance = self.desired_distance_wall
             elif self.Sensor == 2:
@@ -569,11 +573,13 @@ class HoldLane():
             if self.Sensor != 1:
                 self.Sensor = 1
                 self.Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
-                self.Utils.LogInfo(f"Switched to self.Sensor 1")
+                self.Utils.LogInfo(f"Switched to self.Sensor 1 Safety")
                 
             self.Utils.usb_communication.sendMessage(f"D{new_distance}", ESPHoldDistance)
             
         elif self.direction == 1 and self.relative_angle > 45:
+            self.before_safety_state = [self.Sensor, self.desired_distance_wall]
+            
             if self.Sensor == 2:
                 new_distance = self.desired_distance_wall
             elif self.Sensor == 1:
@@ -582,9 +588,17 @@ class HoldLane():
             if self.Sensor != 2:
                 self.Sensor = 2
                 self.Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
-                self.Utils.LogInfo(f"Switched to self.Sensor 2")
+                self.Utils.LogInfo(f"Switched to self.Sensor 2 Safety")
                 
             self.Utils.usb_communication.sendMessage(f"D{new_distance}", ESPHoldDistance)
+            
+        else:
+            self.Utils.usb_communication.sendMessage(f"S{self.before_safety_state[0]}", ESPHoldDistance)
+            self.Utils.usb_communication.sendMessage(f"D{self.before_safety_state[1]}", ESPHoldDistance)
+            self.Sensor = self.before_safety_state[0]
+            self.desired_distance_wall = self.before_safety_state[1]
+            
+            self.Utils.LogInfo(f"Switched to self.Sensor {self.before_safety_state[0]} Safety end")
             
             
 
