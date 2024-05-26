@@ -375,7 +375,7 @@ class HoldLane():
                     self.block_wide_corner = False
                     self.Utils.LogInfo("red direction 1 start")
                     
-            elif self.Utils.blockPositions[self.corner]["color"] == "green" and self.timelastgreenpos1 + 1.5 < time.time() and not self.drive_corner:
+            elif self.Utils.blockPositions[self.corner]["color"] == "green" and self.timelastgreenpos1 + 1.5 < time.time() and self.timelastcorner + 1 < time.time() and not self.drive_corner:
                 if not self.ESPAdjustedCorner:
                     self.Utils.usb_communication.sendMessage("S2", self.Utils.ESPHoldDistance)
                     self.Utils.usb_communication.sendMessage("D 15", self.Utils.ESPHoldDistance)
