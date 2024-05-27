@@ -248,17 +248,17 @@ class HoldLane():
                 self.old_desired_distance_wall = desired_distance_wall_other_direction
             
         else:
-            if self.direction == 0 and not (10 > self.relative_angle > -50):
+            if self.direction == 0 and not (20 > self.relative_angle > -40):
                 # self.Utils.LogInfo(f"Special Case: {self.relative_angle}, {self.direction}")
-                if self.Sensor != 1:
-                    self.Sensor = 1
-                    self.Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
-                    self.Utils.LogInfo(f"Switched to self.Sensor 1 Special")
+                # if self.Sensor != 1:
+                #     self.Sensor = 1
+                #     self.Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
+                #     self.Utils.LogInfo(f"Switched to self.Sensor 1 Special")
                     
-                if abs(self.desired_distance_wall - self.old_desired_distance_wall) > 3:
-                    self.Utils.usb_communication.sendMessage(f"D{self.desired_distance_wall}", ESPHoldDistance)
-                    self.Utils.LogInfo(f"New Distance {self.desired_distance_wall}, Current self.Sensor: {self.Sensor}")
-                    self.old_desired_distance_wall = self.desired_distance_wall
+                # if abs(self.desired_distance_wall - self.old_desired_distance_wall) > 3:
+                #     self.Utils.usb_communication.sendMessage(f"D{self.desired_distance_wall}", ESPHoldDistance)
+                #     self.Utils.LogInfo(f"New Distance {self.desired_distance_wall}, Current self.Sensor: {self.Sensor}")
+                #     self.old_desired_distance_wall = self.desired_distance_wall
                 return
             
             if self.Sensor != 2:
@@ -276,14 +276,14 @@ class HoldLane():
         
     def detectBlockPos(self):
         if not self.active_block_drive:
+            Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['x']: {self.nextBlock['x']}, self.nextBlock['y']: {self.nextBlock['y']}")
             if (self.Utils.Cam.avg_edge_distance < 220) and -15 < self.relative_angle < 40 and self.direction == 1:
-                # Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['x']: {self.nextBlock['x']}, self.nextBlock['y']: {self.nextBlock['y']}")
                 self.nextBlock['position'] = "0"
-                if (120 < self.Utils.Cam.avg_edge_distance < 150) and self.nextBlock['x'] < abs(300 * (1+(self.relative_angle / 13))) and 50 < self.nextBlock["distance"] < 115 and self.timelastcorner + 2 < time.time(): # and next_corner not in Utils.blockPositions:
+                if (130 < self.Utils.Cam.avg_edge_distance < 160) and self.nextBlock['x'] < 300 and 50 < self.nextBlock["distance"] < 105 and self.timelastcorner + 1.5 < time.time() and not self.drive_corner: # and next_corner not in Utils.blockPositions:
                     self.nextBlock['position'] = "1"
                     BlockPos = self.next_corner
                                             
-                elif 85 < self.block_distance_to_wall < 105 and 75 < self.nextBlock["distance"] < 115: # and self.timelastcorner + 1 < time.time(): # and corner not in Utils.blockPositions
+                elif 85 < self.block_distance_to_wall < 105 and 70 < self.nextBlock["distance"] < 100: # and self.timelastcorner + 1 < time.time(): # and corner not in Utils.blockPositions
                     self.nextBlock['position'] = "3"
                     BlockPos = self.corner
                     
@@ -296,11 +296,11 @@ class HoldLane():
                         
             elif (self.Utils.Cam.avg_edge_distance < 200) and -35 < self.relative_angle < 5 and self.direction == 0:
                 # Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['x']: {self.nextBlock['x']}, self.nextBlock['y']: {self.nextBlock['y']}")
-                if (120 < self.Utils.Cam.avg_edge_distance < 150) and self.nextBlock['x'] > 980 and 70 < self.nextBlock["distance"] < 110:
+                if (120 < self.Utils.Cam.avg_edge_distance < 150) and self.nextBlock['x'] > 980 and 50 < self.nextBlock["distance"] < 90 and self.timelastcorner + 2 < time.time():
                     self.nextBlock['position'] = "1"
                     BlockPos = self.corner + 1 if self.corner < 3 else 0
                     
-                elif 85 < self.block_distance_to_wall < 130 and 45 < self.nextBlock["distance"] < 120 and self.timelastcorner + 1.5 < time.time() and self.corner not in self.Utils.blockPositions:
+                elif 85 < self.block_distance_to_wall < 110 and 45 < self.nextBlock["distance"] < 70: # and self.timelastcorner + 1.5 < time.time() and self.corner not in self.Utils.blockPositions:
                     self.nextBlock['position'] = "3"
                     BlockPos = self.corner
                     
@@ -328,7 +328,7 @@ class HoldLane():
                         
             elif (self.Utils.Cam.avg_edge_distance < 200) and -35 < self.relative_angle < 5 and self.direction == 0:
                 # Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['x']: {self.nextBlock['x']}, self.nextBlock['y']: {self.nextBlock['y']}")
-                if (120 < self.Utils.Cam.avg_edge_distance < 150) and self.nextBlock['x'] > 980 and 70 < self.nextBlock["distance"] < 110:
+                if (120 < self.Utils.Cam.avg_edge_distance < 150) and self.nextBlock['x'] > 980 and 50 < self.nextBlock["distance"] < 90 and self.timelastcorner + 1.5 < time.time():
                     self.nextBlock['position'] = "1"
                     BlockPos = self.corner + 1 if self.corner < 3 else 0
 
@@ -341,29 +341,38 @@ class HoldLane():
                 
     def currentCornerCases(self):
         if self.direction == 0:
-            if self.Utils.blockPositions[self.corner]["color"] == "green" and self.timelastgreenpos1 + 1.5 < time.time() and not self.drive_corner:
+            if self.Utils.blockPositions[self.corner]["color"] == "green" and self.timelastgreenpos1 + 1.5 < time.time() and self.timelastcorner + 1.5 < time.time() and not self.drive_corner:
                 if not self.ESPAdjustedCorner:
                     self.Utils.LogInfo("green direction 0 start")
-                    self.Utils.usb_communication.sendMessage("D 15", self.Utils.ESPHoldDistance)
                     self.Utils.usb_communication.sendMessage("S2", self.Utils.ESPHoldDistance)
+                    self.Utils.usb_communication.sendMessage("D 15", self.Utils.ESPHoldDistance)
                     self.desired_distance_wall = 15
                     self.Sensor = 2
                     self.ESPAdjustedCorner = True
                     self.block_wide_corner = False
                     self.Utils.LogInfo("green direction 0 start")
                     
-            elif self.Utils.blockPositions[self.corner]["color"] == "red" and self.timelastredpos1 + 1.5 < time.time() and not self.drive_corner:
-                if not self.ESPAdjustedCorner:
-                    self.Utils.usb_communication.sendMessage("D 15", self.Utils.ESPHoldDistance)
-                    self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
-                    self.desired_distance_wall = 15
-                    self.Sensor = 1
+            elif self.Utils.blockPositions[self.corner]["color"] == "red" and self.timelastredpos1 + 1.5 < time.time() and self.timelastcorner + 0.5 < time.time() and not self.drive_corner:
+                if not self.ESPAdjustedCorner and self.Utils.Cam.avg_edge_distance < 110 and self.timelastcorner + 1.5 < time.time():
+                    self.Utils.usb_communication.sendMessage("D 80", self.Utils.ESPHoldDistance)
+                    self.Utils.usb_communication.sendMessage("S2", self.Utils.ESPHoldDistance)
+                    self.desired_distance_wall = 80
+                    self.Sensor = 2
                     self.ESPAdjustedCorner = True
                     self.block_wide_corner = False
-                    self.Utils.LogInfo("red direction 0 start")
+                    self.Utils.LogInfo("green direction 1 start corner")
+                    
+                elif not self.ESPAdjusted:
+                    self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
+                    self.Utils.usb_communication.sendMessage("D 15", self.Utils.ESPHoldDistance)
+                    self.desired_distance_wall = 15
+                    self.Sensor = 1
+                    self.ESPAdjusted = True
+                    self.block_wide_corner = True
+                    self.Utils.LogInfo("green direction 1 start")
                     
         elif self.direction == 1:
-            if self.Utils.blockPositions[self.corner]["color"] == "red" and self.timelastredpos1 + 1.5 < time.time() and self.timelastcorner + 1.5 < time.time() and not self.drive_corner:
+            if self.Utils.blockPositions[self.corner]["color"] == "red" and self.timelastredpos1 + 1.5 < time.time() and self.timelastcorner + 1 < time.time() and not self.drive_corner:
                 if not self.ESPAdjustedCorner:
                     self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
                     self.Utils.usb_communication.sendMessage("D 15", self.Utils.ESPHoldDistance)
@@ -377,7 +386,7 @@ class HoldLane():
                 if not self.ESPAdjustedCorner and self.Utils.Cam.avg_edge_distance < 110 and self.timelastcorner + 1.5 < time.time():
                     self.Utils.usb_communication.sendMessage("D 80", self.Utils.ESPHoldDistance)
                     self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
-                    self.desired_distance_wall = 90
+                    self.desired_distance_wall = 80
                     self.Sensor = 1
                     self.ESPAdjustedCorner = True
                     self.block_wide_corner = False
@@ -395,16 +404,27 @@ class HoldLane():
                     
     def nextCornerCases(self):
         if self.direction == 0:
-            if self.Utils.blockPositions[self.next_corner]["position"] == "1" and self.Utils.blockPositions[self.next_corner]["color"] == "green":
+            if self.Utils.blockPositions[self.next_corner]["position"] == "1" and self.Utils.blockPositions[self.next_corner]["color"] == "green" and self.timelastcorner + 1.5 < time.time():
                 if not self.ESPAdjusted and 70 < self.Utils.Cam.avg_edge_distance < 150 and self.timelastgreenpos1 + 3 < time.time():
                     self.Utils.usb_communication.sendMessage("D 50", self.Utils.ESPHoldDistance)
                     self.Utils.usb_communication.sendMessage("S2", self.Utils.ESPHoldDistance)
                     self.desired_distance_wall = 50
                     self.Sensor = 2
+                    self.ESPAdjusted_2 = True
                     self.ESPAdjusted = True
                     self.block_wide_corner = True
                     self.ESPAdjustedCorner = False
                     self.Utils.LogInfo("Pos 1 green direction 0 start")
+                    
+                elif self.ESPAdjusted_2 and self.Utils.Cam.avg_edge_distance < 65:
+                    self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
+                    self.Utils.usb_communication.sendMessage("D 0", self.Utils.ESPHoldDistance)
+                    self.desired_distance_wall = 1
+                    self.Sensor = 1
+                    self.ESPAdjusted_2 = False
+                    self.ESPAdjusted = True
+                    self.timelastwidecorner = time.time()
+                    self.block_wide_corner = True
                     
                 elif self.ESPAdjusted and self.Utils.Cam.avg_edge_distance < 70:
                     self.Utils.usb_communication.sendMessage("D 15", self.Utils.ESPHoldDistance)
@@ -424,14 +444,14 @@ class HoldLane():
                     self.Sensor = 1
                     self.ESPAdjusted = True
                     self.block_wide_corner = True
-                    self.ESPAdjustedCorner = False
+                    self.timelastgreenpos1 = time.time()
                     self.Utils.LogInfo("Pos 1 red direction 0 start")
                     
                 elif self.ESPAdjusted and self.Utils.Cam.avg_edge_distance < 140:
                     self.Utils.usb_communication.sendMessage("D 10", self.Utils.ESPHoldDistance)
-                    self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
+                    self.Utils.usb_communication.sendMessage("S2", self.Utils.ESPHoldDistance)
                     self.desired_distance_wall = 10
-                    self.Sensor = 1
+                    self.Sensor = 2
                     self.ESPAdjusted = False
                     self.block_wide_corner = False
                     self.Utils.LogInfo("Pos 1 red direction 0 end")
@@ -461,8 +481,8 @@ class HoldLane():
                     
             elif self.Utils.blockPositions[self.next_corner]["position"] == "1" and self.Utils.blockPositions[self.next_corner]["color"] == "green":
                 if not self.ESPAdjusted and 140 < self.Utils.Cam.avg_edge_distance < 180 and self.timelastgreenpos1 + 3 < time.time():
-                    self.Utils.usb_communication.sendMessage("D 70", self.Utils.ESPHoldDistance)
                     self.Utils.usb_communication.sendMessage("S2", self.Utils.ESPHoldDistance)
+                    self.Utils.usb_communication.sendMessage("D 70", self.Utils.ESPHoldDistance)
                     self.desired_distance_wall = 70
                     self.Sensor = 2
                     self.ESPAdjusted = True
@@ -470,12 +490,12 @@ class HoldLane():
                     self.timelastredpos1 = time.time()
                     
                 elif self.ESPAdjusted and self.Utils.Cam.avg_edge_distance < 140:
+                    self.Utils.usb_communication.sendMessage("S2", self.Utils.ESPHoldDistance)
                     self.Utils.usb_communication.sendMessage("D 10", self.Utils.ESPHoldDistance)
-                    self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
                     self.desired_distance_wall = 10
                     self.Sensor = 1
                     self.ESPAdjusted = False
-                    self.block_wide_corner = False
+                    self.block_wide_corner = True
                     self.Utils.LogInfo("Pos 1 green direction 1 end")
                     self.timelastgreenpos1 = time.time()
                     
@@ -494,17 +514,21 @@ class HoldLane():
                 self.Sensor = 1
                 self.ESPAdjustedCorner = True
                 
-        elif self.direction == 0 and 85 < self.Utils.Cam.avg_edge_distance < 130 and -50 < self.relative_angle < 15 and self.timelastcorner + 2 < time.time() and self.timelastredpos1 + 2 < time.time() and not self.block_wide_corner:
+        elif self.direction == 0 and 90 < self.Utils.Cam.avg_edge_distance < 130 and -50 < self.relative_angle < 15 and self.timelastcorner + 2 < time.time() and not self.block_wide_corner and self.timelastwidecorner + 2 < time.time():
             if not self.ESPAdjustedCorner:
                 print("wide corner start")
-                # self.Utils.usb_communication.sendMessage("D 50", self.Utils.ESPHoldDistance)
                 self.Utils.usb_communication.sendMessage("S2", self.Utils.ESPHoldDistance)
+                
+                if self.desired_distance_wall_smart < 50:
+                    desired_distance_wall_other_direction = 100 - self.desired_distance_wall_smart
+                    self.Utils.usb_communication.sendMessage(f"D {desired_distance_wall_other_direction}", self.Utils.ESPHoldDistance)
+                    
                 self.Sensor = 2
                 self.ESPAdjustedCorner = True
                 
         elif self.Utils.Cam.avg_edge_distance < 85 and self.timelastcorner + 2 < time.time():
             if self.ESPAdjustedCorner:
-                if self.direction == 0:
+                if self.direction == 0 and -50 < self.relative_angle < 10 and not self.active_block_drive and not self.nextBlock:
                     self.Utils.usb_communication.sendMessage("D 50", self.Utils.ESPHoldDistance)
                     self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
                     self.desired_distance_wall = 50
@@ -528,12 +552,15 @@ class HoldLane():
     def cornerStuff(self):
         if self.direction == 0:            
             self.relative_angle = self.Utils.Gyro.angle - self.oldAngle 
+            
             newAngle = self.oldAngle - self.GyroCornerAngle
             if self.Utils.Gyro.angle < newAngle and time.time() > self.TIMEOUT:
                 self.corner = self.corner + 1
                 self.timelastcorner = time.time()
+                
                 self.Utils.LogDebug(f"Corner: {self.corner}")
                 self.Utils.Display.write(f"Corner: {self.corner}")
+                
                 if self.corner == 4:
                     self.corner = 0
                     self.rounds = self.rounds + 1
@@ -541,8 +568,25 @@ class HoldLane():
                     
                 self.oldAngle = newAngle
                 self.drive_corner = False
+                self.sensorAdjustedCorner = False
+                self.ESPAdjusted = False
+                self.block_wide_corner = False
+                self.desired_distance_wall_smart = 50
                 self.Utils.Gyro.angle = self.Utils.Gyro.angle + 20
+                
                 self.TIMEOUT = time.time() + self.CornerWaitTime
+                
+            if (self.timelastcorner + 0.75 < time.time() and not self.ESPAdjustedCorner and not self.ESPAdjusted and 
+                not self.sensorAdjustedCorner):
+                if self.nextBlock and 30 < self.nextBlock["distance"] < 75:
+                    self.sensorAdjustedCorner = True
+                    return
+                
+                self.Sensor = 2
+                self.Utils.usb_communication.sendMessage(f"S2", ESPHoldDistance)
+                self.Utils.usb_communication.sendMessage(f"D50", ESPHoldDistance)
+                self.Utils.LogInfo(f"Switched to self.Sensor 2 Corner")
+                self.sensorAdjustedCorner = True
                 
         elif self.direction == 1:
             self.relative_angle = self.Utils.Gyro.angle - self.oldAngle
@@ -553,6 +597,7 @@ class HoldLane():
                 self.timelastcorner = time.time()
                 
                 self.Utils.LogDebug(f"Corner: {self.corner}")
+                self.Utils.Display.write(f"Corner: {self.corner}")
                 
                 if self.corner == 4:
                     self.corner = 0
