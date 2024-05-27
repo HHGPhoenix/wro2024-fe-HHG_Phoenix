@@ -167,11 +167,11 @@ class Utility:
                 self.usb_communication.sendMessage(f"KP {self.Kp}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"KD {self.Kd}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"ED {self.Ed}", self.ESPHoldDistance)
-                self.usb_communication.sendMessage(f"SPEED {self.StartSpeed}", self.ESPHoldSpeed)
                 self.usb_communication.sendMessage(f"MM {self.Mm}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"S{self.StartSensor}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"ANGR {self.AngR}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"ANGL {self.AngL}", self.ESPHoldDistance)
+                self.usb_communication.sendMessage(f"SPEED {self.StartSpeed}", self.ESPHoldSpeed)
 
                 timeTime = time.time()
                 
