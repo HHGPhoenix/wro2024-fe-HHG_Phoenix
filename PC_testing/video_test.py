@@ -50,7 +50,7 @@ class Camera():
         
         
     def get_edges(self, frame):
-        frame = frame[100:500, 300:980]
+        frame = frame[100:, :]
         
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -62,6 +62,12 @@ class Camera():
         
         binary = cv2.dilate(binary, self.kernel, iterations=2)
         
+        # Get the average pixel value of the left and right side of the image
+        left_avg = np.mean(binary[:, :binary.shape[1]//2])
+        right_avg = np.mean(binary[:, binary.shape[1]//2:])
+        
+        self.avg_brightness_values_left.append(left_avg)  # Append the average brightness to the list
+        self.avg_brightness_values_right.append(right_avg)  # Append the average brightness to the list
 
        # Perform Canny edge detection
         edges = cv2.Canny(binary, 50, 120, apertureSize=3)
@@ -199,7 +205,7 @@ class Camera():
         #frameraw = cv2.cvtColor(frameraw, cv2.COLOR_RGB2BGR)
         frame = frameraw.copy()
         
-        frame = frame[100:, :]
+        # frame = frame[100:, :]
         
         #frameraw = frameraw[100:500, 300:980]
         #frameraw = frameraw[150:, :]
@@ -275,7 +281,8 @@ class Camera():
 
         self.avg_edge_distance_values = []
         self.distance_next_block = -1
-        self.avg_brightness_values = []  # Initialize the list for average brightness values
+        self.avg_brightness_values_left = []  # Initialize the list for average brightness values
+        self.avg_brightness_values_right = []  # Initialize the list for average brightness values
 
         freeze = False  # Variable to control whether the video and plotting are frozen
         show_binary = False  # Variable to control whether the binary or normal frame is shown
@@ -285,7 +292,8 @@ class Camera():
             fig, ax = plt.subplots(figsize=(10, 5))  # Create a figure and an axes with specified size
             line1, = ax.plot([], [], label='avg_edge_distance')  # Initialize a line object for avg_edge_distance
             line2, = ax.plot([], [], label='distance_next_block')  # Initialize a line object for distance_next_block
-            line3, = ax.plot([], [], label='avg_brightness')  # Initialize a line object for avg_brightness
+            line3, = ax.plot([], [], label='avg_brightness_left')  # Initialize a line object for avg_brightness
+            line4, = ax.plot([], [], label='avg_brightness_right')  # Initialize a line object for avg_brightness
             cursor = mplcursors.cursor([line1, line2], hover=True)  # Enable the cursor for both lines
         
             self.distance_next_block_values = []  # Initialize the list for distance_next_block values
@@ -304,12 +312,16 @@ class Camera():
                     line2.set_ydata(self.distance_next_block_values)  # Update the y-data of the line for distance_next_block
                     line2.set_xdata(range(len(self.distance_next_block_values)))  # Update the x-data of the line for distance_next_block
                     
-                    line3.set_ydata(self.avg_brightness_values)  # Update the y-data of the line for avg_brightness
-                    line3.set_xdata(range(len(self.avg_brightness_values)))  # Update the x-data of the line for avg_brightness
+                    line3.set_ydata(self.avg_brightness_values_left)  # Update the y-data of the line for avg_brightness
+                    line3.set_xdata(range(len(self.avg_brightness_values_left)))  # Update the x-data of the line for avg_brightness
+                    
+                    line4.set_ydata(self.avg_brightness_values_right)  # Update the y-data of the line for avg_brightness
+                    line4.set_xdata(range(len(self.avg_brightness_values_right)))  # Update the x-data of the line for avg_brightness
                     
                     ax.add_line(line1)  # Add the line for avg_edge_distance to the axes
                     ax.add_line(line2)  # Add the line for distance_next_block to the axes
                     ax.add_line(line3)  # Add the line for avg_brightness to the axes
+                    ax.add_line(line4)  # Add the line for avg_brightness to the axes
                     
                     ax.set_ylim([0, 300])  # Set the limits of the y-axis
                     ax.relim()  # Recompute the data limits
@@ -348,9 +360,6 @@ class Camera():
                     framebinary = self.get_edges(frameraw)
 
                     self.frame = framebinary if show_binary else frame  # Show the binary frame if show_binary is True, otherwise show the normal frame
-                    
-                    avg_brightness = np.mean(framebinary)  # Calculate the average brightness of the frame
-                    self.avg_brightness_values.append(avg_brightness)  # Append the average brightness to the list
                     
                     cv2.imshow("Video", self.frame)
 
