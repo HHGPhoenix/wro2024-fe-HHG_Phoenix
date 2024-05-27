@@ -88,6 +88,7 @@ class HoldLane():
         self.drive_corner = False
         self.sensorAdjustedCorner = False
         self.active_block_drive = False
+        self.safetyEnabled = False
         
         self.coordinates_self = (640, 720) #x, y
         self.middledistance = 50
@@ -101,7 +102,10 @@ class HoldLane():
         #Hold Lane
         while self.Utils.running and self.rounds < 3:
             time.sleep(0.0001)
+            
             self.cornerStuff()
+            self.avoid_sharp_angle()
+            
             self.Utils.Cam.desired_distance_wall = self.desired_distance_wall
                     
             # get objects and calculate new distance
@@ -136,10 +140,6 @@ class HoldLane():
                         
                 else:
                     self.nextBlock = None
-                
-            if not self.ESPAdjusted and not self.ESPAdjustedCorner:
-                # self.avoid_sharp_angle()
-                pass
                 
             if self.corner in self.Utils.blockPositions:
                 self.currentCornerCases()
@@ -581,7 +581,7 @@ class HoldLane():
                 
                 
     def avoid_sharp_angle(self):
-        if self.direction == 0 and self.relative_angle < -45:
+        if self.direction == 0 and self.relative_angle < -45 and not self.safetyEnabled:
             self.before_safety_state = [self.Sensor, self.desired_distance_wall]
             
             if self.Sensor == 1:
@@ -595,8 +595,9 @@ class HoldLane():
                 self.Utils.LogInfo(f"Switched to self.Sensor 1 Safety")
                 
             self.Utils.usb_communication.sendMessage(f"D{new_distance}", ESPHoldDistance)
+            self.safetyEnabled = True
             
-        elif self.direction == 1 and self.relative_angle > 45:
+        elif self.direction == 1 and self.relative_angle > 45 and not self.safetyEnabled:
             self.before_safety_state = [self.Sensor, self.desired_distance_wall]
             
             if self.Sensor == 2:
@@ -610,8 +611,9 @@ class HoldLane():
                 self.Utils.LogInfo(f"Switched to self.Sensor 2 Safety")
                 
             self.Utils.usb_communication.sendMessage(f"D{new_distance}", ESPHoldDistance)
+            self.safetyEnabled = True
             
-        else:
+        elif self.safetyEnabled:
             self.Utils.usb_communication.sendMessage(f"S{self.before_safety_state[0]}", ESPHoldDistance)
             self.Utils.usb_communication.sendMessage(f"D{self.before_safety_state[1]}", ESPHoldDistance)
             self.Sensor = self.before_safety_state[0]
