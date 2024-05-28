@@ -21,12 +21,12 @@ StopButton = Button(6, Utils)
 Buzzer1 = Buzzer(12, Utils)
 
 Cam = Camera(video_stream=True, Utils=Utils)
-Cam.start_processing()
 
 global ESPHoldDistance, ESPHoldSpeed
-ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1)
+ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1, Cam)
 
 Utils.setupDataLog()
+
 
 
 
@@ -42,8 +42,8 @@ Utils.Kp = 0.7
 Utils.Ed = 125 #Edge detection distance in cm
 Utils.StartSensor = 2
 Utils.Mm = 10
-Utils.AngR = 32
-Utils.AngL = 40
+Utils.AngR = 37
+Utils.AngL = 42
 Utils.startMode = 1
 
 
@@ -63,7 +63,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
     Sensor = 0
     
     #Hold Lane
-    while Utils.running and rounds < 3:
+    while Utils.running:
         time.sleep(0.001)
                 
         if direction == 0:
@@ -77,6 +77,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
             newAngle = oldAngle - GyroCornerAngle
             if Utils.Gyro.angle < newAngle and time.time() > TIMEOUT:
                 corners = corners + 1
+                timelastcorner = time.time()
                 Utils.LogDebug(f"Corner: {corners}")
                 Utils.Display.write(f"Corner: {corners}")
                 if corners == 4:
@@ -93,18 +94,19 @@ def HoldLane(Utils, CornerWaiTTime=1):
                 Utils.LogInfo("Switched to Sensor 2")
                 Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
                 Utils.usb_communication.sendMessage("D35", Utils.ESPHoldDistance)
-                Utils.usb_communication.sendMessage("SPEED 90", Utils.ESPHoldSpeed)
+                Utils.usb_communication.sendMessage("SPEED 180", Utils.ESPHoldSpeed)
             
             newAngle = oldAngle + GyroCornerAngle
             if Utils.Gyro.angle > newAngle and time.time() > TIMEOUT:
                 corners = corners + 1
                 timelastcorner = time.time()
                 Utils.LogDebug(f"Corner: {corners}")
+                Utils.Display.write(f"Corner: {corners}")
                 if corners == 4:
                     corners = 0
                     rounds = rounds + 1
+                    Utils.Display.write(f"Corner: {corners}", f"Round: {rounds}")
                     
-                
                 oldAngle = newAngle
                 TIMEOUT = time.time() + CornerWaiTTime
           
@@ -121,10 +123,13 @@ def HoldLane(Utils, CornerWaiTTime=1):
                     Utils.SensorDistance1 = float(response.split(":")[1].strip())
                 if "SD2:" in responses:
                     Utils.SensorDistance2 = float(response.split(":")[1].strip())
+                    
+        if rounds == 3 and timelastcorner + 0.5 < time.time():
+            if Utils.Cam.avg_edge_distance < 165:
+                Utils.running = False
+                Utils.LogInfo(f"End of path reached {Utils.Cam.avg_edge_distance}")
         
         Utils.LogData()
-        
-    time.sleep(0.2)
 
 
 
@@ -139,19 +144,39 @@ if __name__ == "__main__":
         if Cam.video_stream:
             app = Flask(__name__)
             
+            log = logging.getLogger('werkzeug')
+            log.setLevel(logging.ERROR)
+            
             @app.route('/')
             def index():
                 return render_template('videofeed.html')
 
 
-            @app.route('/video_feed')
-            def video_feed():
-                return Response(Cam.video_frames(),
+            @app.route('/video_feed_1')
+            def video_feed_1():
+                return Response(Cam.video_frames("type1"),
                                 mimetype='multipart/x-mixed-replace; boundary=frame')
                 
+            @app.route('/video_feed_2')
+            def video_feed_2():
+                return Response(Cam.video_frames("type2"),
+                                mimetype='multipart/x-mixed-replace; boundary=frame')
+                
+            @app.route('/status')
+            def status():
+                return Response("Running", mimetype='text/plain')
+                                
             @app.route('/data_feed')
             def data_feed():
                 return jsonify(Utils.data_feed())
+            
+            @app.route('/positions')
+            def positions():
+                return render_template('positions.html')
+            
+            @app.route('/positions_feed')
+            def positions_feed():
+                return jsonify(Utils.blockPositions)
 
             # Run the server in a separate thread
             server_thread = Thread(target=app.run, kwargs={'host':'0.0.0.0', 'threaded':True})
