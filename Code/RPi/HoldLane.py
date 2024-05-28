@@ -3,6 +3,7 @@ from RobotCarClasses import *
 from threading import Thread
 import traceback
 from flask import Flask, render_template, Response, jsonify
+from math import atan2
 
 ##########################################################
 ##                                                      ##
@@ -99,8 +100,29 @@ class HoldLane():
 
 
     def avoidBlocks(self):
+        while not self.Utils.Cam.frames:
+            time.sleep(0.0001)
+        
+        case = -1
+        if self.Utils.Cam.avg_edge_distance > 150:
+            case = 0
+        
+        elif self.Utils.Cam.avg_edge_distance > 100:
+            case = 1
+            
+        if case != -1:
+            drive_directions = []
+            for _ in range(10):
+                drive_direction = self.get_drive_direction(self.Utils.Cam.frames[0])
+                drive_directions.append(drive_direction)
+                
+            self.direction = round(np.mean(drive_directions))
+        
+        else:
+            self.Utils.LogError("Edge detection could not decide on case, maybe not working correctly")
+
         #Hold Lane
-        while self.Utils.running and self.rounds < 3:
+        while self.Utils.running:
             time.sleep(0.0001)
             
             self.cornerStuff()
@@ -183,14 +205,19 @@ class HoldLane():
             # Drive wide around corners
             self.driveWideCorner()
                                     
-            responses = self.Utils.usb_communication.getResponses(ESPHoldDistance)
-            if responses != None:
-                # print(responses)
-                for _ in responses:
-                    if "Drive direction counterclockwise" in responses:
-                        self.direction = 1
-                    if "Drive direction clockwise" in responses:
-                        self.direction = 0
+            _ = self.Utils.usb_communication.getResponses(ESPHoldDistance)
+            # if responses != None:
+            #     # print(responses)
+            #     for _ in responses:
+            #         if "Drive direction counterclockwise" in responses:
+            #             self.direction = 1
+            #         if "Drive direction clockwise" in responses:
+            #             self.direction = 0
+            
+            if self.rounds == 3 and self.timelastcorner + 1 < time.time():
+                if self.Utils.Cam.avg_edge_distance < 150:
+                    self.Utils.running = False
+                    self.Utils.LogInfo(f"End of path reached {self.Utils.Cam.avg_edge_distance}")
             
             self.Utils.LogData()
             # self.Utils.LogDebug(f"self.ESPAdjusted: {self.ESPAdjusted}, self.ESPAdjustedCorner: {self.ESPAdjustedCorner}, self.desired_distance_wall: {self.desired_distance_wall}, relative_angle: {self.relative_angle}, direction: {self.direction}")
@@ -676,10 +703,67 @@ class HoldLane():
             self.desired_distance_wall = self.before_safety_state[1]
             self.safetyEnabled = False
             
-            self.Utils.LogInfo(f"Switched to self.Sensor {self.before_safety_state[0]} Safety end")
+            self.Utils.LogInfo(f"Switched to self.Sensor {self.before_safety_state[0]} Safety end")       
+
+
+    def get_drive_direction(self, frame, case):
+        frame = frame[100:, :]
+        
+        # Convert the frame to grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        gray = cv2.dilate(gray, self.kernel, iterations=1)
+    
+        # Threshold the grayscale image to get a binary image
+        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 1001, 30)
+        
+        binary = cv2.dilate(binary, self.kernel, iterations=2)
+        
+        if case == 0:
+            edges = cv2.Canny(binary, 20, 30, apertureSize=7)
             
+            # Perform Probabilistic Hough Line Transform
+            lines = cv2.HoughLinesP(edges, 4, np.pi/180, 100, minLineLength=50, maxLineGap=30)
+            
+            for line in lines:
+                cv2.line(frame, (line[0][0], line[0][1]), (line[0][2], line[0][3]), (0, 255, 0), 2)
+            
+            min_angle = 90  # Initialize minimum angle to 90 degrees
+            vertical_line = None  # Initialize the vertical line
 
+            for line in lines:
+                for x1, y1, x2, y2 in line:
+                    # Calculate the angle of the line with respect to the vertical axis
+                    angle = degrees(atan2(y2 - y1, x2 - x1))
+                    angle = abs(angle - 90)  # Adjust the range to [0, 180]
 
+                    # If this line is more vertical than the previous most vertical line
+                    if angle < min_angle:
+                        min_angle = angle
+                        vertical_line = line
+
+            if vertical_line is not None:
+                x1, y1, x2, y2 = vertical_line[0]
+                average_x = (x1 + x2) / 2
+
+                cv2.line(frame, (x1, y1), (x2, y2), (244, 255, 0), 2)
+
+                if average_x < 640:
+                    return 1
+                else:
+                    return 0
+
+            return -1
+        
+        elif case == 1:
+            # Get the average pixel value of the left and right side of the image
+            left_avg = np.mean(binary[:, :binary.shape[1]//2])
+            right_avg = np.mean(binary[:, binary.shape[1]//2:])
+            
+            return 1 if left_avg > right_avg else 0
+        
+        else:
+            raise ValueError("Invalid case number")
 
 ##########################################################
 ##                                                      ##
