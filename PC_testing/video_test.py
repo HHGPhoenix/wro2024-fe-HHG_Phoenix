@@ -2,7 +2,7 @@ import threading
 import cv2
 import numpy as np
 from sklearn.linear_model import LinearRegression
-from math import tan, radians, cos, atan, degrees
+from math import tan, radians, cos, atan, degrees, atan2
 import time
 import matplotlib.pyplot as plt
 import mplcursors
@@ -47,6 +47,54 @@ class Camera():
         self.known_height = 0.1
         self.camera_angle = 15
         self.distance_multiplier = 2.22
+    
+    def get_drive_direction(self, frame):
+        frame = frame[100:, :]
+        
+        # Convert the frame to grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        gray = cv2.dilate(gray, self.kernel, iterations=1)
+    
+        # Threshold the grayscale image to get a binary image
+        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 1001, 30)
+        
+        binary = cv2.dilate(binary, self.kernel, iterations=2)
+        
+        edges = cv2.Canny(binary, 20, 30, apertureSize=7)
+        
+        # Perform Probabilistic Hough Line Transform
+        lines = cv2.HoughLinesP(edges, 4, np.pi/180, 100, minLineLength=50, maxLineGap=30)
+        
+        for line in lines:
+            cv2.line(frame, (line[0][0], line[0][1]), (line[0][2], line[0][3]), (0, 255, 0), 2)
+        
+        min_angle = 90  # Initialize minimum angle to 90 degrees
+        vertical_line = None  # Initialize the vertical line
+
+        for line in lines:
+            for x1, y1, x2, y2 in line:
+                # Calculate the angle of the line with respect to the vertical axis
+                angle = degrees(atan2(y2 - y1, x2 - x1))  # Swap x and y
+                angle = abs(angle - 90)  # Adjust the range to [0, 180]
+
+                # If this line is more vertical than the previous most vertical line
+                if angle < min_angle:
+                    min_angle = angle
+                    vertical_line = line
+
+        if vertical_line is not None:
+            x1, y1, x2, y2 = vertical_line[0]
+            average_x = (x1 + x2) / 2
+
+            cv2.line(frame, (x1, y1), (x2, y2), (244, 255, 0), 2)
+
+            if average_x < 640:
+                return 1
+            else:
+                return 0
+
+        return -1
         
         
     def get_edges(self, frame):
@@ -63,14 +111,18 @@ class Camera():
         binary = cv2.dilate(binary, self.kernel, iterations=2)
         
         # Get the average pixel value of the left and right side of the image
-        left_avg = np.mean(binary[:, :binary.shape[1]//2])
-        right_avg = np.mean(binary[:, binary.shape[1]//2:])
+        left_avg = np.average(binary[:, :binary.shape[1]//2])
+        right_avg = np.average(binary[:, binary.shape[1]//2:])
         
         self.avg_brightness_values_left.append(left_avg)  # Append the average brightness to the list
         self.avg_brightness_values_right.append(right_avg)  # Append the average brightness to the list
 
-       # Perform Canny edge detection
+        # Perform Canny edge detection
         edges = cv2.Canny(binary, 50, 120, apertureSize=3)
+        
+        # Draw the edges onto the binary image
+        # binary = cv2.bitwise_and(binary, binary, mask=edges)
+
 
         # Perform Probabilistic Hough Line Transform
         lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, minLineLength=100, maxLineGap=30)
@@ -94,7 +146,7 @@ class Camera():
 
         # Define a threshold for the difference in slopes and intercepts
         slope_threshold = 0.1
-        intercept_threshold = 10.0
+        intercept_threshold = 10
 
         # Group the lines
         try:
@@ -276,7 +328,7 @@ class Camera():
         self.video_writer = None
         self.blockPositions = {}
 
-        video_path = r"C:\Users\felix\Downloads\Videos Runs\alles Licht, fenster zu, Blöcke, kein Filter.mp4"
+        video_path = r"C:\Users\felix\Downloads\Videos Runs\alles Licht, Fenster zu, keine Blöcke, keine Filter.mp4"
         self.cap = cv2.VideoCapture(video_path)
 
         self.avg_edge_distance_values = []
@@ -358,6 +410,7 @@ class Camera():
 
                     StopTime = time.time()
                     framebinary = self.get_edges(frameraw)
+                    print(self.get_drive_direction(frameraw))
 
                     self.frame = framebinary if show_binary else frame  # Show the binary frame if show_binary is True, otherwise show the normal frame
                     

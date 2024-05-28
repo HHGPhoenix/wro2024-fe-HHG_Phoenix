@@ -112,10 +112,14 @@ class Utility:
         #Wait a short time to make sure all threads are stopped
         self.Buzzer1.buzz(1000, 80, 0.5)
         
+        print("expected: all lines ['gpiochip4:5 /GPIO5/', 'gpiochip4:6 /GPIO6/', 'gpiochip4:12 /GPIO12/']")
+        print("all lines", all_lines)
         #Clear all used lines
         for line in all_lines:
             line.release()
+            print("line released", line)
         time.sleep(0.2)
+        chip.close()
             
         StopTime = time.time()
         self.LogDebug(f"Time needed for I2C cleanup: {StopTime - StartTime}")
@@ -171,7 +175,6 @@ class Utility:
                 self.usb_communication.sendMessage(f"S{self.StartSensor}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"ANGR {self.AngR}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"ANGL {self.AngL}", self.ESPHoldDistance)
-                self.usb_communication.sendMessage(f"SPEED {self.StartSpeed}", self.ESPHoldSpeed)
 
                 timeTime = time.time()
                 
@@ -706,7 +709,7 @@ class Camera():
     # Function running in a new thread that constantly updates the coordinates of the blocks in the camera stream
     def process_blocks(self):
         self.video_writer = None
-        self.frames = [None, None]
+        self.frames = [None] * 3
 
         while True:
             self.block_array, framenormal, frameraw = self.get_coordinates()
@@ -714,6 +717,7 @@ class Camera():
 
             self.frames[0] = framenormal
             self.frames[1] = framebinary
+            self.frames[2] = frameraw
 
             # if self.video_writer is None:
             #     # Create a VideoWriter object to save the frames as an mp4 file

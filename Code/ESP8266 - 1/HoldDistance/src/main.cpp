@@ -159,7 +159,9 @@ void loop()
 				command += c; // Append the character to the command string
 			}
 		}
-		delay(10); // wait so the loop isn't too fast
+
+		distance1 = ultraschall1.read();
+		distance2 = ultraschall2.read();
 	}
 	// Main loop if started and not in manual mode
 	else if (started)
