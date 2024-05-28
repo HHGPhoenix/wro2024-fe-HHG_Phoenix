@@ -4,6 +4,7 @@ from threading import Thread
 import traceback
 from flask import Flask, render_template, Response, jsonify
 from math import atan2
+from copy import deepcopy
 
 ##########################################################
 ##                                                      ##
@@ -102,6 +103,8 @@ class HoldLane():
     def avoidBlocks(self):
         while not self.Utils.Cam.frames:
             time.sleep(0.0001)
+            
+        print(self.Utils.Cam.avg_edge_distance)
         
         case = -1
         if self.Utils.Cam.avg_edge_distance > 150:
@@ -113,14 +116,22 @@ class HoldLane():
         if case != -1:
             drive_directions = []
             for _ in range(10):
-                drive_direction = self.get_drive_direction(self.Utils.Cam.frames[0])
-                drive_directions.append(drive_direction)
+                drive_direction = self.get_drive_direction(self.Utils.Cam.frames[2], case)
                 
+                if drive_direction != -1:
+                    drive_directions.append(drive_direction)
+                                
             self.direction = round(np.mean(drive_directions))
+            
+            print("drive_directions", drive_directions)
+            print("self.direction", self.direction)
+            print("case", case)
+            
         
         else:
             self.Utils.LogError("Edge detection could not decide on case, maybe not working correctly")
 
+        self.Utils.usb_communication.sendMessage(f"SPEED {self.Utils.StartSpeed}", ESPHoldSpeed)
         #Hold Lane
         while self.Utils.running:
             time.sleep(0.0001)
@@ -214,8 +225,8 @@ class HoldLane():
             #         if "Drive direction clockwise" in responses:
             #             self.direction = 0
             
-            if self.rounds == 3 and self.timelastcorner + 1 < time.time():
-                if self.Utils.Cam.avg_edge_distance < 150:
+            if self.rounds == 3 and self.timelastcorner + 2 < time.time():
+                if self.Utils.Cam.avg_edge_distance < 165:
                     self.Utils.running = False
                     self.Utils.LogInfo(f"End of path reached {self.Utils.Cam.avg_edge_distance}")
             
@@ -706,8 +717,11 @@ class HoldLane():
             self.Utils.LogInfo(f"Switched to self.Sensor {self.before_safety_state[0]} Safety end")       
 
 
-    def get_drive_direction(self, frame, case):
-        frame = frame[100:, :]
+    def get_drive_direction(self, inputFrame, case):
+        frame = deepcopy(inputFrame)
+        frame = frame[250:, :]
+        
+        self.kernel = self.Utils.Cam.kernel
         
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -715,38 +729,48 @@ class HoldLane():
         gray = cv2.dilate(gray, self.kernel, iterations=1)
     
         # Threshold the grayscale image to get a binary image
-        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 1001, 30)
+        binary = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY)[1]
         
         binary = cv2.dilate(binary, self.kernel, iterations=2)
         
         if case == 0:
+            binary = binary[50:, :]
             edges = cv2.Canny(binary, 20, 30, apertureSize=7)
             
             # Perform Probabilistic Hough Line Transform
-            lines = cv2.HoughLinesP(edges, 4, np.pi/180, 100, minLineLength=50, maxLineGap=30)
+            lines = cv2.HoughLinesP(edges, 4, np.pi/180, 30, minLineLength=50, maxLineGap=30)                
             
-            for line in lines:
-                cv2.line(frame, (line[0][0], line[0][1]), (line[0][2], line[0][3]), (0, 255, 0), 2)
-            
-            min_angle = 90  # Initialize minimum angle to 90 degrees
+            target_angle = 90  # The angle we want to find the closest to
+            closest_angle_diff = float('inf')  # Initialize the closest angle difference to infinity
             vertical_line = None  # Initialize the vertical line
 
-            for line in lines:
-                for x1, y1, x2, y2 in line:
-                    # Calculate the angle of the line with respect to the vertical axis
-                    angle = degrees(atan2(y2 - y1, x2 - x1))
-                    angle = abs(angle - 90)  # Adjust the range to [0, 180]
+            if lines is not None:
+                frame = frame[50:, :]
+                for line in lines:
+                    cv2.line(frame, (line[0][0], line[0][1]), (line[0][2], line[0][3]), (0, 255, 0), 2)
+                    for x1, y1, x2, y2 in line:
+                        # Calculate the angle of the line with respect to the vertical axis
+                        angle = degrees(atan2(y2 - y1, x2 - x1))
+                        angle = abs(angle)  # Adjust the range to [0, 180]
 
-                    # If this line is more vertical than the previous most vertical line
-                    if angle < min_angle:
-                        min_angle = angle
-                        vertical_line = line
+                        # Calculate the difference between this angle and the target angle
+                        angle_diff = abs(target_angle - angle)
+
+                        # If this line is closer to the target angle than the previous closest
+                        print("angle: ", angle, "angle_diff: ", angle_diff)
+                        if angle_diff < closest_angle_diff:
+                            closest_angle_diff = angle_diff
+                            vertical_line = line
+                            
+            # cv2.imwrite("frame.jpg", frame)
+                
 
             if vertical_line is not None:
                 x1, y1, x2, y2 = vertical_line[0]
                 average_x = (x1 + x2) / 2
 
                 cv2.line(frame, (x1, y1), (x2, y2), (244, 255, 0), 2)
+                # cv2.imwrite("frame.jpg", frame)
 
                 if average_x < 640:
                     return 1
@@ -756,9 +780,10 @@ class HoldLane():
             return -1
         
         elif case == 1:
+            new_binary = deepcopy(binary)
             # Get the average pixel value of the left and right side of the image
-            left_avg = np.mean(binary[:, :binary.shape[1]//2])
-            right_avg = np.mean(binary[:, binary.shape[1]//2:])
+            left_avg = np.mean(new_binary[:, :new_binary.shape[1]//2])
+            right_avg = np.mean(new_binary[:, new_binary.shape[1]//2:])
             
             return 1 if left_avg > right_avg else 0
         
