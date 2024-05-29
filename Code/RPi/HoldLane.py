@@ -464,16 +464,6 @@ class HoldLane():
                     self.timelastwidecorner = time.time()
                     self.block_wide_corner = True
                     
-                elif self.ESPAdjusted and self.Utils.Cam.avg_edge_distance < 70:
-                    self.Utils.usb_communication.sendMessage("D 15", self.Utils.ESPHoldDistance)
-                    self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
-                    self.desired_distance_wall = 15
-                    self.Sensor = 1
-                    self.ESPAdjusted = False
-                    self.block_wide_corner = False
-                    self.Utils.LogInfo("Pos 1 green direction 0 end")
-                    self.timelastgreenpos1 = time.time()
-                    
             elif self.Utils.blockPositions[self.next_corner]["position"] == "1" and self.Utils.blockPositions[self.next_corner]["color"] == "red":
                 if not self.ESPAdjusted and 140 < self.Utils.Cam.avg_edge_distance < 180 and self.timelastredpos1 + 3 < time.time():
                     self.Utils.usb_communication.sendMessage("D 70", self.Utils.ESPHoldDistance)
@@ -516,6 +506,7 @@ class HoldLane():
                     self.ESPAdjusted = True
                     self.timelastwidecorner = time.time()
                     self.block_wide_corner = True
+                    self.timelastredpos1 = time.time()
                     
             elif self.Utils.blockPositions[self.next_corner]["position"] == "1" and self.Utils.blockPositions[self.next_corner]["color"] == "green":
                 if not self.ESPAdjusted and 140 < self.Utils.Cam.avg_edge_distance < 180 and self.timelastgreenpos1 + 3 < time.time():
@@ -525,7 +516,6 @@ class HoldLane():
                     self.Sensor = 2
                     self.ESPAdjusted = True
                     self.block_wide_corner = True
-                    self.timelastredpos1 = time.time()
                     
                 elif self.ESPAdjusted and self.Utils.Cam.avg_edge_distance < 140:
                     self.Utils.usb_communication.sendMessage("S2", self.Utils.ESPHoldDistance)
