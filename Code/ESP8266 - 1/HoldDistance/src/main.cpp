@@ -48,6 +48,7 @@ String command;						 // command string
 char c;								 // character for command string
 float lastError = 0;				 // last error for PD
 float KD = 0.5;						 // Derivative constant
+int startMode = 0;					 // Start mode for the small section
 
 // Ultrasonic setup
 Ultrasonic ultraschall1(TrigPin1, EchoPin1, 100000); // Trigger Pin, Echo Pin
@@ -79,7 +80,7 @@ void loop()
 					int numberStart = 5; // Skip the "START" characters
 					int numberLength = command.length();
 					String numberStr = command.substring(numberStart, numberLength);
-					int startMode = numberStr.toInt();
+					startMode = numberStr.toInt();
 
 					Serial.println("Received START command. Performing action... "); // Feedback for Raspberry Pi
 					servo.write(ServoMiddlePosition);								 // Reset servo position
@@ -378,29 +379,32 @@ void loop()
 
 						servo.write(int(ServoMiddlePosition - average)); // Set servo position
 
-						if (!firstCornerDetected && (distanceEdgeDetection > 0))
+						if (startMode == 1)
 						{
-							if (distance1 > distanceEdgeDetection)
+							if (!firstCornerDetected && (distanceEdgeDetection > 0))
 							{
-								firstCornerDetected = true;
-								Serial.println("Drive direction clockwise");
-								activeSensor = 1;
-							}
-							// read other sensor sometimes
-							if (edgeDetectionCounter == 1)
-							{
-								distance2 = ultraschall2.read();
-
-								if (distance2 > distanceEdgeDetection)
+								if (distance1 > distanceEdgeDetection)
 								{
 									firstCornerDetected = true;
-									Serial.println("Drive direction counterclockwise");
-									activeSensor = 2;
+									Serial.println("Drive direction clockwise");
+									activeSensor = 1;
 								}
-							}
-							else
-							{
-								edgeDetectionCounter++;
+								// read other sensor sometimes
+								if (edgeDetectionCounter == 1)
+								{
+									distance2 = ultraschall2.read();
+
+									if (distance2 > distanceEdgeDetection)
+									{
+										firstCornerDetected = true;
+										Serial.println("Drive direction counterclockwise");
+										activeSensor = 2;
+									}
+								}
+								else
+								{
+									edgeDetectionCounter++;
+								}
 							}
 						}
 					}
@@ -471,28 +475,31 @@ void loop()
 						}
 						servo.write(int(ServoMiddlePosition + average2)); // Set servo position
 
-						if (!firstCornerDetected && (distanceEdgeDetection > 0))
+						if (startMode == 1)
 						{
-							if (distance2 > distanceEdgeDetection)
+							if (!firstCornerDetected && (distanceEdgeDetection > 0))
 							{
-								firstCornerDetected = true;
-								Serial.println("Drive direction counterclockwise");
-								activeSensor = 2;
-							}
-							// read other sensor sometimes
-							if (edgeDetectionCounter == 1)
-							{
-								distance1 = ultraschall1.read();
-								if (distance1 > distanceEdgeDetection)
+								if (distance2 > distanceEdgeDetection)
 								{
 									firstCornerDetected = true;
-									Serial.println("Drive direction clockwise");
-									activeSensor = 1;
+									Serial.println("Drive direction counterclockwise");
+									activeSensor = 2;
 								}
-							}
-							else
-							{
-								edgeDetectionCounter++;
+								// read other sensor sometimes
+								if (edgeDetectionCounter == 1)
+								{
+									distance1 = ultraschall1.read();
+									if (distance1 > distanceEdgeDetection)
+									{
+										firstCornerDetected = true;
+										Serial.println("Drive direction clockwise");
+										activeSensor = 1;
+									}
+								}
+								else
+								{
+									edgeDetectionCounter++;
+								}
 							}
 						}
 					}

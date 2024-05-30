@@ -2,10 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Initialize a dictionary to store different types of values
-values = {"avg_edge_distance": [], "distance": [], "self.block_distance_to_wall": [], " self.nextBlock['x']": []}
+values = {"Angle": []}
 
 # Open the log file and read lines
-with open(r'C:\Users\Admin\OneDrive\Dokumente\GitHub\wro2024-fe-HHG_Phoenix\Code\RPi\Debug.log', 'r') as file:
+with open(r'C:\Users\Admin\OneDrive\Dokumente\GitHub\wro2024-fe-HHG_Phoenix\Code\RPi\DataLog.log', 'r') as file:
     for line in file:
         # Split the line into parts
         parts = line.strip().split(', ')
