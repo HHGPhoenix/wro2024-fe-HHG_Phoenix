@@ -23,7 +23,7 @@ Buzzer1 = Buzzer(12, Utils)
 Cam = Camera(video_stream=True, Utils=Utils)
 
 global ESPHoldDistance, ESPHoldSpeed
-ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1, Cam)
+ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(StartButton, StopButton, Buzzer1, Cam)
 
 Utils.setupDataLog()
 

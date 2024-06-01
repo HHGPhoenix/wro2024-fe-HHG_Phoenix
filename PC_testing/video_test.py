@@ -123,7 +123,6 @@ class Camera():
         # Draw the edges onto the binary image
         # binary = cv2.bitwise_and(binary, binary, mask=edges)
 
-
         # Perform Probabilistic Hough Line Transform
         lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, minLineLength=100, maxLineGap=30)
 
