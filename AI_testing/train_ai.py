@@ -1,19 +1,20 @@
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.optimizers import SGD
 
 # Same as before...
-input_dim = (640, 285, 3)
+input_dim = (320, 143, 3)
 num_classes = 3
 num_epochs = 10
 batch_size = 32
 
 # Add data augmentation to the training data generator
 train_datagen = ImageDataGenerator(
-    rescale=1./255,
-    rotation_range=0,
-    width_shift_range=0,
-    height_shift_range=0,
+    rescale=1,
+    rotation_range=10,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
     horizontal_flip=False
 )
 
@@ -51,10 +52,8 @@ model = tf.keras.Sequential([
     tf.keras.layers.Dense(3, activation='sigmoid'),
 ])
 
-# Same as before...
-model.compile(optimizer='adam',
-              loss=tf.keras.losses.BinaryCrossentropy(),
-              metrics=['accuracy'])
+opt = SGD(learning_rate=0.01)
+model.compile(loss = "categorical_crossentropy", optimizer = opt)
 
 # Add early stopping and model checkpointing
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="logs")
