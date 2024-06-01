@@ -24,7 +24,6 @@ import json
 ##                   GPIO init                          ##
 ##                                                      ##
 ##########################################################
-
 global chip, all_lines
 
 chip = gpiod.Chip('gpiochip4')
@@ -38,19 +37,10 @@ all_lines = []
 ##                                                      ##
 ##########################################################
 
-#A class that can be called to raise a custom exception and self.Utils.LogError a custom message
-class CustomException(Exception):
-    def __init__(self, message):
-        self.Utils.LogError(message)  # self.Utils.LogError the custom message
-
-
-
-#A class that has some necessary tools for calculating, usw.
+# A class that has some necessary tools for calculating, usw.
 class Utility:
-    #Transfer data so it can be used in other classes
-    def transferSensorData(self, Farbsensor=None, StartButton=None, StopButton=None, Buzzer1=None, Cam=None):
-        self.setupLog()
-        
+    # Transfer data so it can be used in other classes
+    def transferSensorData(self, StartButton, StopButton, Buzzer1, Cam=None):
         self.usb_communication = USBCommunication(self)
         self.ESPHoldDistance, self.ESPHoldSpeed = self.usb_communication.initNodeMCUs()
         
@@ -64,7 +54,6 @@ class Utility:
         if self.Cam is not None:
             self.Cam.video_writer = None
         
-        self.Farbsensor = Farbsensor
         self.StartButton = StartButton
         self.StopButton = StopButton
         self.Buzzer1 = Buzzer1
@@ -93,11 +82,10 @@ class Utility:
         return self.ESPHoldDistance, self.ESPHoldSpeed
         
         
-    #Cleanup after the run is finished or an error occured
+    # Cleanup after the run is finished or an error occured
     def cleanup(self):
         self.LogDebug("Started cleanup")
-        
-        StartTime = time.time()
+
         self.I2C_communication.stop_threads()
         
         self.StopButton.stop_StopButton()
@@ -107,32 +95,27 @@ class Utility:
                 self.Cam.video_writer.release()
                 pass
         
-        #self.StopNodemcus()
-        
         #Wait a short time to make sure all threads are stopped
         self.Buzzer1.buzz(1000, 80, 0.5)
         
         print("expected: all lines ['gpiochip4:5 /GPIO5/', 'gpiochip4:6 /GPIO6/', 'gpiochip4:12 /GPIO12/']")
         print("all lines", all_lines)
-        #Clear all used lines
+        # Clear all used lines
         for line in all_lines:
             line.release()
             print("line released", line)
         time.sleep(0.2)
         chip.close()
-            
-        StopTime = time.time()
-        self.LogDebug(f"Time needed for I2C cleanup: {StopTime - StartTime}")
         
         self.running = False
         self.usb_communication.closeNodeMCUs()
         os.kill(os.getpid(), signal.SIGTERM)
     
     
-    #Do some init and wait until StartButton is pressed
+    # Do some init and wait until StartButton is pressed
     def StartRun(self):
-        #clear console
-        #os.system('cls' if os.name=='nt' else 'clear')
+        # clear console
+        # os.system('cls' if os.name=='nt' else 'clear')
         
         if self.Cam:
             pCam = mp.Process(target=self.Cam.start_processing())
@@ -155,14 +138,10 @@ class Utility:
         time.sleep(0.1)
         self.Buzzer1.buzz(1000, 80, 0.1)
 
-        bypassIsEnabled = self.check_for_key_json('/tmp/StartupBypass.json', 'enable_startup_bypass')
         
         while self.running and self.waiting:
             time.sleep(0.1)
-            if self.StartButton.state() == 1 or bypassIsEnabled:
-
-                if bypassIsEnabled:
-                    time.sleep(1)
+            if self.StartButton.state() == 1:
         
                 self.usb_communication.startNodeMCUs()
                 self.Gyro.GyroStart = True
@@ -178,13 +157,11 @@ class Utility:
 
                 timeTime = time.time()
                 
-
                 self.StartTime = timeTime
                 self.LogDebug(f"Run started: {timeTime}")
                 self.Display.write("Run started:", f"{timeTime}")  
                 self.Buzzer1.buzz(1000, 80, 0.1) 
 
-                
                 self.waiting = False
                 
     
@@ -293,7 +270,7 @@ class Utility:
     def convert_to_specified_digits(self, number, num_digits):
         # Check if the input number is a valid float or int
         if not isinstance(number, (float, int)):
-            raise CustomException(f"Invalid input: Please provide a valid number: {number}")
+            raise ValueError("The input number must be a valid float or int")
         
         # Convert the number to a string
         num_str = str(number)
@@ -317,13 +294,12 @@ class Utility:
         return final_number
     
     
-    #Collect data from the sensors
+    # Collect data from the sensors
     def data_feed(self):
         return {"D1": self.SensorDistance1, "D2": self.SensorDistance2, "angle": self.Gyro.angle, "voltage": self.ADC.voltage, "cpu_usage": psutil.cpu_percent(), "ram_usage": psutil.virtual_memory().percent}
-
     
-    ############################################################
     
+    # Check for the presence of a key JSON file
     def check_for_key_json(self, json_file_path, key):
         file_path = os.path.join(os.getcwd(), json_file_path)
         if not os.path.exists(file_path):
@@ -347,6 +323,7 @@ class Utility:
         return False
     
 
+    # Change a key JSON file
     def change_key_json(self, json_file_path, key, value):
         file_path = os.path.join(os.getcwd(), json_file_path)
         if not os.path.exists(file_path):
@@ -371,20 +348,23 @@ class Button(Utility):
         
         #GPIO setup
         self.button_line = chip.get_line(SignalPin)
+        
         try:
             self.button_line.request(consumer='Button', type=gpiod.LINE_REQ_DIR_IN, flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP)
-        except OSError:
-            # if platform.system() == 'Linux':
-            # self.Utils.change_key_json('/tmp/StartupBypass.json', 'enable_startup_bypass', 'True')
+        finally:
+            self.button_line.release()
+        
+            try:
+                self.button_line.request(consumer='Button', type=gpiod.LINE_REQ_DIR_IN, flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP)
+            except OSError:
+                print("!!!! REBOOT !!!!")
+                print("OS Error in Button class")
+                print("!!!! REBOOT !!!!")
 
-            print("!!!! REBOOT !!!!")
-            print("OS Error in Button class")
-            print("!!!! REBOOT !!!!")
+                time.sleep(1)
 
-            time.sleep(1)
-
-            # restart the rpi (linux)
-            os.system('sudo reboot')
+                # restart the rpi (linux)
+                os.system('sudo reboot')
 
         all_lines.append(self.button_line)
         
@@ -425,10 +405,25 @@ class Buzzer(Utility):
     def __init__(self, SignalPin, Utils):
 
         self.Utils = Utils
-        self.SignalPin = chip.get_line(SignalPin)
-        self.SignalPin.request(consumer='buzzer', type=gpiod.LINE_REQ_DIR_OUT)
+        self.SignalPinLine = chip.get_line(SignalPin)
         
-        all_lines.append(self.SignalPin)
+        try:
+            self.SignalPinLine.request(consumer='buzzer', type=gpiod.LINE_REQ_DIR_OUT)
+        finally:
+            self.SignalPinLine.release()
+            try:
+                self.SignalPinLine.request(consumer='buzzer', type=gpiod.LINE_REQ_DIR_OUT)
+            except OSError:
+                print("!!!! REBOOT !!!!")
+                print("OS Error in Buzzer class")
+                print("!!!! REBOOT !!!!")
+
+                time.sleep(1)
+
+                # restart the rpi (linux)
+                os.system('sudo reboot')
+        
+        all_lines.append(self.SignalPinLine)
 
     def buzz(self, frequency, volume, duration):
         try:
@@ -454,7 +449,7 @@ class Buzzer(Utility):
 
 #A class for detecting red and green blocks in the camera stream           
 class Camera():
-    def __init__(self, video_stream=False, video_source=0, Utils=None):
+    def __init__(self, video_stream=False, enable_video_writer=False, Utils=None):
         # Variable initialization
         self.freeze = False
         self.frame = None
@@ -463,6 +458,7 @@ class Camera():
         self.video_stream = video_stream
         self.picam2 = Picamera2()
         self.Utils = Utils
+        self.enable_video_writer = enable_video_writer
         
         # Configure and start the camera
         config = self.picam2.create_still_configuration(main={"size": (1280, 720)}, raw={"size": (1280, 720)}, controls={"FrameRate": 34})
@@ -493,7 +489,8 @@ class Camera():
         self.camera_angle = 15
         self.distance_multiplier = 2.22
         
-        
+    
+    # Get distance to the wall
     def get_edges(self, frame):
         frame = frame[250:, 300:980]
         
@@ -719,14 +716,14 @@ class Camera():
             self.frames[1] = framebinary
             self.frames[2] = frameraw
 
-            # if self.video_writer is None:
-            #     # Create a VideoWriter object to save the frames as an mp4 file
-            #     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            #     self.video_writer = cv2.VideoWriter('output.mp4', fourcc, 20, (frameraw.shape[1], frameraw.shape[0]), True)
+            if self.video_writer is None and self.enable_video_writer:
+                # Create a VideoWriter object to save the frames as an mp4 file
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                self.video_writer = cv2.VideoWriter('output.mp4', fourcc, 20, (frameraw.shape[1], frameraw.shape[0]), True)
 
-            # # Write the frame to the video file
-            # self.video_writer.write(frameraw)
-            self.Utils.LogData()
+            # Write the frame to the video file
+            if self.enable_video_writer:
+                self.video_writer.write(frameraw)
 
 
     # Start a new thread for processing the camera stream
@@ -734,7 +731,9 @@ class Camera():
         thread = threading.Thread(target=self.process_blocks)
         thread.daemon = False
         thread.start()
-        
+    
+    
+    # Compress the video frames for the webstream    
     def compress_frame(self, frame):
         dimensions = len(frame.shape)
         if dimensions == 3:

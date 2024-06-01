@@ -21,10 +21,10 @@ StopButton = Button(6, Utils)
 
 Buzzer1 = Buzzer(12, Utils)
 
-Cam = Camera(video_stream=True, Utils=Utils)
+Cam = Camera(video_stream=True, enable_video_writer=False, Utils=Utils)
 
 global ESPHoldDistance, ESPHoldSpeed
-ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(Farbsensor, StartButton, StopButton, Buzzer1, Cam)
+ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(StartButton, StopButton, Buzzer1, Cam)
 
 Utils.setupDataLog()
 
@@ -316,49 +316,55 @@ class HoldLane():
     def detectBlockPos(self):
         if not self.active_block_drive:
             # Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['x']: {self.nextBlock['x']}, self.nextBlock['y']: {self.nextBlock['y']}")
+            
+            # Try to make the x area for pos1 somewhat dynamic
+            pos1_x_area = [0, 0]
+            if self.direction == 1:
+                if self.desired_distance_wall <= 30 and self.Sensor == 2:
+                    pos1_x_area = [200, 400]
+                elif 30 < self.desired_distance_wall < 70 and self.Sensor == 2:
+                    pos1_x_area = [0, 300]
+                elif self.desired_distance_wall >= 70 and self.Sensor == 2:
+                    pos1_x_area = [0, 400]
+            
+            elif self.direction == 0:
+                if self.desired_distance_wall <= 30 and self.Sensor == 1:
+                    pos1_x_area = [880, 1080]
+                elif 30 < self.desired_distance_wall < 70 and self.Sensor == 1:
+                    pos1_x_area = [980, 1280]
+                elif self.desired_distance_wall >= 70 and self.Sensor == 1:
+                    pos1_x_area = [880, 1280]
+            
             if (self.Utils.Cam.avg_edge_distance < 220) and -15 < self.relative_angle < 40 and self.direction == 1:
                 self.nextBlock['position'] = "0"
-                if (130 < self.Utils.Cam.avg_edge_distance < 160) and self.nextBlock['x'] < 300 and 50 < self.nextBlock["distance"] < 105 and self.timelastcorner + 1.5 < time.time() and not self.drive_corner: # and next_corner not in Utils.blockPositions:
+                if (130 < self.Utils.Cam.avg_edge_distance < 160) and pos1_x_area[0] < self.nextBlock['mx'] < pos1_x_area[1] and 50 < self.nextBlock["distance"] < 105 and self.timelastcorner + 1.5 < time.time() and not self.drive_corner: # and next_corner not in Utils.blockPositions:
                     self.nextBlock['position'] = "1"
                     BlockPos = self.next_corner
                                             
                 elif 85 < self.block_distance_to_wall < 105 and 70 < self.nextBlock["distance"] < 100: # and self.timelastcorner + 1 < time.time(): # and corner not in Utils.blockPositions
                     self.nextBlock['position'] = "3"
                     BlockPos = self.corner
-                    
-                # elif 45 < self.nextBlock['distance'] < 70 and self.timelastcorner + 1.5 < time.time():
-                #     self.nextBlock['position'] = "2"
-                #     BlockPos = corner
                 
                 if self.nextBlock['position'] != "0":
                     self.Utils.blockPositions.update({BlockPos: {"position": self.nextBlock['position'], "color": self.nextBlock['color']}})
                         
             elif (self.Utils.Cam.avg_edge_distance < 200) and -35 < self.relative_angle < 5 and self.direction == 0:
-                # Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['x']: {self.nextBlock['x']}, self.nextBlock['y']: {self.nextBlock['y']}")
-                if (120 < self.Utils.Cam.avg_edge_distance < 150) and self.nextBlock['x'] > 980 and 50 < self.nextBlock["distance"] < 90 and self.timelastcorner + 2 < time.time():
+                self.nextBlock['position'] = "0"
+                if (120 < self.Utils.Cam.avg_edge_distance < 150) and pos1_x_area[0] < self.nextBlock['mx'] < pos1_x_area[1] and 50 < self.nextBlock["distance"] < 90 and self.timelastcorner + 2 < time.time():
                     self.nextBlock['position'] = "1"
                     BlockPos = self.corner + 1 if self.corner < 3 else 0
                     
                 elif 85 < self.block_distance_to_wall < 110 and 45 < self.nextBlock["distance"] < 70: # and self.timelastcorner + 1.5 < time.time() and self.corner not in self.Utils.blockPositions:
                     self.nextBlock['position'] = "3"
                     BlockPos = self.corner
-                    
-                # elif corner not in Utils.blockPositions and 45 < self.nextBlock['distance'] < 70:
-                #     self.nextBlock['position'] = "2"
-                #     BlockPos = corner
 
-                else:
-                    self.nextBlock['position'] = "0"
-                
                 if self.nextBlock['position'] != "0":
                     self.Utils.blockPositions.update({BlockPos: {"position": self.nextBlock['position'], "color": self.nextBlock['color']}})
                     
         elif self.nextBlock2:
-            # print("nextBlock2" + str(self.nextBlock2))
             if (self.Utils.Cam.avg_edge_distance < 220) and -15 < self.relative_angle < 40 and self.direction == 1:
-                #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['x']: {self.nextBlock['x']}, self.nextBlock['y']: {self.nextBlock['y']}")
                 self.nextBlock['position'] = "0"
-                if (120 < self.Utils.Cam.avg_edge_distance < 150) and self.nextBlock['x'] < 300 and 50 < self.nextBlock["distance"] < 90 and self.timelastcorner + 1.5 < time.time(): # and next_corner not in Utils.blockPositions:
+                if (120 < self.Utils.Cam.avg_edge_distance < 150) and pos1_x_area[0] < self.nextBlock['mx'] < pos1_x_area[1] and 50 < self.nextBlock["distance"] < 90 and self.timelastcorner + 1.5 < time.time(): # and next_corner not in Utils.blockPositions:
                     self.nextBlock['position'] = "1"
                     BlockPos = self.next_corner
 
@@ -366,14 +372,11 @@ class HoldLane():
                     self.Utils.blockPositions.update({BlockPos: {"position": self.nextBlock['position'], "color": self.nextBlock['color']}})
                         
             elif (self.Utils.Cam.avg_edge_distance < 200) and -35 < self.relative_angle < 5 and self.direction == 0:
-                # Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['x']: {self.nextBlock['x']}, self.nextBlock['y']: {self.nextBlock['y']}")
-                if (120 < self.Utils.Cam.avg_edge_distance < 150) and self.nextBlock['x'] > 980 and 50 < self.nextBlock["distance"] < 90 and self.timelastcorner + 1.5 < time.time():
+                self.nextBlock['position'] = "0"
+                if (120 < self.Utils.Cam.avg_edge_distance < 150) and pos1_x_area[0] < self.nextBlock['mx'] < pos1_x_area[1] and 50 < self.nextBlock["distance"] < 90 and self.timelastcorner + 1.5 < time.time():
                     self.nextBlock['position'] = "1"
                     BlockPos = self.corner + 1 if self.corner < 3 else 0
 
-                else:
-                    self.nextBlock['position'] = "0"
-                
                 if self.nextBlock['position'] != "0":
                     self.Utils.blockPositions.update({BlockPos: {"position": self.nextBlock['position'], "color": self.nextBlock['color']}})
                 
@@ -753,20 +756,15 @@ class HoldLane():
                         angle_diff = abs(target_angle - angle)
 
                         # If this line is closer to the target angle than the previous closest
-                        print("angle: ", angle, "angle_diff: ", angle_diff)
                         if angle_diff < closest_angle_diff:
                             closest_angle_diff = angle_diff
                             vertical_line = line
-                            
-            # cv2.imwrite("frame.jpg", frame)
-                
 
             if vertical_line is not None:
                 x1, y1, x2, y2 = vertical_line[0]
                 average_x = (x1 + x2) / 2
 
                 cv2.line(frame, (x1, y1), (x2, y2), (244, 255, 0), 2)
-                # cv2.imwrite("frame.jpg", frame)
 
                 if average_x < 640:
                     return 1

@@ -22,18 +22,17 @@ class USBCommunication:
         self.messageArrayHoldDistance = []
         self.messageArrayHoldSpeed = []
         
-        """
-        self.EspHoldDistancePin = chip.get_line(24)
-        self.EspHoldSpeedPin = chip.get_line(16)
-        self.EspHoldDistancePin.request(consumer='USBCommunication', type=gpiod.LINE_REQ_DIR_OUT)
-        self.EspHoldSpeedPin.request(consumer='USBCommunication', type=gpiod.LINE_REQ_DIR_OUT)
-        all_lines.append(self.EspHoldDistancePin)
-        all_lines.append(self.EspHoldSpeedPin)
-        self.EspHoldDistancePin.set_value(1)
-        self.EspHoldSpeedPin.set_value(1)
-        """
+        # self.EspHoldDistancePin = chip.get_line(24)
+        # self.EspHoldSpeedPin = chip.get_line(16)
+        # self.EspHoldDistancePin.request(consumer='USBCommunication', type=gpiod.LINE_REQ_DIR_OUT)
+        # self.EspHoldSpeedPin.request(consumer='USBCommunication', type=gpiod.LINE_REQ_DIR_OUT)
+        # all_lines.append(self.EspHoldDistancePin)
+        # all_lines.append(self.EspHoldSpeedPin)
+        # self.EspHoldDistancePin.set_value(1)
+        # self.EspHoldSpeedPin.set_value(1)
         
-        
+    
+    # Heartbeat to check if NodeMCUs are still connected
     def handleHeartbeat(self):
         self.sendMessage("H", self.EspHoldSpeed)
         # time.sleep(0.1)
@@ -52,6 +51,7 @@ class USBCommunication:
             self.Utils.LogWarning(f"NodeMCU for HoldDistance is not responding to heartbeat: '{responseHoldDistance}' x{self.HoldDistanceCounter}")
         
         
+    # Send messages to NodeMCUs
     def handleSendMessage(self):
         completeMessage = ""
         totalSizeHoldDistance = 0
@@ -80,6 +80,7 @@ class USBCommunication:
         self.EspHoldSpeed.write(f"{completeMessage}".encode())
         
         
+    # Get responses from NodeMCUs
     def handleGetResponse(self):
         try:
             responseHoldDistance = self.EspHoldDistance.read(self.EspHoldDistance.inWaiting())
@@ -106,7 +107,8 @@ class USBCommunication:
             self.Utils.LogWarning(f"UnicodeDecodeError for HoldSpeed: {e}")
             return None
         
-        
+      
+    # Threaded function to handle sending messages and getting responses from NodeMCUs  
     def handleThreadedFunctions(self):
         counter = 0
         while self.started:
@@ -118,15 +120,17 @@ class USBCommunication:
             else:
                 counter += 1
         
-        
+      
+    # Send messages to NodeMCUs    
     def sendMessage(self, message, ESP):
         if ESP == self.EspHoldDistance:
             self.messageArrayHoldDistance.append(message)
         
         elif ESP == self.EspHoldSpeed:
             self.messageArrayHoldSpeed.append(message)
+      
         
-            
+    # Get responses from NodeMCUs
     def getResponses(self, ESP, caller=""):    
         if ESP == self.EspHoldDistance:
             for i, response in enumerate(self.responsesHoldDistance):
@@ -169,7 +173,7 @@ class USBCommunication:
                 return responses
         
         
-    #Init both NodeMCUs
+    # Init both NodeMCUs
     def initNodeMCUs(self):
         usb_devices = []
         # Run the 'ls /dev/tty*' command using a shell and capture the output
@@ -220,14 +224,16 @@ class USBCommunication:
         
         return self.EspHoldDistance, self.EspHoldSpeed
         
-    #Start both NodeMCUs and wait for responses
+        
+    # Start both NodeMCUs and wait for responses
     def startNodeMCUs(self):
         #Start both NodeMCUs
         self.sendMessage(f"START {self.Utils.startMode}", self.EspHoldDistance)
         self.sendMessage("START", self.EspHoldSpeed)
         time.sleep(0.1)
+           
             
-    #Stop both NodeMCUs and wait for responses
+    # Stop both NodeMCUs and wait for responses
     def stopNodeMCUs(self):
         for ESP in [self.EspHoldDistance, self.EspHoldSpeed]:
             ESP.flush()
@@ -248,7 +254,8 @@ class USBCommunication:
         
         time.sleep(0.1)
         
-        
+    
+    # Close both NodeMCUs
     def closeNodeMCUs(self):
         self.started = False
         
@@ -273,6 +280,8 @@ class USBCommunication:
             self.Utils.LogWarning("Reset NodeMCU for HoldSpeed")
             
         
+        
+# If this is executed as main program, it will test for a heartbeat from the NodeMCUs
 if __name__ == "__main__":
     try:
         usb_communication = USBCommunication()
