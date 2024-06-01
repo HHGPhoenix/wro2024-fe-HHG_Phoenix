@@ -24,7 +24,6 @@ import json
 ##                   GPIO init                          ##
 ##                                                      ##
 ##########################################################
-
 global chip, all_lines
 
 chip = gpiod.Chip('gpiochip4')
@@ -37,13 +36,6 @@ all_lines = []
 ##                     Classes                          ##
 ##                                                      ##
 ##########################################################
-
-# A class that can be called to raise a custom exception and self.Utils.LogError a custom message
-class CustomException(Exception):
-    def __init__(self, message):
-        self.Utils.LogError(message)  # self.Utils.LogError the custom message
-
-
 
 # A class that has some necessary tools for calculating, usw.
 class Utility:
@@ -278,7 +270,7 @@ class Utility:
     def convert_to_specified_digits(self, number, num_digits):
         # Check if the input number is a valid float or int
         if not isinstance(number, (float, int)):
-            raise CustomException(f"Invalid input: Please provide a valid number: {number}")
+            raise ValueError("The input number must be a valid float or int")
         
         # Convert the number to a string
         num_str = str(number)
@@ -732,6 +724,7 @@ class Camera():
             # Write the frame to the video file
             if self.enable_video_writer:
                 self.video_writer.write(frameraw)
+
 
     # Start a new thread for processing the camera stream
     def start_processing(self):

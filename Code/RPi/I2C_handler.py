@@ -11,6 +11,7 @@ class I2Ccommunication:
         self.ColorSensor = ColorSensor()
     
         
+    # start all threads for I2C communication
     def start_threads(self):
         self.Display.threadStop = 0
         tOled = threading.Thread(target=self.Display.update, daemon=True)
@@ -28,6 +29,8 @@ class I2Ccommunication:
         # tColor = threading.Thread(target=self.ColorSensor.read, daemon=True)
         # tColor.start()
     
+    
+    # stop all threads for I2C communication
     def stop_threads(self):
         self.Display.threadStop = 1
         self.Gyro.threadStop = 1
