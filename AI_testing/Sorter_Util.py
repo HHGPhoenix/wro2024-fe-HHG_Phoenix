@@ -4,6 +4,7 @@ import shutil
 from tkinter import *
 from tkinter import filedialog, simpledialog
 from PIL import Image, ImageTk
+import re
 
 # JSON file to save settings
 json_file = 'settings.json'
@@ -22,6 +23,8 @@ def display_next_image():
     global current_image
     if dir_path and os.path.exists(dir_path):  # Check if dir_path is not None and exists
         jpg_files = [f for f in os.listdir(dir_path) if f.endswith('.jpg')]
+        # Extract the frame number from the file name and sort the files by it
+        jpg_files = sorted(jpg_files, key=lambda f: int(re.search(r'frame(\d+)', f).group(1)))
         if jpg_files:
             current_image = os.path.join(dir_path, jpg_files[0])
             img = Image.open(current_image)
