@@ -5,6 +5,7 @@ from tkinter import *
 from tkinter import filedialog, simpledialog
 from PIL import Image, ImageTk
 import re
+import uuid
 
 # JSON file to save settings
 json_file = 'settings.json'
@@ -12,10 +13,19 @@ json_file = 'settings.json'
 # Set the size for all images
 image_size = (500, 500)
 
+
 def move_file(subdir):
     global current_image
     if current_image:
-        shutil.move(current_image, os.path.join(dir_path, subdir))
+        # Generate a unique name for the file
+        base, ext = os.path.splitext(current_image)
+        new_name = base + str(uuid.uuid4()) + ext
+
+        # Rename the file
+        os.rename(current_image, new_name)
+
+        # Move the file
+        shutil.move(new_name, os.path.join(dir_path, subdir))
         current_image = None
         display_next_image()
 

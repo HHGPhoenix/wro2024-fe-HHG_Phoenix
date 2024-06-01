@@ -3,7 +3,7 @@ import os
 import time
 
 global file_path, output_path
-file_path = r"C:\Users\felix\Downloads\Videos Runs\alles Licht, fenster zu, Blöcke, kein Filter.mp4"
+file_path = r"C:\Users\felix\Downloads\Videos Runs\alles Licht, Fenster auf, Blöcke.mp4"
 # output_path = r"D:\Datasets\WRO Beta test\not_categorized\test_imag3es"
 output_path = r"C:\Users\felix\Downloads\Videos Runs\test_images"
 
