@@ -2,3 +2,4 @@
 *.log
 .vscode/settings.json
 /tmp
+model.keras
