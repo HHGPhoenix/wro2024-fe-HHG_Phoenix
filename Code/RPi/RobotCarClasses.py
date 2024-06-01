@@ -413,10 +413,25 @@ class Buzzer(Utility):
     def __init__(self, SignalPin, Utils):
 
         self.Utils = Utils
-        self.SignalPin = chip.get_line(SignalPin)
-        self.SignalPin.request(consumer='buzzer', type=gpiod.LINE_REQ_DIR_OUT)
+        self.SignalPinLine = chip.get_line(SignalPin)
         
-        all_lines.append(self.SignalPin)
+        try:
+            self.SignalPinLine.request(consumer='buzzer', type=gpiod.LINE_REQ_DIR_OUT)
+        finally:
+            self.SignalPinLine.release()
+            try:
+                self.SignalPinLine.request(consumer='buzzer', type=gpiod.LINE_REQ_DIR_OUT)
+            except OSError:
+                print("!!!! REBOOT !!!!")
+                print("OS Error in Buzzer class")
+                print("!!!! REBOOT !!!!")
+
+                time.sleep(1)
+
+                # restart the rpi (linux)
+                os.system('sudo reboot')
+        
+        all_lines.append(self.SignalPinLine)
 
     def buzz(self, frequency, volume, duration):
         try:
@@ -442,7 +457,7 @@ class Buzzer(Utility):
 
 #A class for detecting red and green blocks in the camera stream           
 class Camera():
-    def __init__(self, video_stream=False, video_source=0, Utils=None):
+    def __init__(self, video_stream=False, enable_video_writer=False, Utils=None):
         # Variable initialization
         self.freeze = False
         self.frame = None
@@ -451,6 +466,7 @@ class Camera():
         self.video_stream = video_stream
         self.picam2 = Picamera2()
         self.Utils = Utils
+        self.enable_video_writer = enable_video_writer
         
         # Configure and start the camera
         config = self.picam2.create_still_configuration(main={"size": (1280, 720)}, raw={"size": (1280, 720)}, controls={"FrameRate": 34})
@@ -481,7 +497,8 @@ class Camera():
         self.camera_angle = 15
         self.distance_multiplier = 2.22
         
-        
+    
+    # Get distance to the wall
     def get_edges(self, frame):
         frame = frame[250:, 300:980]
         
@@ -707,22 +724,23 @@ class Camera():
             self.frames[1] = framebinary
             self.frames[2] = frameraw
 
-            # if self.video_writer is None:
-            #     # Create a VideoWriter object to save the frames as an mp4 file
-            #     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            #     self.video_writer = cv2.VideoWriter('output.mp4', fourcc, 20, (frameraw.shape[1], frameraw.shape[0]), True)
+            if self.video_writer is None and self.enable_video_writer:
+                # Create a VideoWriter object to save the frames as an mp4 file
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                self.video_writer = cv2.VideoWriter('output.mp4', fourcc, 20, (frameraw.shape[1], frameraw.shape[0]), True)
 
-            # # Write the frame to the video file
-            # self.video_writer.write(frameraw)
-            self.Utils.LogData()
-
+            # Write the frame to the video file
+            if self.enable_video_writer:
+                self.video_writer.write(frameraw)
 
     # Start a new thread for processing the camera stream
     def start_processing(self):
         thread = threading.Thread(target=self.process_blocks)
         thread.daemon = False
         thread.start()
-        
+    
+    
+    # Compress the video frames for the webstream    
     def compress_frame(self, frame):
         dimensions = len(frame.shape)
         if dimensions == 3:
