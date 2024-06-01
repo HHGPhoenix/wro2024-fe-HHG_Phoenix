@@ -18,7 +18,7 @@ train_datagen = ImageDataGenerator(
 )
 
 train_generator = train_datagen.flow_from_directory(
-    r"C:\Users\erfin\Documents\Github Repos\wro2024-fe-HHG_Phoenix\WRO Beta test",
+    r".\WRO Beta test",
     target_size=input_dim[:2],
     batch_size=batch_size,
     class_mode='categorical',
@@ -28,7 +28,7 @@ train_generator = train_datagen.flow_from_directory(
 # Same as before...
 test_datagen = ImageDataGenerator(rescale=1./255)
 test_generator = test_datagen.flow_from_directory(
-    r'C:\Users\erfin\Documents\Github Repos\wro2024-fe-HHG_Phoenix\WRO Beta test\Testing',
+    r'.\WRO Beta test\Testing',
     target_size=input_dim[:2],
     batch_size=batch_size,
     class_mode='categorical',
@@ -36,16 +36,19 @@ test_generator = test_datagen.flow_from_directory(
 
 # Add dropout layers to the model
 model = tf.keras.Sequential([
-    tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_dim),
-    tf.keras.layers.MaxPooling2D((2, 2)),
-    tf.keras.layers.Dropout(0.25),
-    tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
-    tf.keras.layers.MaxPooling2D((2, 2)),
-    tf.keras.layers.Dropout(0.25),
+    tf.keras.layers.Conv2D(16, (3, 3), 1, activation='relu', input_shape=input_dim),
+    tf.keras.layers.MaxPooling2D(),
+    
+    tf.keras.layers.Conv2D(32, (3, 3), 1, activation='relu'),
+    tf.keras.layers.MaxPooling2D(),
+    
+    tf.keras.layers.Conv2D(16, (3, 3), 1, activation='relu'),
+    tf.keras.layers.MaxPooling2D(),
+    
     tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense(64, activation='relu'),
-    tf.keras.layers.Dropout(0.5),
-    tf.keras.layers.Dense(num_classes, activation='softmax')
+    
+    tf.keras.layers.Dense(256, activation='relu'),
+    tf.keras.layers.Dense(3, activation='sigmoid'),
 ])
 
 # Same as before...
