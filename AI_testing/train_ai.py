@@ -4,7 +4,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator # type: igno
 # Define your model architecture
 input_dim = (640, 285, 3)  # Replace with the actual input dimension (height, width, channels)
 num_classes = 3  # Number of classes (Red, Green, Nothing)
-num_epochs = 10  # Replace 10 with the actual number of epochs
+num_epochs = 1  # Replace 10 with the actual number of epochs
 batch_size = 32  # Replace 32 with the actual batch size
 
 # Create an ImageDataGenerator for training data
