@@ -11,14 +11,14 @@ batch_size = 32
 # Add data augmentation to the training data generator
 train_datagen = ImageDataGenerator(
     rescale=1./255,
-    rotation_range=20,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    horizontal_flip=True
+    rotation_range=0,
+    width_shift_range=0,
+    height_shift_range=0,
+    horizontal_flip=False
 )
 
 train_generator = train_datagen.flow_from_directory(
-    r".\WRO Beta test",
+    r".\Dataset stuff\WRO Beta test",
     target_size=input_dim[:2],
     batch_size=batch_size,
     class_mode='categorical',
@@ -28,7 +28,7 @@ train_generator = train_datagen.flow_from_directory(
 # Same as before...
 test_datagen = ImageDataGenerator(rescale=1./255)
 test_generator = test_datagen.flow_from_directory(
-    r'.\WRO Beta test\Testing',
+    r'.\Dataset stuff\Testing',
     target_size=input_dim[:2],
     batch_size=batch_size,
     class_mode='categorical',
@@ -53,17 +53,14 @@ model = tf.keras.Sequential([
 
 # Same as before...
 model.compile(optimizer='adam',
-              loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
+              loss=tf.keras.losses.BinaryCrossentropy(),
               metrics=['accuracy'])
 
 # Add early stopping and model checkpointing
-callbacks = [
-    EarlyStopping(patience=5, restore_best_weights=True),
-    ModelCheckpoint('model.keras', save_best_only=True)
-]
+tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="logs")
 
 # Train the model with validation data
-model.fit(train_generator, epochs=num_epochs, validation_data=test_generator, callbacks=callbacks)
+hist = model.fit(train_generator, epochs=num_epochs, validation_data=test_generator, callbacks=tensorboard_callback)
 
 # Evaluate the model
 test_loss, test_acc = model.evaluate(test_generator)
