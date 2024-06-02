@@ -14,8 +14,8 @@ from adafruit_ads1x15.analog_in import AnalogIn
 #A class for writing to a OLED Display
 class DisplayOled():
     def __init__(self, Utils):
-        serial = i2c(port=0, address=0x3C)
-        self.device = sh1106(serial)
+        # serial = i2c(port=0, address=0x3C)
+        # self.device = sh1106(serial)
         
         #Variable init
         self.first_line = ""
@@ -23,9 +23,9 @@ class DisplayOled():
         self.threadStop = 0
         self.Utils = Utils
         
-        #Wake the screen by drawing an outline
-        with canvas(self.device) as draw:
-            draw.rectangle(self.device.bounding_box, outline="white", fill="black")
+        # Wake the screen by drawing an outline
+        # with canvas(self.device) as draw:
+            # draw.rectangle(self.device.bounding_box, outline="white", fill="black")
     
        
     #Clear the Display 
@@ -84,7 +84,7 @@ class Gyroscope():
     def __init__(self):
         i2c = busio.I2C(board.D1, board.D0)
         self.sensor = adafruit_mpu6050.MPU6050(i2c)
-        self.sensor._gyro_range = 0
+        self.sensor._gyro_range = 1
         
         self.threadStop = 0
         self.GyroStart = False
@@ -138,7 +138,7 @@ class Gyroscope():
    
 #A class for reading a ADS1015 ADC        
 class AnalogDigitalConverter():
-    def __init__(self, channel=2):
+    def __init__(self, channel=3):
         #Variables
         self.threadStop = 0
         self.channel = channel

@@ -16,6 +16,7 @@ from I2C_handler import I2Ccommunication
 from sklearn.linear_model import LinearRegression
 from math import tan, radians, cos, atan, degrees
 import json
+import uuid
 # import platform
 
 
@@ -41,6 +42,7 @@ all_lines = []
 class Utility:
     # Transfer data so it can be used in other classes
     def transferSensorData(self, StartButton, StopButton, Buzzer1, Cam=None):
+        self.setupLog()
         self.usb_communication = USBCommunication(self)
         self.ESPHoldDistance, self.ESPHoldSpeed = self.usb_communication.initNodeMCUs()
         
@@ -437,9 +439,9 @@ class Buzzer(Utility):
 
             end_time = time.time() + duration
             while time.time() < end_time:
-                self.SignalPin.set_value(1)
+                self.SignalPinLine.set_value(1)
                 time.sleep(on_time)
-                self.SignalPin.set_value(0)
+                self.SignalPinLine.set_value(0)
                 time.sleep(off_time)
                 
         except PermissionError:
@@ -719,7 +721,7 @@ class Camera():
             if self.video_writer is None and self.enable_video_writer:
                 # Create a VideoWriter object to save the frames as an mp4 file
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                self.video_writer = cv2.VideoWriter('output.mp4', fourcc, 20, (frameraw.shape[1], frameraw.shape[0]), True)
+                self.video_writer = cv2.VideoWriter(f'./videos/output_{str(uuid.uuid4())}.mp4', fourcc, 20, (frameraw.shape[1], frameraw.shape[0]), True)
 
             # Write the frame to the video file
             if self.enable_video_writer:
