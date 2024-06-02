@@ -8,7 +8,7 @@ from tensorflow.keras.models import load_model, Model
 model = load_model('cube_classifier.keras')
 
 # Load the provided image for prediction
-img_path = r'Dataset stuff\Testing\Red\frame455.jpg'  # Path to the uploaded image
+img_path = r'Dataset stuff/Testing/Red/frame455.jpg'  # Path to the uploaded image
 img = tf.keras.preprocessing.image.load_img(img_path, target_size=(320, 143))
 img_array = tf.keras.preprocessing.image.img_to_array(img) / 255.0
 img_array = np.expand_dims(img_array, axis=0)
