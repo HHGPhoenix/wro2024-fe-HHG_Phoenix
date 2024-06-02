@@ -10,7 +10,7 @@ model = load_model('cube_classifier.keras')
 class_labels = ['Green', 'Nothing', 'Red']
 
 # Open the video file
-video_path = 'AI_testing\input.mp4'  # replace with your video path
+video_path = 'AI_testing_old\input.mp4'  # replace with your video path
 cap = cv2.VideoCapture(video_path)
 
 # Check if video opened successfully
