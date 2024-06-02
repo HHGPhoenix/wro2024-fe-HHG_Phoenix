@@ -59,31 +59,39 @@ def process_video(model_path, video_path):
             blank_image[y_offset:y_offset+new_height, x_offset:x_offset+new_width] = frame
 
             # Preprocess the frame for the model
-            img_array = cv2.resize(blank_image, (320, 143)) / 255.0
+            # img_array = cv2.resize(blank_image, (320, 143)) / 255.0
+            img_array = cv2.resize(blank_image, (224, 224)) / 255.0
+            
             img_array = np.expand_dims(img_array, axis=0)
 
             # Predict the class of the image
             prediction = model.predict(img_array)
-
+            
             # Find the index of the highest probability
             predicted_index = np.argmax(prediction)
-
+            
             # Get the class label
             predicted_class = class_labels[predicted_index]
-
+            
             print(f'Predicted class: {predicted_class}')
-
+            
             # Display the resulting frame with prediction
             cv2.putText(blank_image, f'Predicted class: {predicted_class}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             
             # Add "Press 'Q' to quit" text
             cv2.putText(blank_image, "Press 'Q' to quit", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             
+            # Display probabilities of each class
+            y_pos = 110
+            for i, prob in enumerate(prediction[0]):
+                cv2.putText(blank_image, f'{class_labels[i]}: {prob:.2f}', (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                y_pos += 40
+            
             cv2.imshow('Frame', blank_image)
-
+            
             # Make the window fullscreen
             cv2.setWindowProperty('Frame', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-
+            
             # Press Q on keyboard to exit
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 break

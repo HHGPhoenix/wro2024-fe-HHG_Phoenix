@@ -8,3 +8,4 @@ cube_classifier.keras
 cube_classifier.h5
 cube_classifier.tflite
 settings.json
+*.keras
