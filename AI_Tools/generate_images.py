@@ -1,62 +1,87 @@
 import cv2
 import os
 import time
+from tkinter import Tk, Label, Button, StringVar, messagebox, ttk
+from tkinter.filedialog import askopenfilename, askdirectory
 
-global file_path, output_path
-file_path = r"C:\Users\felix\Downloads\Videos Runs\alles Licht, Fenster auf, Blöcke.mp4"
-# output_path = r"D:\Datasets\WRO Beta test\not_categorized\test_imag3es"
-output_path = r"C:\Users\felix\Downloads\Videos Runs\test_images"
+global file_path, output_path, progress
+file_path = ""
+output_path = ""
+progress = None
 
-# Check if file exists
-if not os.path.isfile(file_path):
-    print(f"File does not exist: {file_path}")
+def main():
+    global progress, status_text
+    root = Tk()
+    status_text = StringVar()
+    Label(root, textvariable=status_text).pack()
+    Button(root, text="Select Input File", command=select_input_file).pack()
+    Button(root, text="Select Output Directory", command=select_output_directory).pack()
+    Button(root, text="Start", command=generate_images).pack()
+    progress = ttk.Progressbar(root, length=100, mode='determinate')
+    progress.pack()
+    root.mainloop()
 
-# Check if directory exists
-if not os.path.isdir(output_path):
-    print(f"Directory does not exist: {output_path}")
+def select_input_file():
+    global file_path
+    file_path = askopenfilename()
+    status_text.set("Input file selected")
 
-# Check if you have write permissions
-if not os.access(output_path, os.W_OK):
-    print(f"Do not have write permissions for directory: {output_path}")
-
+def select_output_directory():
+    global output_path
+    output_path = askdirectory()
+    status_text.set("Output directory selected")
 
 def generate_images():
+    global status_text, progress
+    if not file_path or not output_path:
+        messagebox.showerror("Error", "Please select both input file and output directory")
+        return
+
     # Load the video
     cap = cv2.VideoCapture(file_path)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    progress['maximum'] = total_frames
 
     time.sleep(1)
-    
+
     try:
-        while True:
-            ret, frameraw = cap.read()
-            if not ret:
+        while cap.isOpened():
+            try:
+                ret, frameraw = cap.read()
+                if not ret:
+                    break
+            except Exception as e:
+                print(e)
                 break
-            
-            print(frameraw.shape)
 
             frame = frameraw.copy()
-            
-            print(frame.shape)  
-            
+
             # Save the frame
             frame_number = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-            print(f"Frame {frame_number}")
             output_file = os.path.join(output_path, f"frame{frame_number}.jpg")
-            print("Length of output_file:", len(output_file))
+
             # Check if directory exists
             if not os.path.exists(output_path):
-                os.makedirs(output_path)  # Uncommented this line
-                print("Directory created")
+                os.makedirs(output_path)
+                status_text.set("Directory created")
 
             return_value = cv2.imwrite(output_file, frame)
-            print("Return value:", return_value)
-            # cv2.imshow("Frame", frame)
+            status_text.set(f"Frame {frame_number} saved, return value: {return_value}")
+
+            progress['value'] = frame_number
+            progress.update()
+
             cv2.waitKey(1)  # Add a small delay to allow the window to update
-            
+
             time.sleep(0.01)
+
+            # Stop the loop when the last frame is reached
+            if frame_number == total_frames:
+                break
     finally:
         cap.release()
-        
+        status_text.set("Image generation completed")
+
 
 if __name__ == "__main__":
-    generate_images()
+    main()
