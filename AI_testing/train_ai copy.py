@@ -62,14 +62,14 @@ model.compile(optimizer=Adam(),
 # Fit the model
 history = model.fit(
     train_generator,
-    steps_per_epoch=train_generator.samples // train_generator.batch_size,
+    # steps_per_epoch=train_generator.samples // train_generator.batch_size,
     validation_data=validation_generator,
-    validation_steps=validation_generator.samples // validation_generator.batch_size,
+    # validation_steps=validation_generator.samples // validation_generator.batch_size,
     epochs=15,
     callbacks=[early_stopping]  # use early stopping
 )
 
-loss, accuracy = model.evaluate(validation_generator, steps=validation_generator.samples // validation_generator.batch_size)
+loss, accuracy = model.evaluate(validation_generator)
 print(f'Validation accuracy: {accuracy:.2f}')
 
 model.save('cube_classifier.keras')
