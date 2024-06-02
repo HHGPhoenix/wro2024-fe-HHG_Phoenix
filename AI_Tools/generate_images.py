@@ -71,9 +71,9 @@ def generate_images():
             progress['value'] = frame_number
             progress.update()
 
-            cv2.waitKey(1)  # Add a small delay to allow the window to update
+            # cv2.waitKey(1)  # Add a small delay to allow the window to update
 
-            time.sleep(0.01)
+            time.sleep(0.001)
 
             # Stop the loop when the last frame is reached
             if frame_number == total_frames:

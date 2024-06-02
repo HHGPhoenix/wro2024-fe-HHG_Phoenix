@@ -3,7 +3,10 @@ from tkinter import filedialog
 import cv2
 import tensorflow as tf
 import numpy as np
+import os
 from tensorflow.keras.models import load_model
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # Function to load and process video
 def process_video(model_path, video_path):
