@@ -8,7 +8,7 @@ import re
 import uuid
 
 # JSON file to save settings
-json_file = 'settings.json'
+json_file = None
 
 # Set the size for all images
 image_size = (500, 500)
@@ -80,13 +80,13 @@ def remove_subdir():
         save_settings()
 
 def save_settings():
-    if dir_path and subdirs:  # Only save if dir_path and subdirs are not None
+    if dir_path or subdirs:  # Save if either dir_path or subdirs is not None
         with open(json_file, 'w') as f:
             json.dump({'dir_path': dir_path, 'subdirs': subdirs}, f)
 
 def load_settings():
     global dir_path, subdirs, json_file
-    if os.path.exists(json_file):
+    if json_file and os.path.exists(json_file):
         with open(json_file, 'r') as f:
             settings = json.load(f)
             dir_path = settings.get('dir_path')
@@ -96,8 +96,9 @@ def load_settings():
                 button.pack()
                 buttons.append(button)
     else:
-        json_file = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Select location to save settings.json")
-        if json_file:  # Only proceed if a file location was selected
+        while not json_file:  # Keep asking until a file location is selected
+            json_file = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Select location to save settings.json", initialfile="settings.json")
+        if dir_path or subdirs:  # Save settings if either dir_path or subdirs is set
             save_settings()
 
 root = Tk()
