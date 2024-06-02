@@ -65,12 +65,12 @@ def start_distribution():
         files_for_folder_1 = files[split_point:]
         
         for file in files_for_folder_1:
-            shutil.move(os.path.join(subdir, file), os.path.join(target_subdir_1, file))
+            shutil.copy2(os.path.join(subdir, file), os.path.join(target_subdir_1, file))
         
         for file in files_for_folder_2:
-            shutil.move(os.path.join(subdir, file), os.path.join(target_subdir_2, file))
+            shutil.copy2(os.path.join(subdir, file), os.path.join(target_subdir_2, file))
 
-    messagebox.showinfo("Success", "Files have been distributed successfully.")
+    messagebox.showinfo("Success", "Files have been copied successfully.")
 
 # Setup Tkinter window
 root = tk.Tk()
