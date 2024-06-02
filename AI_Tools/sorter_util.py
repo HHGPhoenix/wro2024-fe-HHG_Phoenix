@@ -1,81 +1,85 @@
 import os
 import json
 import shutil
-from tkinter import *
-from tkinter import filedialog, simpledialog
-from PIL import Image, ImageTk
 import re
 import uuid
+from tkinter import filedialog, simpledialog
+from PIL import Image, ImageTk
+import customtkinter as ctk
 
 # JSON file to save settings
-json_file = None
+json_file = 'settings.json'
 
-# Set the size for all images
-image_size = (500, 500)
-
+# Set the size for all images (one side)
+image_side_size = 500
 
 def move_file(subdir):
     global current_image
     if current_image:
-        # Generate a unique name for the file
         base, ext = os.path.splitext(current_image)
         new_name = base + str(uuid.uuid4()) + ext
-
-        # Rename the file
         os.rename(current_image, new_name)
-
-        # Move the file
-        shutil.move(new_name, os.path.join(dir_path, subdir))
+        shutil.move(new_name, os.path.join(subdir))
         current_image = None
         display_next_image()
 
+def resize_image(img, size):
+    width, height = img.size
+    if width > height:
+        new_width = size
+        new_height = int((size / width) * height)
+    else:
+        new_height = size
+        new_width = int((size / height) * width)
+    return img.resize((new_width, new_height), Image.LANCZOS)
+
 def display_next_image():
     global current_image, current_image_index
-    if dir_path and os.path.exists(dir_path):  # Check if dir_path is not None and exists
+    if dir_path and os.path.exists(dir_path):
         jpg_files = [f for f in os.listdir(dir_path) if f.endswith('.jpg')]
-        jpg_files = sorted(jpg_files, key=lambda f: int(re.search(r'frame(\d+)', f).group(1)))
+        jpg_files = sorted(jpg_files, key=lambda f: int((re.search(r'frame(\d+)', f) or re.search(r'(\d+)', f)).group(1)))
         if jpg_files:
-            current_image_index = (current_image_index + 1) % len(jpg_files)  # Update the current image index
+            current_image_index = (current_image_index + 1) % len(jpg_files)
             current_image = os.path.join(dir_path, jpg_files[current_image_index])
             img = Image.open(current_image)
-            img = img.resize(image_size, Image.LANCZOS)  # Resize the image
+            img = resize_image(img, image_side_size)
             photo = ImageTk.PhotoImage(img)
-            label.config(image=photo)
+            label.configure(image=photo)
             label.image = photo
         else:
-            label.config(image=None)
+            label.configure(image=None)
 
 def display_previous_image():
     global current_image, current_image_index
-    if dir_path and os.path.exists(dir_path):  # Check if dir_path is not None and exists
+    if dir_path and os.path.exists(dir_path):
         jpg_files = [f for f in os.listdir(dir_path) if f.endswith('.jpg')]
-        jpg_files = sorted(jpg_files, key=lambda f: int(re.search(r'frame(\d+)', f).group(1)))
+        jpg_files = sorted(jpg_files, key=lambda f: int((re.search(r'frame(\d+)', f) or re.search(r'(\d+)', f)).group(1)))
         if jpg_files:
-            current_image_index = (current_image_index - 1) % len(jpg_files)  # Update the current image index
+            current_image_index = (current_image_index - 1) % len(jpg_files)
             current_image = os.path.join(dir_path, jpg_files[current_image_index])
             img = Image.open(current_image)
-            img = img.resize(image_size, Image.LANCZOS)  # Resize the image
+            img = resize_image(img, image_side_size)
             photo = ImageTk.PhotoImage(img)
-            label.config(image=photo)
+            label.configure(image=photo)
             label.image = photo
         else:
-            label.config(image=None)
+            label.configure(image=None)
 
 def select_directory():
     global dir_path
     dir_path = filedialog.askdirectory()
-    if dir_path:  # Only display next image if a directory was selected
+    if dir_path:
         display_next_image()
         save_settings()
-
-# Rest of the code remains the same
 
 def add_subdir():
     subdir = filedialog.askdirectory()
     if subdir:
-        button = Button(root, text=subdir, command=lambda subdir=subdir: move_file(subdir), relief=FLAT)  # Make the button flat
-        button.pack()
+        subdir_name = os.path.basename(subdir)
+        button = ctk.CTkButton(subdir_frame, text=subdir_name, command=lambda subdir=subdir: move_file(subdir))
+        buttons.append(button)
         subdirs.append(subdir)
+        refresh_subdir_buttons()
         save_settings()
 
 def edit_subdir():
@@ -84,19 +88,28 @@ def edit_subdir():
         new_subdir = filedialog.askdirectory()
         if new_subdir:
             subdirs[subdir_index - 1] = new_subdir
-            buttons[subdir_index - 1]['text'] = new_subdir
+            buttons[subdir_index - 1].configure(text=os.path.basename(new_subdir))
             save_settings()
 
 def remove_subdir():
     subdir_index = simpledialog.askinteger("Input", "Enter button number to remove", minvalue=1, maxvalue=len(subdirs))
     if subdir_index is not None:
         subdirs.pop(subdir_index - 1)
-        buttons[subdir_index - 1].destroy()
+        if buttons[subdir_index - 1] is not None:
+            buttons[subdir_index - 1].destroy()
         buttons.pop(subdir_index - 1)
+        refresh_subdir_buttons()
         save_settings()
 
+def refresh_subdir_buttons():
+    for widget in subdir_frame.winfo_children():
+        if widget not in buttons:
+            widget.destroy()
+    for button in buttons:
+        button.pack(padx=5, pady=5, fill='both')
+
 def save_settings():
-    if dir_path or subdirs:  # Save if either dir_path or subdirs is not None
+    if dir_path or subdirs:
         with open(json_file, 'w') as f:
             json.dump({'dir_path': dir_path, 'subdirs': subdirs}, f)
 
@@ -108,51 +121,53 @@ def load_settings():
             dir_path = settings.get('dir_path')
             subdirs = settings.get('subdirs', [])
             for subdir in subdirs:
-                button = Button(root, text=subdir, command=lambda subdir=subdir: move_file(subdir), relief=FLAT)  # Make the button flat
-                button.pack()
+                subdir_name = os.path.basename(subdir)
+                button = ctk.CTkButton(subdir_frame, text=subdir_name, command=lambda subdir=subdir: move_file(subdir))
                 buttons.append(button)
+            refresh_subdir_buttons()
     else:
         json_file = filedialog.askopenfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Select location to save settings.json", initialfile="settings.json")
 
         if os.path.exists(json_file):
             load_settings()
-
         elif not json_file:
             json_file = 'settings.json'
             load_settings()
 
-root = Tk()
+# Initialize customtkinter
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
-# Set the initial size of the window and enable the maximize button
+root = ctk.CTk()
 root.geometry("800x600")
 root.resizable(True, True)
 
-# Use native window icons
-# root.iconbitmap(default='icon.ico')
-
 current_image = None
+current_image_index = -1
 dir_path = None
 subdirs = []
 buttons = []
 
-label = Label(root)
-label.pack()
+label = ctk.CTkLabel(root, text="")
+label.pack(pady=10)
 
-select_dir_button = Button(root, text="Select Directory", command=select_directory, relief=FLAT)  # Make the button flat
-select_dir_button.pack()
+select_dir_button = ctk.CTkButton(root, text="Select Directory", command=select_directory)
+select_dir_button.pack(pady=5)
 
-add_subdir_button = Button(root, text="Add Subdirectory", command=add_subdir, relief=FLAT)  # Make the button flat
-add_subdir_button.pack()
+add_subdir_button = ctk.CTkButton(root, text="Add Subdirectory", command=add_subdir)
+add_subdir_button.pack(pady=5)
 
-edit_subdir_button = Button(root, text="Edit Subdirectory", command=edit_subdir, relief=FLAT)  # Make the button flat
-edit_subdir_button.pack()
+edit_subdir_button = ctk.CTkButton(root, text="Edit Subdirectory", command=edit_subdir)
+edit_subdir_button.pack(pady=5)
 
-remove_subdir_button = Button(root, text="Remove Subdirectory", command=remove_subdir, relief=FLAT)  # Make the button flat
-remove_subdir_button.pack()
+remove_subdir_button = ctk.CTkButton(root, text="Remove Subdirectory", command=remove_subdir)
+remove_subdir_button.pack(pady=5)
 
-# Add a new button to load the previous image
-prev_image_button = Button(root, text="Previous Image", command=display_previous_image, relief=FLAT)  # Make the button flat
-prev_image_button.pack()
+prev_image_button = ctk.CTkButton(root, text="Previous Image", command=display_previous_image)
+prev_image_button.pack(pady=5)
+
+subdir_frame = ctk.CTkFrame(root)
+subdir_frame.pack(pady=10, fill="both", expand=True)
 
 load_settings()
 
