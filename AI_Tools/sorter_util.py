@@ -6,9 +6,11 @@ import uuid
 from tkinter import filedialog, simpledialog
 from PIL import Image, ImageTk
 import customtkinter as ctk
+import tkinter.messagebox as messagebox
+import tkinter as tk
 
 # JSON file to save settings
-json_file = 'settings.json'
+json_file = ''
 
 # Set the size for all images (one side)
 image_side_size = 500
@@ -113,9 +115,22 @@ def save_settings():
         with open(json_file, 'w') as f:
             json.dump({'dir_path': dir_path, 'subdirs': subdirs}, f)
 
+
 def load_settings():
     global dir_path, subdirs, json_file
-    if json_file and os.path.exists(json_file):
+
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+
+    if not json_file:
+        if messagebox.askyesno("Settings file", "Do you want to create a new settings file?"):
+            json_file = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Create new settings.json", initialfile="settings.json")
+            with open(json_file, 'w') as f:
+                json.dump({'dir_path': None, 'subdirs': []}, f)
+        else:
+            json_file = filedialog.askopenfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Select existing settings.json")
+
+    if os.path.exists(json_file):
         with open(json_file, 'r') as f:
             settings = json.load(f)
             dir_path = settings.get('dir_path')
@@ -125,14 +140,15 @@ def load_settings():
                 button = ctk.CTkButton(subdir_frame, text=subdir_name, command=lambda subdir=subdir: move_file(subdir))
                 buttons.append(button)
             refresh_subdir_buttons()
-    else:
-        json_file = filedialog.askopenfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Select location to save settings.json", initialfile="settings.json")
 
-        if os.path.exists(json_file):
-            load_settings()
-        elif not json_file:
-            json_file = 'settings.json'
-            load_settings()
+def delete_current_image():
+    global current_image
+    if current_image:
+        os.remove(current_image)
+        current_image = None
+        display_next_image()
+
+
 
 # Initialize customtkinter
 ctk.set_appearance_mode("dark")
@@ -165,6 +181,9 @@ remove_subdir_button.pack(pady=5)
 
 prev_image_button = ctk.CTkButton(root, text="Previous Image", command=display_previous_image)
 prev_image_button.pack(pady=5)
+
+delete_image_button = ctk.CTkButton(root, text="Delete Image", command=delete_current_image)
+delete_image_button.pack(pady=5)
 
 subdir_frame = ctk.CTkFrame(root)
 subdir_frame.pack(pady=10, fill="both", expand=True)
