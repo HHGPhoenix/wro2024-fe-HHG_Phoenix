@@ -85,7 +85,7 @@ def save_settings():
             json.dump({'dir_path': dir_path, 'subdirs': subdirs}, f)
 
 def load_settings():
-    global dir_path, subdirs
+    global dir_path, subdirs, json_file
     if os.path.exists(json_file):
         with open(json_file, 'r') as f:
             settings = json.load(f)
@@ -95,6 +95,10 @@ def load_settings():
                 button = Button(root, text=subdir, command=lambda subdir=subdir: move_file(subdir), relief=FLAT)  # Make the button flat
                 button.pack()
                 buttons.append(button)
+    else:
+        json_file = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Select location to save settings.json")
+        if json_file:  # Only proceed if a file location was selected
+            save_settings()
 
 root = Tk()
 
