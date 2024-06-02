@@ -47,7 +47,7 @@ model = Sequential([
     Flatten(),
     Dense(128, activation='relu'),
     Dropout(0.5),
-    Dense(3, activation='relu')
+    Dense(3, activation='softmax')
 ])
 
 # Add early stopping
@@ -65,23 +65,11 @@ history = model.fit(
     steps_per_epoch=train_generator.samples // train_generator.batch_size,
     validation_data=validation_generator,
     validation_steps=validation_generator.samples // validation_generator.batch_size,
-    epochs=1,
+    epochs=15,
     callbacks=[early_stopping]  # use early stopping
 )
 
 loss, accuracy = model.evaluate(validation_generator, steps=validation_generator.samples // validation_generator.batch_size)
 print(f'Validation accuracy: {accuracy:.2f}')
 
-model.save('cube_classifier.h5')
-
-# import tensorflow as tf
-
-# model2 = tf.keras.models.load_model('cube_classifier.h5', compile=False)
-
-# Converting a tf.Keras model to a TensorFlow Lite model.
-converter = tf.lite.TFLiteConverter.from_keras_model(model)
-tflite_model = converter.convert()
-
-
-# Save the model to disk
-open("cube_classifier.tflite", "wb").write(tflite_model)
+model.save('cube_classifier.keras')
