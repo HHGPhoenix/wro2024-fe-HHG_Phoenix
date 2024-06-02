@@ -6,6 +6,7 @@ from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.utils import class_weight
 from tensorflow.keras.optimizers import Adam
 import numpy as np
+from tensorflow.keras.losses import SparseCategoricalCrossentropy
 
 # Data augmentation
 train_datagen = ImageDataGenerator(
@@ -33,30 +34,37 @@ validation_generator = train_datagen.flow_from_directory(
     subset='validation'
 )
 
-# Add dropout layers to the model
+# # Add dropout layers to the model
+# model = Sequential([
+#     Conv2D(32, (3, 3), activation='relu', input_shape=(320, 143, 3)),
+#     MaxPooling2D(pool_size=(2, 2)),
+#     Dropout(0.25),
+#     Conv2D(64, (3, 3), activation='relu'),
+#     MaxPooling2D(pool_size=(2, 2)),
+#     Dropout(0.25),
+#     Conv2D(128, (3, 3), activation='relu'),
+#     MaxPooling2D(pool_size=(2, 2)),
+#     Dropout(0.25),
+#     Flatten(),
+#     Dense(128, activation='relu'),
+#     Dropout(0.5),
+#     Dense(3, activation='relu')
+# ])
+
 model = Sequential([
-    Conv2D(32, (3, 3), activation='relu', input_shape=(320, 143, 3)),
-    MaxPooling2D(pool_size=(2, 2)),
-    Dropout(0.25),
-    Conv2D(64, (3, 3), activation='relu'),
-    MaxPooling2D(pool_size=(2, 2)),
-    Dropout(0.25),
-    Conv2D(128, (3, 3), activation='relu'),
-    MaxPooling2D(pool_size=(2, 2)),
-    Dropout(0.25),
-    Flatten(),
+    Flatten(input_shape=(320, 143, 3)),
     Dense(128, activation='relu'),
-    Dropout(0.5),
-    Dense(3, activation='relu')
+    Dense(3)
 ])
+
 
 # Add early stopping
 early_stopping = EarlyStopping(monitor='val_loss', patience=5)
 
 print(np.unique(train_generator.classes))
 
-model.compile(optimizer=Adam(),
-              loss='categorical_crossentropy',
+model.compile(optimizer='adam',
+              loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
               metrics=['accuracy'])
 
 # Fit the model
