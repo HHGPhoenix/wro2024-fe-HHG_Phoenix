@@ -30,13 +30,29 @@ def move_file(subdir):
         display_next_image()
 
 def display_next_image():
-    global current_image
+    global current_image, current_image_index
     if dir_path and os.path.exists(dir_path):  # Check if dir_path is not None and exists
         jpg_files = [f for f in os.listdir(dir_path) if f.endswith('.jpg')]
-        # Extract the frame number from the file name and sort the files by it
         jpg_files = sorted(jpg_files, key=lambda f: int(re.search(r'frame(\d+)', f).group(1)))
         if jpg_files:
-            current_image = os.path.join(dir_path, jpg_files[0])
+            current_image_index = (current_image_index + 1) % len(jpg_files)  # Update the current image index
+            current_image = os.path.join(dir_path, jpg_files[current_image_index])
+            img = Image.open(current_image)
+            img = img.resize(image_size, Image.LANCZOS)  # Resize the image
+            photo = ImageTk.PhotoImage(img)
+            label.config(image=photo)
+            label.image = photo
+        else:
+            label.config(image=None)
+
+def display_previous_image():
+    global current_image, current_image_index
+    if dir_path and os.path.exists(dir_path):  # Check if dir_path is not None and exists
+        jpg_files = [f for f in os.listdir(dir_path) if f.endswith('.jpg')]
+        jpg_files = sorted(jpg_files, key=lambda f: int(re.search(r'frame(\d+)', f).group(1)))
+        if jpg_files:
+            current_image_index = (current_image_index - 1) % len(jpg_files)  # Update the current image index
+            current_image = os.path.join(dir_path, jpg_files[current_image_index])
             img = Image.open(current_image)
             img = img.resize(image_size, Image.LANCZOS)  # Resize the image
             photo = ImageTk.PhotoImage(img)
@@ -96,10 +112,14 @@ def load_settings():
                 button.pack()
                 buttons.append(button)
     else:
-        while not json_file:  # Keep asking until a file location is selected
-            json_file = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Select location to save settings.json", initialfile="settings.json")
-        if dir_path or subdirs:  # Save settings if either dir_path or subdirs is set
-            save_settings()
+        json_file = filedialog.askopenfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Select location to save settings.json", initialfile="settings.json")
+
+        if os.path.exists(json_file):
+            load_settings()
+
+        elif not json_file:
+            json_file = 'settings.json'
+            load_settings()
 
 root = Tk()
 
@@ -129,6 +149,10 @@ edit_subdir_button.pack()
 
 remove_subdir_button = Button(root, text="Remove Subdirectory", command=remove_subdir, relief=FLAT)  # Make the button flat
 remove_subdir_button.pack()
+
+# Add a new button to load the previous image
+prev_image_button = Button(root, text="Previous Image", command=display_previous_image, relief=FLAT)  # Make the button flat
+prev_image_button.pack()
 
 load_settings()
 
