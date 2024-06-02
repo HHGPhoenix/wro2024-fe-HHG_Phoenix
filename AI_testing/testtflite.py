@@ -3,6 +3,7 @@ import numpy as np
 # import matplotlib.pyplot as plt
 from tensorflow.keras.preprocessing import image
 from tensorflow.keras.models import load_model, Model
+import time
 
 # Load the trained model
 # model = load_model('cube_classifier.tflite')
@@ -22,9 +23,19 @@ img_array = np.expand_dims(img_array, axis=0)
 # Set the tensor to point to the input data to be inferred
 model.set_tensor(input_details[0]['index'], img_array)
 
+# Start the timer
+start_time = time.time()
+
 # Run the inference
 model.invoke()
 
+# Stop the timer
+end_time = time.time()
+
+# Calculate the elapsed time
+elapsed_time = end_time - start_time
+
+print(f'Time taken to run the model: {elapsed_time} seconds')
 # The function `get_tensor()` returns a copy of the tensor data.
 # Use `tensor()` in order to get a pointer to the tensor.
 prediction = model.get_tensor(output_details[0]['index'])
