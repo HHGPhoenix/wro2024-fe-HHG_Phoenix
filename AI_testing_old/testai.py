@@ -5,11 +5,12 @@ from tensorflow.keras.preprocessing import image
 from tensorflow.keras.models import load_model, Model
 
 # Load the trained model
-model = load_model('cube_classifier_vgg16.keras')
+model = load_model('cube_classifier.keras')
 
 # Load the provided image for prediction
-img_path = r'Dataset stuff/Testing/Green/frame328.jpg'  # Path to the uploaded image
-img = tf.keras.preprocessing.image.load_img(img_path, target_size=(224, 224))
+img_path = r'Dataset stuff\Testing\Red\frame455.jpg'  # Path to the uploaded image 
+# img = tf.keras.preprocessing.image.load_img(img_path, target_size=(224, 224))  # Resize the image to (224, 224)
+img = tf.keras.preprocessing.image.load_img(img_path, target_size=(320, 143))  # Resize the image to (224, 224)
 img_array = tf.keras.preprocessing.image.img_to_array(img) / 255.0
 img_array = np.expand_dims(img_array, axis=0)
 
@@ -19,16 +20,16 @@ prediction = model.predict(img_array)
 # Print the prediction probabilities
 print(f'Prediction probabilities: {prediction}')
 
-# Assuming these are your class labels in the same order as the output
-class_labels = ['Green', 'Nothing', 'Red']
+# # Assuming these are your class labels in the same order as the output
+# class_labels = ['Green', 'Nothing', 'Red']
 
-# Find the index of the highest probability
-predicted_index = np.argmax(prediction)
+# # Find the index of the highest probability
+# predicted_index = np.argmax(prediction)
 
-# Get the class label
-predicted_class = class_labels[predicted_index]
+# # Get the class label
+# predicted_class = class_labels[predicted_index]
 
-print(f'The predicted class is: {predicted_class}')
+# print(f'The predicted class is: {predicted_class}')
 
 # # Initialize the model with a dummy input to define the input shape
 # dummy_input = np.zeros((1, 128, 128, 3))

@@ -3,8 +3,8 @@ from tkinter import filedialog, messagebox
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, CSVLogger
 from tensorflow.keras.applications import VGG16
 from tensorflow.keras.optimizers import Adam
 from sklearn.utils import class_weight
@@ -30,14 +30,16 @@ def start_training():
     # Data augmentation
     train_datagen = ImageDataGenerator(
         rescale=1./255,
-        shear_range=0.2,
-        zoom_range=0.2,
-        rotation_range=20,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        brightness_range=[0.8, 1.2],
+        shear_range=0.3,
+        zoom_range=0.3,
+        rotation_range=20,  # Increased rotation range
+        width_shift_range=0.3,
+        height_shift_range=0.3,
+        brightness_range=[0.5, 1.5],  # Wider brightness range
         horizontal_flip=True,
-        validation_split=0.2
+        vertical_flip=True,  # Include vertical flip
+        fill_mode='nearest',  # Fill mode for image augmentation
+        validation_split=0.1
     )
 
     # Load training and validation data
@@ -57,30 +59,36 @@ def start_training():
         subset='validation'
     )
 
-    # Load the VGG16 model pre-trained on ImageNet, excluding the top (fully connected) layers
+    # Load the VGG16 model pre-trained on ImageNet, including the top (fully connected) layers
     base_model = VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
 
-    # Freeze the base_model
-    base_model.trainable = False
+    # Unfreeze some of the deeper layers of VGG16
+    for layer in base_model.layers[-8:]:  # Unfreezing more layers for better fine-tuning
+        layer.trainable = True
 
     # Add custom top layers
     model = Sequential([
         base_model,
         Flatten(),
-        Dense(256, activation='relu'),
+        Dense(512, activation='relu'),
+        BatchNormalization(),  # Added batch normalization
         Dropout(0.5),
-        Dense(128, activation='relu'),
-        Dropout(0.2),
+        Dense(256, activation='relu'),
+        BatchNormalization(),  # Added batch normalization
+        Dropout(0.3),
         Dense(train_generator.num_classes, activation='softmax')
     ])
 
     # Compile the model
     model.compile(optimizer=Adam(learning_rate=0.0001),
-                  loss='categorical_crossentropy',
-                  metrics=['accuracy'])
+                loss='categorical_crossentropy',
+                metrics=['accuracy'])
 
-    # Add early stopping
-    early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+    # Callbacks
+    early_stopping = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+    model_checkpoint = ModelCheckpoint('best_model.keras', monitor='val_loss', save_best_only=True)
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=1e-6)
+    csv_logger = CSVLogger('training_log.csv', append=True)
 
     # Compute class weights
     class_weights = class_weight.compute_class_weight(
@@ -96,9 +104,9 @@ def start_training():
         steps_per_epoch=train_generator.samples // train_generator.batch_size,
         validation_data=validation_generator,
         validation_steps=validation_generator.samples // validation_generator.batch_size,
-        epochs=20,
+        epochs=100,  # Increased number of epochs
         class_weight=class_weights,
-        callbacks=[early_stopping]
+        callbacks=[early_stopping, model_checkpoint, reduce_lr, csv_logger]
     )
 
     # Evaluate the model

@@ -9,3 +9,5 @@ cube_classifier.h5
 cube_classifier.tflite
 settings.json
 *.keras
+/hyperparameter_tuning
+*.csv
