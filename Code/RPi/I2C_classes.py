@@ -5,7 +5,7 @@ from luma.oled.device import sh1106
 from gpiozero import CPUTemperature
 import psutil
 import busio
-import board, adafruit_tcs34725
+import board, adafruit_tcs34725, adafruit_mpu6050
 import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 import MPU6050
@@ -82,6 +82,63 @@ class DisplayOled():
 
 #A class for reading a MPU6050 Gyroscope
 class Gyroscope():
+    def __init__(self):
+        i2c = busio.I2C(board.D1, board.D0)
+        self.sensor = adafruit_mpu6050.MPU6050(i2c)
+        self.sensor._gyro_range = 0
+        
+        self.threadStop = 0
+        self.GyroStart = False
+
+        #Initialize variables for storing the angle and time
+        self.angle = 0.0  # Initial angle
+        self.last_time = time.time()
+    
+    #Read the gyroscope data and calculate the angle
+    def get_angle(self):
+        while self.threadStop == 0:
+            if self.GyroStart == True:
+                time.sleep(0.01)
+                offset_x = 0.29
+                offset_y = 0.0
+                offset_z = 0.0
+                #Read gyroscope data
+                gyro_data = self.sensor.gyro
+                gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
+
+                # Get the current time
+                current_time = time.time()
+
+                # Calculate the time elapsed since the last measurement
+                delta_time = current_time - self.last_time
+                
+                #bugfix for time-jumps
+                if delta_time >= 0.5:
+                    delta_time = 0.003
+
+                # Integrate the gyroscope readings to get the change in angle
+                if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
+                    gyro_data = 0
+                else:
+                    gyro_data = gyro_data[0]
+                    
+                delta_angle = gyro_data * delta_time * 60
+
+                # Update the angle
+                self.angle += delta_angle
+
+                # Update the last time for the next iteration
+                self.last_time = current_time
+                
+            else:
+                self.angle = 0.0
+                self.last_time = time.time()
+                time.sleep(0.1)
+
+
+
+#A class for reading a MPU6050 Gyroscope
+class Gyroscope2():
     def __init__(self):
         self.threadStop = 0
         self.rotation = [0, 0, 0]
