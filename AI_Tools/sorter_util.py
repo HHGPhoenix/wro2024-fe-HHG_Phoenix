@@ -200,31 +200,50 @@ subdirs = []
 buttons = []
 
 label = ctk.CTkLabel(root, text="")
-label.pack(pady=10)
+label.grid(row=0, column=0, columnspan=4, pady=10)
 
-select_dir_button = ctk.CTkButton(root, text="Select Directory", command=select_directory)
-select_dir_button.pack(pady=5)
+button_frame = ctk.CTkFrame(root)
+button_frame.grid(row=1, column=0, columnspan=4, pady=10)
 
-add_subdir_button = ctk.CTkButton(root, text="Add Subdirectory", command=add_subdir)
-add_subdir_button.pack(pady=5)
+select_dir_button = ctk.CTkButton(button_frame, text="Select Directory", command=select_directory)
+select_dir_button.grid(row=0, column=0, padx=5, pady=5)
 
-edit_subdir_button = ctk.CTkButton(root, text="Edit Subdirectory", command=edit_subdir)
-edit_subdir_button.pack(pady=5)
+add_subdir_button = ctk.CTkButton(button_frame, text="Add Subdirectory", command=add_subdir)
+add_subdir_button.grid(row=0, column=1, padx=5, pady=5)
 
-remove_subdir_button = ctk.CTkButton(root, text="Remove Subdirectory", command=remove_subdir)
-remove_subdir_button.pack(pady=5)
+edit_subdir_button = ctk.CTkButton(button_frame, text="Edit Subdirectory", command=edit_subdir)
+edit_subdir_button.grid(row=0, column=2, padx=5, pady=5)
 
-prev_image_button = ctk.CTkButton(root, text="Previous Image", command=display_previous_image)
-prev_image_button.pack(pady=5)
+remove_subdir_button = ctk.CTkButton(button_frame, text="Remove Subdirectory", command=remove_subdir)
+remove_subdir_button.grid(row=0, column=3, padx=5, pady=5)
 
-delete_image_button = ctk.CTkButton(root, text="Delete Image", command=delete_current_image)
-delete_image_button.pack(pady=5)
+prev_image_button = ctk.CTkButton(button_frame, text="Previous Image", command=display_previous_image)
+prev_image_button.grid(row=1, column=0, padx=5, pady=5)
 
-reset_button = ctk.CTkButton(root, text="Reset Settings", command=reset_settings)
-reset_button.pack(pady=5)
+delete_image_button = ctk.CTkButton(button_frame, text="Delete Image", command=delete_current_image)
+delete_image_button.grid(row=1, column=1, padx=5, pady=5)
 
-subdir_frame = ctk.CTkFrame(root)
-subdir_frame.pack(pady=10, fill="both", expand=True)
+reset_button = ctk.CTkButton(button_frame, text="Reset Settings", command=reset_settings)
+reset_button.grid(row=1, column=2, padx=5, pady=5)
+
+# Adding a scrollable frame for subdirectory buttons
+subdir_canvas = tk.Canvas(root)  # Add your color here
+subdir_frame = ctk.CTkFrame(subdir_canvas)
+subdir_scrollbar = tk.Scrollbar(root, orient="vertical", command=subdir_canvas.yview)
+subdir_canvas.configure(yscrollcommand=subdir_scrollbar.set)
+
+# Make the canvas as large as possible
+root.grid_rowconfigure(2, weight=1)
+root.grid_columnconfigure(0, weight=1)
+
+subdir_scrollbar.grid(row=2, column=4, sticky="ns")
+subdir_canvas.grid(row=2, column=0, columnspan=4, sticky="nsew")
+subdir_canvas.create_window((0, 0), window=subdir_frame, anchor="nw")
+
+def on_subdir_frame_configure(event):
+    subdir_canvas.configure(scrollregion=subdir_canvas.bbox("all"))
+
+subdir_frame.bind("<Configure>", on_subdir_frame_configure)
 
 load_settings()
 
