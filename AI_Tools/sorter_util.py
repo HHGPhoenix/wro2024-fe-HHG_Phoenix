@@ -15,6 +15,9 @@ json_file = ''
 # Set the size for all images (one side)
 image_side_size = 500
 
+# Dictionary to keep track of moved images
+moved_images = {}
+
 def move_file(subdir):
     global current_image
     if current_image:
@@ -22,8 +25,20 @@ def move_file(subdir):
         new_name = base + str(uuid.uuid4()) + ext
         os.rename(current_image, new_name)
         shutil.move(new_name, os.path.join(subdir))
+        moved_images[new_name] = current_image
         current_image = None
         display_next_image()
+        save_settings()
+
+def restore_file():
+    global current_image
+    if current_image in moved_images:
+        original_path = moved_images[current_image]
+        shutil.move(current_image, original_path)
+        current_image = original_path
+        del moved_images[original_path]
+        display_previous_image()
+        save_settings()
 
 def resize_image(img, size):
     width, height = img.size
@@ -53,19 +68,22 @@ def display_next_image():
 
 def display_previous_image():
     global current_image, current_image_index
-    if dir_path and os.path.exists(dir_path):
-        jpg_files = [f for f in os.listdir(dir_path) if f.endswith('.jpg')]
-        jpg_files = sorted(jpg_files, key=lambda f: int((re.search(r'frame(\d+)', f) or re.search(r'(\d+)', f)).group(1)))
-        if jpg_files:
-            current_image_index = (current_image_index - 1) % len(jpg_files)
-            current_image = os.path.join(dir_path, jpg_files[current_image_index])
-            img = Image.open(current_image)
-            img = resize_image(img, image_side_size)
-            photo = ImageTk.PhotoImage(img)
-            label.configure(image=photo)
-            label.image = photo
-        else:
-            label.configure(image=None)
+    if current_image in moved_images:
+        restore_file()
+    else:
+        if dir_path and os.path.exists(dir_path):
+            jpg_files = [f for f in os.listdir(dir_path) if f.endswith('.jpg')]
+            jpg_files = sorted(jpg_files, key=lambda f: int((re.search(r'frame(\d+)', f) or re.search(r'(\d+)', f)).group(1)))
+            if jpg_files:
+                current_image_index = (current_image_index - 1) % len(jpg_files)
+                current_image = os.path.join(dir_path, jpg_files[current_image_index])
+                img = Image.open(current_image)
+                img = resize_image(img, image_side_size)
+                photo = ImageTk.PhotoImage(img)
+                label.configure(image=photo)
+                label.image = photo
+            else:
+                label.configure(image=None)
 
 def select_directory():
     global dir_path
@@ -113,11 +131,10 @@ def refresh_subdir_buttons():
 def save_settings():
     if dir_path or subdirs:
         with open(json_file, 'w') as f:
-            json.dump({'dir_path': dir_path, 'subdirs': subdirs}, f)
-
+            json.dump({'dir_path': dir_path, 'subdirs': subdirs, 'moved_images': moved_images}, f)
 
 def load_settings():
-    global dir_path, subdirs, json_file
+    global dir_path, subdirs, json_file, moved_images
 
     root = tk.Tk()
     root.withdraw()  # Hide the main window
@@ -126,7 +143,7 @@ def load_settings():
         if messagebox.askyesno("Settings file", "Do you want to create a new settings file?"):
             json_file = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Create new settings.json", initialfile="settings.json")
             with open(json_file, 'w') as f:
-                json.dump({'dir_path': None, 'subdirs': []}, f)
+                json.dump({'dir_path': None, 'subdirs': [], 'moved_images': {}}, f)
         else:
             json_file = filedialog.askopenfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Select existing settings.json")
 
@@ -135,6 +152,7 @@ def load_settings():
             settings = json.load(f)
             dir_path = settings.get('dir_path')
             subdirs = settings.get('subdirs', [])
+            moved_images = settings.get('moved_images', {})
             for subdir in subdirs:
                 subdir_name = os.path.basename(subdir)
                 button = ctk.CTkButton(subdir_frame, text=subdir_name, command=lambda subdir=subdir: move_file(subdir))
@@ -148,7 +166,24 @@ def delete_current_image():
         current_image = None
         display_next_image()
 
+def reset_settings():
+    global dir_path, subdirs, moved_images, current_image, current_image_index
 
+    if messagebox.askyesno("Reset Settings", "Are you sure you want to reset all settings?"):
+        dir_path = None
+        subdirs = []
+        moved_images = {}
+        current_image = None
+        current_image_index = -1
+
+        if os.path.exists(json_file):
+            os.remove(json_file)
+        
+        for button in buttons:
+            button.destroy()
+        buttons.clear()
+        label.configure(image=None)
+        save_settings()
 
 # Initialize customtkinter
 ctk.set_appearance_mode("dark")
@@ -184,6 +219,9 @@ prev_image_button.pack(pady=5)
 
 delete_image_button = ctk.CTkButton(root, text="Delete Image", command=delete_current_image)
 delete_image_button.pack(pady=5)
+
+reset_button = ctk.CTkButton(root, text="Reset Settings", command=reset_settings)
+reset_button.pack(pady=5)
 
 subdir_frame = ctk.CTkFrame(root)
 subdir_frame.pack(pady=10, fill="both", expand=True)
