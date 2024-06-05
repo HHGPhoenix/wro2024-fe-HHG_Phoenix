@@ -796,8 +796,8 @@ class HoldLane():
         elif case == 1:
             new_binary = deepcopy(binary)
             # Get the average pixel value of the left and right side of the image
-            left_avg = np.mean(new_binary[:, :new_binary.shape[1]//2])
-            right_avg = np.mean(new_binary[:, new_binary.shape[1]//2:])
+            left_avg = np.mean(new_binary[:, :400])
+            right_avg = np.mean(new_binary[:, 880:])
             
             return 1 if left_avg > right_avg else 0
         
