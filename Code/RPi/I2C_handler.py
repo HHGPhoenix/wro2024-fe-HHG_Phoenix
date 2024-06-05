@@ -18,7 +18,7 @@ class I2Ccommunication:
         # tOled.start()
         
         self.Gyro.threadStop = 0
-        tGyro = threading.Thread(target=self.Gyro.get_angle, daemon=True)
+        tGyro = threading.Thread(target=self.Gyro.read, daemon=True)
         tGyro.start()
         
         self.ADC.threadStop = 0

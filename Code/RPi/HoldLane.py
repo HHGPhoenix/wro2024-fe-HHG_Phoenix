@@ -61,7 +61,8 @@ class HoldLane():
         self.rounds = 0
         self.direction = -1
         self.oldAngle = 0
-        self.GyroCornerAngle = 70
+        self.GyroCornerAngleStart = 70
+        self.GyroCornerAngle = 90
         self.Sensor = 0
         self.relative_angle = 0
         self.desired_distance_wall = 50
@@ -574,30 +575,52 @@ class HoldLane():
                     
                     
     def cornerStuff(self):
-        if self.direction == 0:            
-            self.relative_angle = self.Utils.Gyro.angle - self.oldAngle 
-            
-            newAngle = self.oldAngle - self.GyroCornerAngle
+        print(self.relative_angle)
+        if self.direction == 0:
+            self.relative_angle = self.Utils.Gyro.angle - self.oldAngle
+            if self.relative_angle < -180:
+                self.relative_angle += 360
+            elif self.relative_angle > 180:
+                self.relative_angle -= 360
+    
+            if self.corner == 0 and self.rounds == 0:
+                newAngle = self.oldAngle - self.GyroCornerAngle
+                if newAngle < -180:
+                    newAngle += 360
+                elif newAngle > 180:
+                    newAngle -= 360
+                    
+            else:
+                newAngle = self.oldAngle - self.GyroCornerAngle
+                if newAngle < -180:
+                    newAngle += 360
+                elif newAngle > 180:
+                    newAngle -= 360
+    
             if self.Utils.Gyro.angle < newAngle and time.time() > self.TIMEOUT:
-                self.corner = self.corner + 1
+                self.corner += 1
                 self.timelastcorner = time.time()
-                
+    
                 self.Utils.LogDebug(f"Corner: {self.corner}")
                 self.Utils.Display.write(f"Corner: {self.corner}")
-                
+    
                 if self.corner == 4:
                     self.corner = 0
-                    self.rounds = self.rounds + 1
+                    self.rounds += 1
                     self.Utils.Display.write(f"Corner: {self.corner}", f"Round: {self.rounds}")
-                    
+    
                 self.oldAngle = newAngle
                 self.drive_corner = False
                 self.sensorAdjustedCorner = False
                 self.ESPAdjusted = False
                 self.block_wide_corner = False
                 self.desired_distance_wall_smart = 50
-                self.Utils.Gyro.angle = self.Utils.Gyro.angle + 23
-                
+
+                if self.Utils.Gyro.angle < -180:
+                    self.Utils.Gyro.angle += 360
+                elif self.Utils.Gyro.angle > 180:
+                    self.Utils.Gyro.angle -= 360
+    
                 self.TIMEOUT = time.time() + self.CornerWaitTime
                 
             if (self.timelastcorner + 0.75 < time.time() and not self.ESPAdjustedCorner and not self.ESPAdjusted and 
@@ -614,19 +637,35 @@ class HoldLane():
                 
         elif self.direction == 1:
             self.relative_angle = self.Utils.Gyro.angle - self.oldAngle
-            
-            newAngle = self.oldAngle + self.GyroCornerAngle
+            if self.relative_angle < -180:
+                self.relative_angle += 360
+            elif self.relative_angle > 180:
+                self.relative_angle -= 360
+        
+            if self.corner == 0 and self.rounds == 0:
+                newAngle = self.oldAngle + self.GyroCornerAngleStart
+                if newAngle < -180:
+                    newAngle += 360
+                elif newAngle > 180:
+                    newAngle -= 360
+                    
+            else:
+                newAngle = self.oldAngle + self.GyroCornerAngle
+                if newAngle < -180:
+                    newAngle += 360
+                elif newAngle > 180:
+                    newAngle -= 360
+        
             if self.Utils.Gyro.angle > newAngle and time.time() > self.TIMEOUT:
-                self.Utils.Gyro.angle = self.Utils.Gyro.angle - 23
-                self.corner = self.corner + 1
+                self.corner += 1
                 self.timelastcorner = time.time()
-                
+        
                 self.Utils.LogDebug(f"Corner: {self.corner}")
                 self.Utils.Display.write(f"Corner: {self.corner}")
-                
+        
                 if self.corner == 4:
                     self.corner = 0
-                    self.rounds = self.rounds + 1
+                    self.rounds += 1
                     self.Utils.Display.write(f"Corner: {self.corner}", f"Round: {self.rounds}")
         
                 self.oldAngle = newAngle
@@ -635,15 +674,20 @@ class HoldLane():
                 self.ESPAdjusted = False
                 self.block_wide_corner = False
                 self.desired_distance_wall_smart = 50
-                
+        
+                if self.Utils.Gyro.angle < -180:
+                    self.Utils.Gyro.angle += 360
+                elif self.Utils.Gyro.angle > 180:
+                    self.Utils.Gyro.angle -= 360
+        
                 self.TIMEOUT = time.time() + self.CornerWaitTime
-                
+        
             if (self.timelastcorner + 0.75 < time.time() and not self.ESPAdjustedCorner and not self.ESPAdjusted and 
-                not self.sensorAdjustedCorner and not self.safetyEnabled and not self.safetyEnabled_inside):
+                not self.sensorAdjustedCorner):
                 if self.nextBlock and 30 < self.nextBlock["distance"] < 75:
                     self.sensorAdjustedCorner = True
                     return
-                
+        
                 self.Sensor = 1
                 self.Utils.usb_communication.sendMessage(f"S1", ESPHoldDistance)
                 self.Utils.usb_communication.sendMessage(f"D50", ESPHoldDistance)

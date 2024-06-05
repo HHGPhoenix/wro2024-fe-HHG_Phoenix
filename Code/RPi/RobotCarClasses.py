@@ -147,6 +147,8 @@ class Utility:
         
                 self.usb_communication.startNodeMCUs()
                 self.Gyro.GyroStart = True
+                self.Gyro.mpu.reset_DMP()
+                self.Gyro.mpu.reset_FIFO()
 
                 self.usb_communication.sendMessage(f"D {self.Distance}", self.ESPHoldDistance)
                 self.usb_communication.sendMessage(f"KP {self.Kp}", self.ESPHoldDistance)

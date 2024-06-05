@@ -121,6 +121,7 @@ class Gyroscope():
             
             # Now you can get roll, pitch, yaw
             self.rotation = self.mpu.DMP_get_euler_roll_pitch_yaw(quat, grav)
+            self.angle = self.rotation.z
             
             # rotation = mpu.get_rotation()
             # print("X: {0:.2f}, Y: {1:.2f}, Z: {2:.2f}".format(rotation[0], rotation[1], rotation[2]))
