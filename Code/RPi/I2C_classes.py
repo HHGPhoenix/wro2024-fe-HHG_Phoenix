@@ -5,9 +5,10 @@ from luma.oled.device import sh1106
 from gpiozero import CPUTemperature
 import psutil
 import busio
-import board, adafruit_tcs34725, adafruit_mpu6050
+import board, adafruit_tcs34725
 import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
+import MPU6050
 
 
 
@@ -82,59 +83,53 @@ class DisplayOled():
 #A class for reading a MPU6050 Gyroscope
 class Gyroscope():
     def __init__(self):
-        i2c = busio.I2C(board.D1, board.D0)
-        self.sensor = adafruit_mpu6050.MPU6050(i2c)
-        self.sensor._gyro_range = 1
-        
         self.threadStop = 0
-        self.GyroStart = False
-
-        #Initialize variables for storing the angle and time
-        self.angle = 0.0  # Initial angle
-        self.last_time = time.time()
-    
-
-    #Read the gyroscope data and calculate the angle
-    def get_angle(self):
+        self.rotation = [0, 0, 0]
+        
+        self.mpu = MPU6050.MPU6050(a_bus=0, a_address=0x69)
+        self.mpu.dmp_initialize()
+        self.mpu.set_DMP_enabled(True)
+        
+        
+        self.mpu.set_x_gyro_offset(int(40))
+        self.mpu.set_y_gyro_offset(int(-17))
+        self.mpu.set_z_gyro_offset(int(0))
+        
+        self.mpu.set_x_accel_offset(int(-90))
+        self.mpu.set_y_accel_offset(int(-665))
+        self.mpu.set_z_accel_offset(int(-950))
+        
+    def read(self):
         while self.threadStop == 0:
-            if self.GyroStart == True:
-                time.sleep(0.005)
-                offset_x = 0.29
-                offset_y = 0.0
-                offset_z = 0.0
-                #Read gyroscope data
-                gyro_data = self.sensor.gyro
-                gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
-
-                # Get the current time
-                current_time = time.time()
-
-                # Calculate the time elapsed since the last measurement
-                delta_time = current_time - self.last_time
-                
-                #bugfix for time-jumps
-                if delta_time >= 0.5:
-                    delta_time = 0.003
-
-                # Integrate the gyroscope readings to get the change in angle
-                if gyro_data[0] < 0.02 and gyro_data[0] > -0.02:
-                    gyro_data = 0
-                else:
-                    gyro_data = gyro_data[0]
-                    
-                delta_angle = gyro_data * delta_time * 60
-
-                # Update the angle
-                self.angle += delta_angle
-
-                # Update the last time for the next iteration
-                self.last_time = current_time
-                
-            else:
-                self.angle = 0.0
-                self.last_time = time.time()
-                time.sleep(0.1)
-   
+            # Assuming you have already initialized and calibrated your MPU6050 as 'mpu'
+            # Get FIFO buffer data
+            fifo_count = self.mpu.get_FIFO_count()
+            if fifo_count < 42:
+                continue
+            fifo_buffer = self.mpu.get_FIFO_bytes(fifo_count)
+            
+            # Now you can get quaternion data
+            quat = self.mpu.DMP_get_quaternion(fifo_buffer)
+            
+            
+            # Get gravity vector
+            grav = self.mpu.DMP_get_gravity(quat)
+            
+            if grav.x == 0 or grav.y == 0 or grav.z == 0:
+                continue
+            
+            
+            # Now you can get roll, pitch, yaw
+            self.rotation = self.mpu.DMP_get_euler_roll_pitch_yaw(quat, grav)
+            
+            # rotation = mpu.get_rotation()
+            # print("X: {0:.2f}, Y: {1:.2f}, Z: {2:.2f}".format(rotation[0], rotation[1], rotation[2]))
+            # acceleration = mpu.get_acceleration()
+            # print("X: {0:.2f}, Y: {1:.2f}, Z: {2:.2f}".format(acceleration[0], acceleration[1], acceleration[2]))
+            
+            # Adjust axes for upright robot
+            
+            # print("Roll: {0:.2f}, Pitch: {1:.2f}, Yaw: {2:.2f}".format(rotation.x, rotation.y, rotation.z))
    
 #A class for reading a ADS1015 ADC        
 class AnalogDigitalConverter():

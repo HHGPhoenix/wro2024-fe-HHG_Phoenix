@@ -694,45 +694,46 @@ class MPU6050:
             print('DMP initialization was successful')
         return 0
 
-    # Acceleration and gyro offset setters and getters
     def set_x_accel_offset(self, a_offset):
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_XA_OFFS_H,
-                                   ctypes.c_int8(a_offset >> 8).value)
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_XA_OFFS_L_TC,
-                                   ctypes.c_int8(a_offset).value)
-
+        high_byte = ctypes.c_int16(a_offset).value >> 8
+        low_byte = ctypes.c_int16(a_offset).value & 0xFF
+        print(high_byte)
+        print(low_byte)
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_XA_OFFS_H, high_byte)
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_XA_OFFS_L_TC, low_byte)
+    
     def set_y_accel_offset(self, a_offset):
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_YA_OFFS_H,
-                                   ctypes.c_int8(a_offset >> 8).value)
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_YA_OFFS_L_TC,
-                                   ctypes.c_int8(a_offset).value)
-
+        high_byte = ctypes.c_int16(a_offset).value >> 8
+        low_byte = ctypes.c_int16(a_offset).value & 0xFF
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_YA_OFFS_H, high_byte)
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_YA_OFFS_L_TC, low_byte)
+    
     def set_z_accel_offset(self, a_offset):
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_ZA_OFFS_H,
-                                   ctypes.c_int8(a_offset >> 8).value)
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_ZA_OFFS_L_TC,
-                                   ctypes.c_int8(a_offset).value)
+        high_byte = ctypes.c_int16(a_offset).value >> 8
+        low_byte = ctypes.c_int16(a_offset).value & 0xFF
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_ZA_OFFS_H, high_byte)
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_ZA_OFFS_L_TC, low_byte)
 
     def set_x_gyro_offset(self, a_offset):
-        print(a_offset)
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_XG_OFFS_USRH,
-                                   ctypes.c_int8(a_offset >> 8).value)
-        print(ctypes.c_int8(a_offset >> 8).value)
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_XG_OFFS_USRL,
-                                   ctypes.c_int8(a_offset).value)
-        print(ctypes.c_int8(a_offset).value)
+        # print(a_offset)
+        high_byte = ctypes.c_int16(a_offset).value >> 8
+        low_byte = ctypes.c_int16(a_offset).value & 0xFF
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_XG_OFFS_USRH, high_byte)
+        # print(high_byte)
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_XG_OFFS_USRL, low_byte)
+        # print(low_byte)
 
     def set_y_gyro_offset(self, a_offset):
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_YG_OFFS_USRH,
-                                   ctypes.c_int8(a_offset >> 8).value)
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_YG_OFFS_USRL,
-                                   ctypes.c_int8(a_offset).value)
-
+        high_byte = ctypes.c_int16(a_offset).value >> 8
+        low_byte = ctypes.c_int16(a_offset).value & 0xFF
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_YG_OFFS_USRH, high_byte)
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_YG_OFFS_USRL, low_byte)
+    
     def set_z_gyro_offset(self, a_offset):
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_ZG_OFFS_USRH,
-                                   ctypes.c_int8(a_offset >> 8).value)
-        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_ZG_OFFS_USRL,
-                                   ctypes.c_int8(a_offset).value)
+        high_byte = ctypes.c_int16(a_offset).value >> 8
+        low_byte = ctypes.c_int16(a_offset).value & 0xFF
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_ZG_OFFS_USRH, high_byte)
+        self.__bus.write_byte_data(self.__dev_id, C.MPU6050_RA_ZG_OFFS_USRL, low_byte)
 
     # Main interfacing functions to get raw data from MPU
     def get_acceleration(self):
@@ -847,6 +848,9 @@ class MPU6050:
         y = a_vector_raw.y - a_vect_grav.y*8192
         z = a_vector_raw.z - a_vect_grav.z*8192
         return V(x, y, z)
+    
+    
+
 
 
 class MPU6050IRQHandler:
