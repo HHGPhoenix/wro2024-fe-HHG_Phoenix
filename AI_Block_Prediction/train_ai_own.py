@@ -16,6 +16,9 @@ import os
 #print all gpu devices
 print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
+for gpu in tf.config.experimental.list_physical_devices('GPU'):
+    tf.config.experimental.set_memory_growth(gpu, True)
+
 def select_dataset_path():
     path = filedialog.askdirectory()
     dataset_path_var.set(path)
@@ -82,81 +85,82 @@ def plot_training_history(history, model_id):
     plt.show()
 
 def start_training():
-    dataset_path = dataset_path_var.get()
+    try:
+        dataset_path = dataset_path_var.get()
 
-    # Data augmentation
-    datagen = ImageDataGenerator(
-        rescale=1./255,
-        shear_range=0.2,
-        zoom_range=0.2,
-        rotation_range=20,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        horizontal_flip=True,
-        validation_split=0.2
-    )
+        # Data augmentation
+        datagen = ImageDataGenerator(
+            rescale=1./255,
+            shear_range=0.2,
+            zoom_range=0.2,
+            rotation_range=20,
+            width_shift_range=0.2,
+            height_shift_range=0.2,
+            horizontal_flip=True,
+            validation_split=0.2
+        )
 
-    # Load training and validation data
-    global train_generator
-    train_generator = datagen.flow_from_directory(
-        dataset_path,
-        target_size=(320, 143),
-        batch_size=32,
-        class_mode='categorical',
-        subset='training'
-    )
+        # Load training and validation data
+        global train_generator
+        train_generator = datagen.flow_from_directory(
+            dataset_path,
+            target_size=(320, 143),
+            batch_size=32,
+            class_mode='categorical',
+            subset='training'
+        )
 
-    validation_generator = datagen.flow_from_directory(
-        dataset_path,
-        target_size=(320, 143),
-        batch_size=32,
-        class_mode='categorical',
-        subset='validation'
-    )
+        validation_generator = datagen.flow_from_directory(
+            dataset_path,
+            target_size=(320, 143),
+            batch_size=32,
+            class_mode='categorical',
+            subset='validation'
+        )
 
-    hypermodel = CNNHyperModel()
+        hypermodel = CNNHyperModel()
 
-    tuner = RandomSearch(
-        hypermodel,
-        objective='val_accuracy',
-        max_trials=20,
-        executions_per_trial=2,
-        directory='hyperparameter_tuning',
-        project_name='cnn_tuning'
-    )
+        tuner = RandomSearch(
+            hypermodel,
+            objective='val_accuracy',
+            max_trials=20,
+            executions_per_trial=1,
+            directory='hyperparameter_tuning',
+            project_name='cnn_tuning'
+        )
 
-    tuner.search(train_generator, epochs=20, validation_data=validation_generator)
+        tuner.search(train_generator, epochs=20, validation_data=validation_generator)
+    finally:
+        best_model = tuner.get_best_models(num_models=1)[0]
 
-    best_model = tuner.get_best_models(num_models=1)[0]
+        best_model.summary()
 
-    best_model.summary()
+        # Generate a unique ID for the model
+        model_id = str(uuid.uuid4())
 
-    # Generate a unique ID for the model
-    model_id = str(uuid.uuid4())
+        # Early stopping and model checkpoint
+        early_stopping = EarlyStopping(monitor='val_loss', patience=10)
+        model_checkpoint = ModelCheckpoint(f'best_model_{model_id}_{{val_accuracy:.2f}}.keras', monitor='val_accuracy', save_best_only=True)
 
-    # Early stopping and model checkpoint
-    early_stopping = EarlyStopping(monitor='val_loss', patience=10)
-    model_checkpoint = ModelCheckpoint(f'best_model_{model_id}_{{val_accuracy:.2f}}.h5', monitor='val_accuracy', save_best_only=True)
+        # Fit the best model
+        history = best_model.fit(
+            train_generator,
+            steps_per_epoch=train_generator.samples // train_generator.batch_size,
+            validation_data=validation_generator,
+            validation_steps=validation_generator.samples // validation_generator.batch_size,
+            epochs=50,
+            callbacks=[early_stopping, model_checkpoint]
+        )
 
-    # Fit the best model
-    history = best_model.fit(
-        train_generator,
-        steps_per_epoch=train_generator.samples // train_generator.batch_size,
-        validation_data=validation_generator,
-        validation_steps=validation_generator.samples // validation_generator.batch_size,
-        epochs=50,
-        callbacks=[early_stopping, model_checkpoint]
-    )
+        loss, accuracy = best_model.evaluate(validation_generator)
+        print(f'Validation accuracy: {accuracy:.2f}')
 
-    loss, accuracy = best_model.evaluate(validation_generator)
-    print(f'Validation accuracy: {accuracy:.2f}')
+        # Save the model with the accuracy in the filename
+        model_filename = f'cube_classifier_{model_id}_{accuracy:.2f}.keras'
+        best_model.save(model_filename)
 
-    # Save the model with the accuracy in the filename
-    model_filename = f'cube_classifier_{model_id}_{accuracy:.2f}.keras'
-    best_model.save(model_filename)
-
-    # Plot and save training history
-    plot_training_history(history, model_id)
+        # Plot and save training history
+        plot_training_history(history, model_id)
 
 # Tkinter GUI setup
 root = tk.Tk()
