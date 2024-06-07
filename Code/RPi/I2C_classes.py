@@ -105,7 +105,7 @@ class Gyroscope():
                 #Read gyroscope data
                 gyro_data = self.sensor.gyro
                 gyro_data = [gyro_data[0] + offset_x, gyro_data[1] + offset_y, gyro_data[2] + offset_z]
-
+                
                 # Get the current time
                 current_time = time.time()
 
