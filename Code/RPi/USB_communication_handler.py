@@ -2,7 +2,7 @@ import subprocess
 import time
 import serial
 import threading
-import logging
+import time
 import gpiod
 
 global chip, all_lines
@@ -19,8 +19,8 @@ class USBCommunication:
         self.HoldDistanceCounter = 0
         self.responsesHoldDistance = []
         self.responsesHoldSpeed = []
-        self.messageArrayHoldDistance = []
-        self.messageArrayHoldSpeed = []
+        self.messageArrayHoldDistance = {}
+        self.messageArrayHoldSpeed = {}
         
         # self.EspHoldDistancePin = chip.get_line(24)
         # self.EspHoldSpeedPin = chip.get_line(16)
@@ -51,33 +51,56 @@ class USBCommunication:
             self.Utils.LogWarning(f"NodeMCU for HoldDistance is not responding to heartbeat: '{responseHoldDistance}' x{self.HoldDistanceCounter}")
         
         
-    # Send messages to NodeMCUs
     def handleSendMessage(self):
         completeMessage = ""
         totalSizeHoldDistance = 0
-        for message in self.messageArrayHoldDistance:
-            messageSize = len(f"{message}\n".encode())
-            if totalSizeHoldDistance + messageSize > 64:
-                break
-            completeMessage += f"{message}\n"
-            totalSizeHoldDistance += messageSize
-            self.messageArrayHoldDistance.remove(message)
-            
+    
+        # Sort the dictionary by timestamp
+        sortedDictHoldDistance = dict(sorted(self.messageArrayHoldDistance.items()))
+    
+        # Keep track of the commands we've seen
+        seenCommandsHoldDistance = set()
+    
+        for timestamp, message in sortedDictHoldDistance.items():
+            command = message.split(' ')[0]  # Extract the command part
+            if command not in seenCommandsHoldDistance:
+                messageSize = len(f"{message}\n".encode())
+                if totalSizeHoldDistance + messageSize > 64:
+                    break
+                completeMessage += f"{message}\n"
+                totalSizeHoldDistance += messageSize
+                seenCommandsHoldDistance.add(command)
+    
         self.EspHoldDistance.write(f"{completeMessage}".encode())
-
+    
+        # Remove seen commands from the original dictionary
+        self.messageArrayHoldDistance = {timestamp: message for timestamp, message in self.messageArrayHoldDistance.items() if message.split(' ')[0] not in seenCommandsHoldDistance}
+    
         time.sleep(0.05)
-
+    
         completeMessage = ""
         totalSizeHoldSpeed = 0
-        for message in self.messageArrayHoldSpeed:
-            messageSize = len(f"{message}\n".encode())
-            if totalSizeHoldSpeed + messageSize > 64:
-                break
-            completeMessage += f"{message}\n"
-            totalSizeHoldSpeed += messageSize
-            self.messageArrayHoldSpeed.remove(message)
-            
+    
+        # Sort the dictionary by timestamp
+        sortedDictHoldSpeed = dict(sorted(self.messageArrayHoldSpeed.items()))
+    
+        # Keep track of the commands we've seen
+        seenCommandsHoldSpeed = set()
+    
+        for timestamp, message in sortedDictHoldSpeed.items():
+            command = message.split(' ')[0]  # Extract the command part
+            if command not in seenCommandsHoldSpeed:
+                messageSize = len(f"{message}\n".encode())
+                if totalSizeHoldSpeed + messageSize > 64:
+                    break
+                completeMessage += f"{message}\n"
+                totalSizeHoldSpeed += messageSize
+                seenCommandsHoldSpeed.add(command)
+    
         self.EspHoldSpeed.write(f"{completeMessage}".encode())
+    
+        # Remove seen commands from the original dictionary
+        self.messageArrayHoldSpeed = {timestamp: message for timestamp, message in self.messageArrayHoldSpeed.items() if message.split(' ')[0] not in seenCommandsHoldSpeed}
         
         
     # Get responses from NodeMCUs
@@ -124,10 +147,10 @@ class USBCommunication:
     # Send messages to NodeMCUs    
     def sendMessage(self, message, ESP):
         if ESP == self.EspHoldDistance:
-            self.messageArrayHoldDistance.append(message)
+            self.messageArrayHoldDistance.update({time.time: message})
         
         elif ESP == self.EspHoldSpeed:
-            self.messageArrayHoldSpeed.append(message)
+            self.messageArrayHoldSpeed.update({time.time: message})
       
         
     # Get responses from NodeMCUs
