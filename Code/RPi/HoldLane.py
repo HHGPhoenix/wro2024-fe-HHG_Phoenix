@@ -772,31 +772,33 @@ class HoldLane():
 
     def get_drive_direction(self, inputFrame, case):
         frame = deepcopy(inputFrame)
-        frame = frame[250:, :]
-        
+        left_third = frame[:, :frame_width//3]
+        right_third = frame[:, (2*frame_width)//3:]
+        frame = np.concatenate((left_third, right_third), axis=1)
+    
         self.kernel = self.Utils.Cam.kernel
-        
+    
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
+    
         gray = cv2.dilate(gray, self.kernel, iterations=1)
     
         # Threshold the grayscale image to get a binary image
         binary = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY)[1]
-        
+    
         binary = cv2.dilate(binary, self.kernel, iterations=2)
-        
+    
         if case == 0:
             binary = binary[50:, :]
             edges = cv2.Canny(binary, 20, 30, apertureSize=7)
-            
+    
             # Perform Probabilistic Hough Line Transform
             lines = cv2.HoughLinesP(edges, 4, np.pi/180, 30, minLineLength=50, maxLineGap=30)                
-            
+    
             target_angle = 90  # The angle we want to find the closest to
             closest_angle_diff = float('inf')  # Initialize the closest angle difference to infinity
             vertical_line = None  # Initialize the vertical line
-
+    
             if lines is not None:
                 frame = frame[50:, :]
                 for line in lines:
@@ -805,10 +807,10 @@ class HoldLane():
                         # Calculate the angle of the line with respect to the vertical axis
                         angle = degrees(atan2(y2 - y1, x2 - x1))
                         angle = abs(angle)  # Adjust the range to [0, 180]
-
+    
                         # Calculate the difference between this angle and the target angle
                         angle_diff = abs(target_angle - angle)
-
+    
                         # If this line is closer to the target angle than the previous closest
                         if angle_diff < closest_angle_diff:
                             closest_angle_diff = angle_diff
