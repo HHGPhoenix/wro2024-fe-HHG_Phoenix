@@ -368,13 +368,13 @@ void loop()
 						// send it to the computer as ASCII digits
 
 						// limit correction to servo range
-						if (average > angle_right)
+						if (average > angle_left)
 						{
-							average = angle_right;
+							average = angle_left;
 						}
-						else if (average < -angle_left)
+						else if (average < -angle_right)
 						{
-							average = -angle_left;
+							average = -angle_right;
 						}
 
 						servo.write(int(ServoMiddlePosition - average)); // Set servo position
@@ -465,13 +465,13 @@ void loop()
 						average2 = total2 / numReadings2;
 
 						// limit correction to servo range
-						if (average2 > angle_left)
+						if (average2 > angle_right)
 						{
-							average2 = angle_left;
+							average2 = angle_right;
 						}
-						else if (average2 < -angle_right)
+						else if (average2 < -angle_left)
 						{
-							average2 = -angle_right;
+							average2 = -angle_left;
 						}
 						servo.write(int(ServoMiddlePosition + average2)); // Set servo position
 
