@@ -36,12 +36,12 @@ Utils.setupDataLog()
 #Constants
 Utils.StartSpeed = 100
 Utils.Distance = 50
-Utils.Kp = 0.7
+Utils.Kp = 0.5
 Utils.Ed = 125 #Edge detection distance in cm
 Utils.StartSensor = 2
 Utils.Mm = 10
-Utils.AngR = 37
-Utils.AngL = 42
+Utils.AngR = 40
+Utils.AngL = 44
 Utils.startMode = 1
 
 
@@ -60,6 +60,8 @@ def HoldLane(Utils, CornerWaiTTime=1):
     GyroCornerAngle = 90
     Sensor = 0
     
+    Utils.usb_communication.sendMessage("START", Utils.ESPHoldSpeed)
+    Utils.usb_communication.sendMessage(f"SPEED {Utils.StartSpeed}", Utils.ESPHoldSpeed)
     #Hold Lane
     while Utils.running:
         time.sleep(0.001)
@@ -69,7 +71,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
                 Sensor = 1
                 Utils.LogInfo("Switched to Sensor 1")
                 Utils.usb_communication.sendMessage("S1", Utils.ESPHoldDistance)
-                Utils.usb_communication.sendMessage("D35", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D30", Utils.ESPHoldDistance)
                 Utils.usb_communication.sendMessage("SPEED 180", Utils.ESPHoldSpeed)
                 
             newAngle = oldAngle - GyroCornerAngle
@@ -91,7 +93,7 @@ def HoldLane(Utils, CornerWaiTTime=1):
                 Sensor = 2
                 Utils.LogInfo("Switched to Sensor 2")
                 Utils.usb_communication.sendMessage("S2", Utils.ESPHoldDistance)
-                Utils.usb_communication.sendMessage("D35", Utils.ESPHoldDistance)
+                Utils.usb_communication.sendMessage("D30", Utils.ESPHoldDistance)
                 Utils.usb_communication.sendMessage("SPEED 180", Utils.ESPHoldSpeed)
             
             newAngle = oldAngle + GyroCornerAngle
@@ -113,14 +115,12 @@ def HoldLane(Utils, CornerWaiTTime=1):
         if (responses != None):
             # print(responses)
             for response in responses:
-                if "Drive direction counterclockwise" in responses:
+                print(response)
+                
+                if "DDCC" in responses:
                     direction = 1
-                if "Drive direction clockwise" in responses:
+                if "DDC" in responses:
                     direction = 0
-                if "SD1:" in responses:
-                    Utils.SensorDistance1 = float(response.split(":")[1].strip())
-                if "SD2:" in responses:
-                    Utils.SensorDistance2 = float(response.split(":")[1].strip())
                     
         if rounds == 3 and timelastcorner + 0.5 < time.time():
             if Utils.Cam.avg_edge_distance < 165:

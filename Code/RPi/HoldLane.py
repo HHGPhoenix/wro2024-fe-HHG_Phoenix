@@ -114,7 +114,7 @@ class HoldLane():
             
         if case != -1:
             drive_directions = []
-            for _ in range(10):
+            for _ in range(3):
                 drive_direction = self.get_drive_direction(self.Utils.Cam.frames[2], case)
                 
                 if drive_direction != -1:
@@ -130,6 +130,7 @@ class HoldLane():
         else:
             self.Utils.LogError("Edge detection could not decide on case, maybe not working correctly")
 
+        self.Utils.usb_communication.sendMessage(f"START", ESPHoldSpeed)
         self.Utils.usb_communication.sendMessage(f"SPEED {self.Utils.StartSpeed}", ESPHoldSpeed)
         #Hold Lane
         while self.Utils.running:
@@ -309,16 +310,16 @@ class HoldLane():
                 pos1_x_area = [0, 300]
         
         elif self.direction == 0:
-            if self.desired_distance_wall <= 30:
+            if self.desired_distance_wall <= 30 and self.Sensor == 1:
                 pos1_x_area = [730, 1050]
             elif 30 < self.desired_distance_wall < 70:
-                pos1_x_area = [960, 1230]
-            elif self.desired_distance_wall >= 70:
+                pos1_x_area = [960, 1280]
+            elif self.desired_distance_wall <= 30 and self.Sensor == 2:
                 pos1_x_area = [980, 1280]
             
         
         if not self.active_block_drive:
-            # Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['mx']: {self.nextBlock['mx']}, self.nextBlock['y']: {self.nextBlock['y']}")
+            Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['mx']: {self.nextBlock['mx']}, self.nextBlock['y']: {self.nextBlock['y']}")
             
             # Try to make the x area for pos1 somewhat dynamic
             # self.Utils.LogInfo(f"nextblock[x]: {self.nextBlock['mx']}")
@@ -330,7 +331,7 @@ class HoldLane():
                     self.nextBlock['position'] = "1"
                     BlockPos = self.next_corner
                                             
-                elif 95 < self.block_distance_to_wall < 120 and 70 < self.nextBlock["distance"] < 100: # and self.timelastcorner + 1 < time.time(): # and corner not in Utils.blockPositions
+                elif 95 < self.block_distance_to_wall < 120 and 70 < self.nextBlock["distance"] < 100 and self.timelastcorner + 1.5 < time.time(): # and corner not in Utils.blockPositions
                     self.nextBlock['position'] = "3"
                     BlockPos = self.corner
                 
@@ -339,11 +340,11 @@ class HoldLane():
                         
             elif (self.Utils.Cam.avg_edge_distance < 220) and -35 < self.relative_angle < 15 and self.direction == 0:
                 self.nextBlock['position'] = "0"
-                if (130 < self.Utils.Cam.avg_edge_distance < 160) and self.block_distance_to_wall < 85 and pos1_x_area[0] < self.nextBlock['mx'] < pos1_x_area[1] and 50 < self.nextBlock["distance"] < 105 and self.timelastcorner + 1.5 < time.time():
+                if (130 < self.Utils.Cam.avg_edge_distance < 180) and self.block_distance_to_wall < 95 and pos1_x_area[0] < self.nextBlock['mx'] < pos1_x_area[1] and 50 < self.nextBlock["distance"] < 105 and self.timelastcorner + 1.5 < time.time():
                     self.nextBlock['position'] = "1"
                     BlockPos = self.corner + 1 if self.corner < 3 else 0
                     
-                elif 95 < self.block_distance_to_wall < 120 and 70 < self.nextBlock["distance"] < 100: # and self.timelastcorner + 1.5 < time.time() and self.corner not in self.Utils.blockPositions:
+                elif 95 < self.block_distance_to_wall < 120 and 70 < self.nextBlock["distance"] < 100 and self.timelastcorner + 1.5 < time.time():# and self.corner not in self.Utils.blockPositions:
                     self.nextBlock['position'] = "3"
                     BlockPos = self.corner
 
@@ -774,49 +775,59 @@ class HoldLane():
     def get_drive_direction(self, inputFrame, case):
         frame = deepcopy(inputFrame)
         frame_width = frame.shape[1]
-        left_third = frame[:, :frame_width//3]
-        right_third = frame[:, (2*frame_width)//3:]
-        frame = np.concatenate((left_third, right_third), axis=1)
-    
+        middle_third_start = frame_width//3
+        middle_third_end = (2*frame_width)//3
+
         self.kernel = self.Utils.Cam.kernel
-    
+
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    
+
         gray = cv2.dilate(gray, self.kernel, iterations=1)
-    
+
         # Threshold the grayscale image to get a binary image
         binary = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY)[1]
-    
+
         binary = cv2.dilate(binary, self.kernel, iterations=2)
-    
+
         if case == 0:
-            binary = binary[50:, :]
+            binary = binary[300:, :]
+            frame = frame[300:, :]
             edges = cv2.Canny(binary, 20, 30, apertureSize=7)
-    
+
             # Perform Probabilistic Hough Line Transform
             lines = cv2.HoughLinesP(edges, 4, np.pi/180, 30, minLineLength=50, maxLineGap=30)                
-    
+
             target_angle = 90  # The angle we want to find the closest to
             closest_angle_diff = float('inf')  # Initialize the closest angle difference to infinity
             vertical_line = None  # Initialize the vertical line
-    
+
             if lines is not None:
-                frame = frame[50:, :]
                 for line in lines:
-                    cv2.line(frame, (line[0][0], line[0][1]), (line[0][2], line[0][3]), (0, 255, 0), 2)
                     for x1, y1, x2, y2 in line:
+                        average_x = (x1 + x2) / 2
+                        # Skip the line if it's in the middle third of the frame
+                        if middle_third_start <= average_x <= middle_third_end:
+                            continue
+                        
+                        if abs(y2 - y1) < 20:
+                            continue
+
+                        cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
                         # Calculate the angle of the line with respect to the vertical axis
                         angle = degrees(atan2(y2 - y1, x2 - x1))
                         angle = abs(angle)  # Adjust the range to [0, 180]
-    
+
                         # Calculate the difference between this angle and the target angle
                         angle_diff = abs(target_angle - angle)
-    
+
                         # If this line is closer to the target angle than the previous closest
                         if angle_diff < closest_angle_diff:
                             closest_angle_diff = angle_diff
                             vertical_line = line
+                            
+                        cv2.imwrite("frame.jpg", frame)
 
             if vertical_line is not None:
                 x1, y1, x2, y2 = vertical_line[0]
@@ -833,6 +844,7 @@ class HoldLane():
         
         elif case == 1:
             new_binary = deepcopy(binary)
+            new_binary = new_binary[250:, :]
             # Get the average pixel value of the left and right side of the image
             left_avg = np.mean(new_binary[:, :new_binary.shape[1]//2])
             right_avg = np.mean(new_binary[:, new_binary.shape[1]//2:])

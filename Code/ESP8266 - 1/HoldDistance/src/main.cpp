@@ -88,33 +88,32 @@ void loop()
 
 					firstCornerDetected = false; // Reset corner detection
 
-					distance1 = 0;
-					distance2 = 0;
-
 					if (startMode == 1)
 					{
-						timeoutcounter = 0;
-						// Check for start in small section
-						while (distance1 == 0)
-						{
-							distance1 = ultraschall1.read();
-							timeoutcounter++;
-							if (timeoutcounter > 5)
-							{
-								break;
-							}
-						}
+						distance1 = ultraschall1.read(); // get distance in cm
+						distance2 = ultraschall2.read(); // get distance in cm
+						// timeoutcounter = 0;
+						// // Check for start in small section
+						// while (distance1 == 0)
+						// {
+						// 	distance1 = ultraschall1.read();
+						// 	timeoutcounter++;
+						// 	if (timeoutcounter > 5)
+						// 	{
+						// 		break;
+						// 	}
+						// }
 
-						timeoutcounter = 0;
-						while (distance2 == 0)
-						{
-							distance2 = ultraschall2.read();
-							timeoutcounter++;
-							if (timeoutcounter > 5)
-							{
-								break;
-							}
-						}
+						// timeoutcounter = 0;
+						// while (distance2 == 0)
+						// {
+						// 	distance2 = ultraschall2.read();
+						// 	timeoutcounter++;
+						// 	if (timeoutcounter > 5)
+						// 	{
+						// 		break;
+						// 	}
+						// }
 
 						// Check if both sensors read a valid value
 						if (distance1 > 0 && distance2 > 0)
@@ -127,13 +126,15 @@ void loop()
 								{
 									firstCornerDetected = true;
 									delay(500);
-									Serial.println("Drive direction clockwise");
+									Serial.println("DD C");
+									activeSensor = 1;
 								}
 								else
 								{
 									firstCornerDetected = true;
 									delay(500);
-									Serial.println("Drive direction counterclockwise");
+									Serial.println("DD CC");
+									activeSensor = 2;
 								}
 							}
 						}
@@ -386,7 +387,7 @@ void loop()
 								if (distance1 > distanceEdgeDetection)
 								{
 									firstCornerDetected = true;
-									Serial.println("Drive direction clockwise");
+									Serial.println("DDC");
 									activeSensor = 1;
 								}
 								// read other sensor sometimes
@@ -397,7 +398,7 @@ void loop()
 									if (distance2 > distanceEdgeDetection)
 									{
 										firstCornerDetected = true;
-										Serial.println("Drive direction counterclockwise");
+										Serial.println("DDCC");
 										activeSensor = 2;
 									}
 								}
@@ -482,7 +483,7 @@ void loop()
 								if (distance2 > distanceEdgeDetection)
 								{
 									firstCornerDetected = true;
-									Serial.println("Drive direction counterclockwise");
+									Serial.println("DDCC");
 									activeSensor = 2;
 								}
 								// read other sensor sometimes
@@ -492,7 +493,7 @@ void loop()
 									if (distance1 > distanceEdgeDetection)
 									{
 										firstCornerDetected = true;
-										Serial.println("Drive direction clockwise");
+										Serial.println("DDC");
 										activeSensor = 1;
 									}
 								}
