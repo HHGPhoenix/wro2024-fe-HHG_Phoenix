@@ -13,9 +13,9 @@ class I2Ccommunication:
         
     # start all threads for I2C communication
     def start_threads(self):
-        # self.Display.threadStop = 0
-        # tOled = threading.Thread(target=self.Display.update, daemon=True)
-        # tOled.start()
+        self.Display.threadStop = 0
+        tOled = threading.Thread(target=self.Display.update, daemon=True)
+        tOled.start()
         
         self.Gyro.threadStop = 0
         tGyro = threading.Thread(target=self.Gyro.get_angle, daemon=True)
@@ -35,4 +35,4 @@ class I2Ccommunication:
         self.Display.threadStop = 1
         self.Gyro.threadStop = 1
         self.ADC.threadStop = 1
-        # self.ColorSensor.threadStop = 1
+        self.ColorSensor.threadStop = 1

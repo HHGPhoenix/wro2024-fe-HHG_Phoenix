@@ -15,8 +15,8 @@ import MPU6050
 #A class for writing to a OLED Display
 class DisplayOled():
     def __init__(self, Utils):
-        # serial = i2c(port=0, address=0x3C)
-        # self.device = sh1106(serial)
+        serial = i2c(port=0, address=0x3C)
+        self.device = sh1106(serial)
         
         #Variable init
         self.first_line = ""
@@ -25,8 +25,8 @@ class DisplayOled():
         self.Utils = Utils
         
         # Wake the screen by drawing an outline
-        # with canvas(self.device) as draw:
-            # draw.rectangle(self.device.bounding_box, outline="white", fill="black")
+        with canvas(self.device) as draw:
+            draw.rectangle(self.device.bounding_box, outline="white", fill="black")
     
        
     #Clear the Display 

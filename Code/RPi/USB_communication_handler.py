@@ -229,7 +229,7 @@ class USBCommunication:
     def startNodeMCUs(self):
         #Start both NodeMCUs
         self.sendMessage(f"START {self.Utils.startMode}", self.EspHoldDistance)
-        self.sendMessage("START", self.EspHoldSpeed)
+        # self.sendMessage("START", self.EspHoldSpeed)
         time.sleep(0.1)
            
             
