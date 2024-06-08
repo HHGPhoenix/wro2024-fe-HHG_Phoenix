@@ -561,7 +561,8 @@ class HoldLane():
             if self.ESPAdjustedCorner:
                 if self.direction == 0 and -50 < self.relative_angle < 10 and not self.active_block_drive and not self.nextBlock:
                     self.Utils.usb_communication.sendMessage("D 50", self.Utils.ESPHoldDistance)
-                    self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)
+                    self.Utils.usb_communication.sendMessage("S1", self.Utils.ESPHoldDistance)      
+                                  
                     self.desired_distance_wall = 50
                     self.Sensor = 1
                     self.ESPAdjustedCorner = False
@@ -772,6 +773,7 @@ class HoldLane():
 
     def get_drive_direction(self, inputFrame, case):
         frame = deepcopy(inputFrame)
+        frame_width = frame.shape[1]
         left_third = frame[:, :frame_width//3]
         right_third = frame[:, (2*frame_width)//3:]
         frame = np.concatenate((left_third, right_third), axis=1)
