@@ -412,7 +412,7 @@ void loop()
 				}
 				else
 				{
-					servo.write(ServoMiddlePosition + angle_left);
+					servo.write(ServoMiddlePosition + angle_right);
 				}
 				delay(10); // wait so the loop isn't too fast
 			}
@@ -507,7 +507,7 @@ void loop()
 				}
 				else
 				{
-					servo.write(ServoMiddlePosition - angle_right);
+					servo.write(ServoMiddlePosition - angle_left);
 				}
 				delay(10); // wait so the loop isn't too fast
 			}
