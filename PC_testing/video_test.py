@@ -8,10 +8,11 @@ import matplotlib.pyplot as plt
 import mplcursors
 import threading
 from flask import Flask, render_template, Response, jsonify
+from copy import deepcopy
 
 #A class for detecting red and green blocks in the camera stream           
 class Camera():
-    def __init__(self, video_stream=False, video_source=0):
+    def __init__(self, video_stream=False, video_source=0, Utils=None):
         # Variable initialization
         self.freeze = False
         self.frame = None
@@ -40,6 +41,8 @@ class Camera():
         self.desired_distance_wall = -1
         self.block_distance = -1
         
+        self.frames = [None, None, None]
+        
         self.edge_distances = []
         self.avg_edge_distance = 0
         
@@ -47,58 +50,136 @@ class Camera():
         self.known_height = 0.1
         self.camera_angle = 15
         self.distance_multiplier = 2.22
-    
-    def get_drive_direction(self, frame):
-        frame = frame[100:, :]
         
+        self.Utils = Utils
+        #Variables
+        self.TIMEOUT = 0
+        self.corner = 0
+        self.rounds = 0
+        self.direction = -1
+        self.oldAngle = 0
+        self.GyroCornerAngle = 70
+        self.Sensor = 0
+        self.relative_angle = 0
+        self.desired_distance_wall = 50
+        self.smooth_to_middle = False
+        self.smoothing_counter = 0
+        self.CornerWaitTime = 1
+        self.nextBlock = None
+        self.block_distance_to_wall = 0
+        self.before_safety_state = [self.Sensor, self.desired_distance_wall]
+        self.desired_distance_wall_smart = 50
+        
+        self.timelastcorner = 0
+        self.timelastgreenpos1 = 0
+        self.timelastredpos1 = 0
+        self.timelastwidecorner = 0
+        
+        #Cutoffs
+        self.YCutOffTop = 0
+        self.SIZE = 0
+        
+        self.ESPAdjustedCorner = False
+        self.ESPAdjusted = False
+        self.ESPAdjusted_2 = False
+        self.detect_new_block = True
+        self.block_wide_corner = False
+        self.drive_corner = False
+        self.sensorAdjustedCorner = False
+        self.active_block_drive = False
+        self.safetyEnabled = False
+        self.safetyEnabled_inside = False
+        
+        self.coordinates_self = (640, 720) #x, y
+        self.middledistance = 50
+        self.KP = 0.23
+        self.desired_distance_to_block_red = -650
+        self.desired_distance_to_block_green = 650
+        self.old_desired_distance_wall = 50
+    
+    def get_drive_direction(self, inputFrame, case):
+        frame = deepcopy(inputFrame)
+        frame_width = frame.shape[1]
+        middle_third_start = frame_width//3
+        middle_third_end = (2*frame_width)//3
+
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
+
         gray = cv2.dilate(gray, self.kernel, iterations=1)
-    
+
         # Threshold the grayscale image to get a binary image
-        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 1001, 30)
-        
+        binary = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY)[1]
+
         binary = cv2.dilate(binary, self.kernel, iterations=2)
+
+        if case == 0:
+            binary = binary[300:, :]
+            frame = frame[300:, :]
+            edges = cv2.Canny(binary, 20, 30, apertureSize=7)
+
+            # Perform Probabilistic Hough Line Transform
+            lines = cv2.HoughLinesP(edges, 4, np.pi/180, 30, minLineLength=50, maxLineGap=30)                
+
+            target_angle = 90  # The angle we want to find the closest to
+            closest_angle_diff = float('inf')  # Initialize the closest angle difference to infinity
+            vertical_line = None  # Initialize the vertical line
+
+            if lines is not None:
+                for line in lines:
+                    for x1, y1, x2, y2 in line:
+                        average_x = (x1 + x2) / 2
+                        # Skip the line if it's in the middle third of the frame
+                        if middle_third_start <= average_x <= middle_third_end:
+                            continue
+                        
+                        if abs(y2 - y1) < 20:
+                            continue
+
+                        cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+                        # Calculate the angle of the line with respect to the vertical axis
+                        angle = degrees(atan2(y2 - y1, x2 - x1))
+                        angle = abs(angle)  # Adjust the range to [0, 180]
+
+                        # Calculate the difference between this angle and the target angle
+                        angle_diff = abs(target_angle - angle)
+
+                        # If this line is closer to the target angle than the previous closest
+                        if angle_diff < closest_angle_diff:
+                            closest_angle_diff = angle_diff
+                            vertical_line = line
+                            
+                        cv2.imwrite("frame.jpg", frame)
+
+            if vertical_line is not None:
+                x1, y1, x2, y2 = vertical_line[0]
+                average_x = (x1 + x2) / 2
+
+                cv2.line(frame, (x1, y1), (x2, y2), (244, 255, 0), 2)
+
+                if average_x < 640:
+                    return 1
+                else:
+                    return 0
+
+            return -1
         
-        edges = cv2.Canny(binary, 20, 30, apertureSize=7)
+        elif case == 1:
+            new_binary = deepcopy(binary)
+            new_binary = new_binary[250:, :]
+            # Get the average pixel value of the left and right side of the image
+            left_avg = np.mean(new_binary[:, :new_binary.shape[1]//2])
+            right_avg = np.mean(new_binary[:, new_binary.shape[1]//2:])
+            
+            return 1 if left_avg > right_avg else 0
         
-        # Perform Probabilistic Hough Line Transform
-        lines = cv2.HoughLinesP(edges, 4, np.pi/180, 100, minLineLength=50, maxLineGap=30)
-        
-        for line in lines:
-            cv2.line(frame, (line[0][0], line[0][1]), (line[0][2], line[0][3]), (0, 255, 0), 2)
-        
-        min_angle = 90  # Initialize minimum angle to 90 degrees
-        vertical_line = None  # Initialize the vertical line
-
-        for line in lines:
-            for x1, y1, x2, y2 in line:
-                # Calculate the angle of the line with respect to the vertical axis
-                angle = degrees(atan2(y2 - y1, x2 - x1))  # Swap x and y
-                angle = abs(angle - 90)  # Adjust the range to [0, 180]
-
-                # If this line is more vertical than the previous most vertical line
-                if angle < min_angle:
-                    min_angle = angle
-                    vertical_line = line
-
-        if vertical_line is not None:
-            x1, y1, x2, y2 = vertical_line[0]
-            average_x = (x1 + x2) / 2
-
-            cv2.line(frame, (x1, y1), (x2, y2), (244, 255, 0), 2)
-
-            if average_x < 640:
-                return 1
-            else:
-                return 0
-
-        return -1
+        else:
+            raise ValueError("Invalid case number")
         
         
     def get_edges(self, frame):
-        frame = frame[100:, :]
+        frame = frame[100:, 300:980]
         
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -256,7 +337,7 @@ class Camera():
         #frameraw = cv2.cvtColor(frameraw, cv2.COLOR_RGB2BGR)
         frame = frameraw.copy()
         
-        # frame = frame[100:, :]
+        frame = frame[100:, :]
         
         #frameraw = frameraw[100:500, 300:980]
         #frameraw = frameraw[150:, :]
@@ -327,7 +408,7 @@ class Camera():
         self.video_writer = None
         self.blockPositions = {}
 
-        video_path = r"C:\Users\felix\Downloads\Videos Runs\alles Licht, Fenster zu, keine Blöcke, keine Filter.mp4"
+        video_path = r"C:\Users\felix\Downloads\Videos Runs\alles Licht, fenster zu, Blöcke, kein Filter.mp4"
         self.cap = cv2.VideoCapture(video_path)
 
         self.avg_edge_distance_values = []
@@ -391,7 +472,7 @@ class Camera():
         cv2.namedWindow("Video")
         cv2.setMouseCallback("Video", self.mouse_event)
 
-        try:
+        try:     
             while True:
                 key = cv2.waitKey(1) & 0xFF  # Get the last key pressed
                 if key == ord('f'):  # If the last key pressed was 'f', toggle the freeze variable
@@ -401,17 +482,20 @@ class Camera():
 
                 if not freeze:  # Only update the video if the video and plotting are not frozen
                     StartTime = time.time()
-                    self.block_array, frameraw, frame = self.get_coordinates()
+                    self.block_array, frameraw, framenormal = self.get_coordinates()
+                    framebinary = self.get_edges(frameraw)
                     
+                    self.frames[0] = framenormal
+                    self.frames[1] = framebinary
+                    self.frames[2] = frameraw
+
                     self.calculate_block_positions()
                     
                     time.sleep(0.06)
 
                     StopTime = time.time()
-                    framebinary = self.get_edges(frameraw)
-                    print(self.get_drive_direction(frameraw))
 
-                    self.frame = framebinary if show_binary else frame  # Show the binary frame if show_binary is True, otherwise show the normal frame
+                    self.frame = framebinary if show_binary else framenormal  # Show the binary frame if show_binary is True, otherwise show the normal frame
                     
                     cv2.imshow("Video", self.frame)
 
@@ -435,40 +519,10 @@ class Camera():
             cv2.imshow("Color Sample", color_sample)
             
     def calculate_block_positions(self):
-        #Variables
-        TIMEOUT = 0
-        TIMEOUTBlock = 0.5
-        corners = 0
-        rounds = 0
-        Sensor = 2
-        direction = 1
-        relative_angle = 0
-        oldAngle = 0
-        detect_new_block = True
-        Last_Esp_Command = 0
-        desired_distance_wall = 50
-        timelastcorner = time.time()
-        Inverted = False
-        
-        old_desired_distance_wall = 50
-        
-        coordinates_self = (640, 720) #x, y
-        middledistance = 50
-        GyroCornerAngle = 70
-
-        FreezeSize = 150
-        FreezeY = 330
-        FreezeBlock = False
-        KP = 0.22
-        desired_distance_to_block_red = -700
-        desired_distance_to_block_green = 700
-        
-        SensorFirstCornerChanged = False
-        active_block_drive = False
-        ESP_adjusted = False
-        ESP_adjusted_back = True
-        Special_red_case_adjusted_back = False
         SIZE = 0
+        self.timelastcorner = 0
+        self.Sensor = 1
+        self.direction = 1
         
         block_array = self.block_array.copy()
         if len(block_array) > 0:
@@ -480,75 +534,66 @@ class Camera():
                     block_array.remove(block)
                 
         #print(block_array)
-        if len(block_array) > 0 or active_block_drive:
+        if len(block_array) > 0 or self.active_block_drive:
             #Utils.LogDebug(f"Lenght of block_array: {len(block_array)}")
             #Sort blocks by size
             
-            if not active_block_drive:
+            if not self.active_block_drive:
                 block_array.sort(key=lambda x: x['size'], reverse=True)
 
-                nextBlock = block_array[0]
+                self.nextBlock = block_array[0]
                 
-            nextBlock["distance"] = self.get_distance_to_block(nextBlock)
+            self.nextBlock["distance"] = self.get_distance_to_block(self.nextBlock)
             
-            self.distance_next_block = nextBlock["distance"]
+            self.distance_next_block = self.nextBlock["distance"]
             
-            #print(nextBlock["distance"])
-            block_distance_to_wall = self.avg_edge_distance - nextBlock['distance']
-            if (self.avg_edge_distance < 200) and not active_block_drive and -10 < relative_angle < 40 and direction == 1:
-                print(f"avg_edge_distance: {self.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
-                #block_distance_to_wall = self.avg_edge_distance - nextBlock['distance']
-                #Utils.LogInfo(f"avg_edge_distance: {self.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
-                if (120 < self.avg_edge_distance < 180) and nextBlock['x'] < 300 and 45 < nextBlock["distance"] < 110:
-                    nextBlock['position'] = "1"
-                    BlockPos = corners + 1 if corners < 3 else 0
-                elif 80 < block_distance_to_wall < 130 and 40 < nextBlock["distance"] < 80:
-                    nextBlock['position'] = "3"
-                    #print("3")
-                    BlockPos = corners
-                elif 30 < block_distance_to_wall < 80 and 40 < nextBlock["distance"] < 80: #or block_distance_to_wall < 80:
-                    nextBlock['position'] = "2"
-                    if abs(relative_angle) > 30:
-                        BlockPos = corners + 1 if corners < 3 else 0
-                    else:
-                        BlockPos = corners
+        pos1_x_area = [0, 0]
+        if self.direction == 1:
+            if self.desired_distance_wall <= 30 and self.Sensor == 2:
+                pos1_x_area = [230, 550]
+            elif 30 < self.desired_distance_wall < 70:
+                pos1_x_area = [50, 320]
+            elif self.desired_distance_wall <= 30 and self.Sensor == 1:
+                pos1_x_area = [0, 300]
+        
+        elif self.direction == 0:
+            if self.desired_distance_wall <= 30 and self.Sensor == 1:
+                pos1_x_area = [730, 1050]
+            elif 30 < self.desired_distance_wall < 70:
+                pos1_x_area = [960, 1280]
+            elif self.desired_distance_wall <= 30 and self.Sensor == 2:
+                pos1_x_area = [980, 1280]
+        
+        
+        if not self.active_block_drive and self.nextBlock:
+            self.block_distance_to_wall = self.avg_edge_distance - self.nextBlock["distance"]
+            self.next_corner = self.corner + 1 if self.corner < 3 else 0
 
-                else:
-                    nextBlock['position'] = "0"
+            if (self.avg_edge_distance < 220) and -15 < self.relative_angle < 40 and self.direction == 1:
+                self.nextBlock['position'] = "0"
+                if (130 < self.avg_edge_distance < 160) and self.block_distance_to_wall < 85 and pos1_x_area[0] < self.nextBlock['mx'] < pos1_x_area[1] and 50 < self.nextBlock["distance"] < 105 and self.timelastcorner + 1.5 < time.time() and not self.drive_corner: # and next_corner not in Utils.blockPositions:
+                    self.nextBlock['position'] = "1"
+                    BlockPos = self.next_corner
+                                            
+                elif 95 < self.block_distance_to_wall < 120 and 70 < self.nextBlock["distance"] < 100 and self.timelastcorner + 1.5 < time.time(): # and corner not in Utils.blockPositions
+                    self.nextBlock['position'] = "3"
+                    BlockPos = self.corner
                 
-                if nextBlock['position'] != "0" and nextBlock["position"] != "3":
-                    active_block_drive = True
-                    self.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
-                
-                elif nextBlock['position'] != "0" and nextBlock["position"] == "3":# and BlockPos not in self.blockPositions:
-                    self.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
+                if self.nextBlock['position'] != "0":
+                    self.blockPositions.update({BlockPos: {"position": self.nextBlock['position'], "color": self.nextBlock['color']}})
                         
-            elif (self.avg_edge_distance < 200) and not active_block_drive and - 40 < relative_angle < 10 and direction == 0:
-                #Utils.LogInfo(f"avg_edge_distance: {self.avg_edge_distance}, distance: {nextBlock['distance']}, block_distance_to_wall: {block_distance_to_wall}, nextblock['x']: {nextBlock['x']}, nextblock['y']: {nextBlock['y']}")
-                if (120 < self.avg_edge_distance < 180) and nextBlock['x'] > 780 and nextBlock['y'] > 200 and 70 < nextBlock["distance"] < 110:
-                    nextBlock['position'] = "1"
-                    BlockPos = corners + 1 if corners < 3 else 0
-                elif 80 < block_distance_to_wall < 130 and nextBlock["distance"] < 80:
-                    nextBlock['position'] = "3"
-                    BlockPos = corners
-                elif 130 < block_distance_to_wall < 180 and nextBlock["distance"] < 80:# or block_distance_to_wall < 80:
-                    nextBlock['position'] = "2"
-                    if abs(relative_angle) > 40:
-                        BlockPos = corners + 1 if corners < 3 else 0
-                    else:
-                        BlockPos = corners
-                else:
-                    nextBlock['position'] = "0"
-                
-                if nextBlock['position'] != "0" and nextBlock["position"] != "3":
-                    active_block_drive = True
-                    self.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
-                
-                elif nextBlock['position'] != "0" and nextBlock["position"] == "3":# and BlockPos not in self.blockPositions:
-                    self.blockPositions.update({BlockPos: {"position": nextBlock['position'], "color": nextBlock['color']}})
+            elif (self.avg_edge_distance < 220) and -35 < self.relative_angle < 15 and self.direction == 0:
+                self.nextBlock['position'] = "0"
+                if (130 < self.avg_edge_distance < 180) and self.block_distance_to_wall < 95 and pos1_x_area[0] < self.nextBlock['mx'] < pos1_x_area[1] and 50 < self.nextBlock["distance"] < 105 and self.timelastcorner + 1.5 < time.time():
+                    self.nextBlock['position'] = "1"
+                    BlockPos = self.corner + 1 if self.corner < 3 else 0
                     
-        else:
-            self.distance_next_block = -1
+                elif 95 < self.block_distance_to_wall < 120 and 70 < self.nextBlock["distance"] < 100 and self.timelastcorner + 1.5 < time.time():# and self.corner not in self.Utils.blockPositions:
+                    self.nextBlock['position'] = "3"
+                    BlockPos = self.corner
+
+                if self.nextBlock['position'] != "0":
+                    self.blockPositions.update({BlockPos: {"position": self.nextBlock['position'], "color": self.nextBlock['color']}})
             
             
 if __name__ == '__main__':
