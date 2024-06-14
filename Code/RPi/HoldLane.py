@@ -21,7 +21,7 @@ StopButton = Button(6, Utils)
 
 Buzzer1 = Buzzer(12, Utils)
 
-Cam = Camera(video_stream=True, enable_video_writer=False, Utils=Utils)
+Cam = Camera(video_stream=True, enable_video_writer=True, Utils=Utils)
 
 global ESPHoldDistance, ESPHoldSpeed
 ESPHoldDistance, ESPHoldSpeed = Utils.transferSensorData(StartButton, StopButton, Buzzer1, Cam)
@@ -305,7 +305,7 @@ class HoldLane():
             if self.desired_distance_wall <= 30 and self.Sensor == 2:
                 pos1_x_area = [230, 550]
             elif 30 < self.desired_distance_wall < 70:
-                pos1_x_area = [50, 320]
+                pos1_x_area = [50, 380]
             elif self.desired_distance_wall <= 30 and self.Sensor == 1:
                 pos1_x_area = [0, 300]
         
@@ -313,13 +313,13 @@ class HoldLane():
             if self.desired_distance_wall <= 30 and self.Sensor == 1:
                 pos1_x_area = [730, 1050]
             elif 30 < self.desired_distance_wall < 70:
-                pos1_x_area = [960, 1280]
+                pos1_x_area = [910, 1280]
             elif self.desired_distance_wall <= 30 and self.Sensor == 2:
                 pos1_x_area = [980, 1280]
             
         
         if not self.active_block_drive:
-            #Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['mx']: {self.nextBlock['mx']}, self.nextBlock['y']: {self.nextBlock['y']}")
+            Utils.LogInfo(f"avg_edge_distance: {Utils.Cam.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['mx']: {self.nextBlock['mx']}, self.nextBlock['y']: {self.nextBlock['y']}")
             
             self.block_distance_to_wall = self.Utils.Cam.avg_edge_distance - self.nextBlock['distance']
             

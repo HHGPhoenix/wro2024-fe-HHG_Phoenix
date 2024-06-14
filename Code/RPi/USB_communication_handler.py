@@ -119,7 +119,6 @@ class USBCommunication:
             #     counter = 0
             # else:
             #     counter += 1
-        
       
     # Send messages to NodeMCUs    
     def sendMessage(self, message, ESP):

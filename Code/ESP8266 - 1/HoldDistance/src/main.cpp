@@ -126,14 +126,14 @@ void loop()
 								{
 									firstCornerDetected = true;
 									delay(500);
-									Serial.println("DD C");
+									Serial.println("DDC");
 									activeSensor = 1;
 								}
 								else
 								{
 									firstCornerDetected = true;
 									delay(500);
-									Serial.println("DD CC");
+									Serial.println("DDCC");
 									activeSensor = 2;
 								}
 							}

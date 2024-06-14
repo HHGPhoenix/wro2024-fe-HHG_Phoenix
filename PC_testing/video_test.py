@@ -5,7 +5,7 @@ from sklearn.linear_model import LinearRegression
 from math import tan, radians, cos, atan, degrees, atan2
 import time
 import matplotlib.pyplot as plt
-import mplcursors
+# import mplcursors
 import threading
 from flask import Flask, render_template, Response, jsonify
 from copy import deepcopy
@@ -27,14 +27,14 @@ class Camera():
         # self.picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
         
         # Define the color ranges for green and red in HSV color space
-        self.lower_green = np.array([53, 100, 40])
-        self.upper_green = np.array([93, 220, 150])
+        self.lower_green = np.array([58, 90, 60])
+        self.upper_green = np.array([70, 150, 120])
 
-        self.lower_red1 = np.array([0, 160, 120])
-        self.upper_red1 = np.array([5, 220, 200])
+        self.lower_red1 = np.array([0, 160, 75])
+        self.upper_red1 = np.array([5, 230, 200])
 
-        self.lower_red2 = np.array([173, 160, 100])
-        self.upper_red2 = np.array([180, 220, 200])
+        self.lower_red2 = np.array([173, 160, 75])
+        self.upper_red2 = np.array([180, 230, 200])
 
         # Define the kernel for morphological operations
         self.kernel = np.ones((7, 7), np.uint8)
@@ -179,7 +179,7 @@ class Camera():
         
         
     def get_edges(self, frame):
-        frame = frame[100:, 300:980]
+        frame = frame[250:, 300:980]
         
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -337,7 +337,7 @@ class Camera():
         #frameraw = cv2.cvtColor(frameraw, cv2.COLOR_RGB2BGR)
         frame = frameraw.copy()
         
-        frame = frame[100:, :]
+        frame = frame[250:, :]
         
         #frameraw = frameraw[100:500, 300:980]
         #frameraw = frameraw[150:, :]
@@ -408,7 +408,7 @@ class Camera():
         self.video_writer = None
         self.blockPositions = {}
 
-        video_path = r"C:\Users\felix\Downloads\Videos Runs\alles Licht, fenster zu, Blöcke, kein Filter.mp4"
+        video_path = r"C:\Users\Admin\OneDrive\Dokumente\GitHub\wro2024-fe-HHG_Phoenix\Code\RPi\save1.mp4"
         self.cap = cv2.VideoCapture(video_path)
 
         self.avg_edge_distance_values = []
@@ -426,7 +426,7 @@ class Camera():
             line2, = ax.plot([], [], label='distance_next_block')  # Initialize a line object for distance_next_block
             line3, = ax.plot([], [], label='avg_brightness_left')  # Initialize a line object for avg_brightness
             line4, = ax.plot([], [], label='avg_brightness_right')  # Initialize a line object for avg_brightness
-            cursor = mplcursors.cursor([line1, line2], hover=True)  # Enable the cursor for both lines
+            # cursor = mplcursors.cursor([line1, line2], hover=True)  # Enable the cursor for both lines
         
             self.distance_next_block_values = []  # Initialize the list for distance_next_block values
         
@@ -460,9 +460,9 @@ class Camera():
                     ax.autoscale_view()  # Rescale the view
                     ax.legend()  # Add a legend
         
-                    cursor.connect("add", lambda sel: sel.annotation.set_text(
-                        'Point {}, Y={}'.format(sel.index, sel.target[1])
-                    ))  # Update the annotation for each data point
+                    # cursor.connect("add", lambda sel: sel.annotation.set_text(
+                    #     'Point {}, Y={}'.format(sel.index, sel.target[1])
+                    # ))  # Update the annotation for each data point
         
                     plt.draw()  # Redraw the figure
                     plt.pause(0.01)
@@ -552,7 +552,7 @@ class Camera():
             if self.desired_distance_wall <= 30 and self.Sensor == 2:
                 pos1_x_area = [230, 550]
             elif 30 < self.desired_distance_wall < 70:
-                pos1_x_area = [50, 320]
+                pos1_x_area = [50, 380]
             elif self.desired_distance_wall <= 30 and self.Sensor == 1:
                 pos1_x_area = [0, 300]
         
@@ -560,12 +560,14 @@ class Camera():
             if self.desired_distance_wall <= 30 and self.Sensor == 1:
                 pos1_x_area = [730, 1050]
             elif 30 < self.desired_distance_wall < 70:
-                pos1_x_area = [960, 1280]
+                pos1_x_area = [900, 1280]
             elif self.desired_distance_wall <= 30 and self.Sensor == 2:
                 pos1_x_area = [980, 1280]
         
         
-        if not self.active_block_drive and self.nextBlock:
+        if not self.active_block_drive and self.nextBlock is not None:
+            print(f"avg_edge_distance: {self.avg_edge_distance}, distance: {self.nextBlock['distance']}, self.block_distance_to_wall: {self.block_distance_to_wall}, self.nextBlock['mx']: {self.nextBlock['mx']}, self.nextBlock['y']: {self.nextBlock['y']}")
+            
             self.block_distance_to_wall = self.avg_edge_distance - self.nextBlock["distance"]
             self.next_corner = self.corner + 1 if self.corner < 3 else 0
 

@@ -469,14 +469,15 @@ class Camera():
         self.picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
         
         # Define the color ranges for green and red in HSV color space
-        self.lower_green = np.array([53, 100, 40])
-        self.upper_green = np.array([93, 220, 150])
+        self.lower_green = np.array([58, 90, 60])
+        self.upper_green = np.array([70, 150, 120])
 
         self.lower_red1 = np.array([0, 160, 120])
         self.upper_red1 = np.array([5, 220, 200])
 
         self.lower_red2 = np.array([173, 160, 100])
         self.upper_red2 = np.array([180, 220, 200])
+
 
         # Define the kernel for morphological operations
         self.kernel = np.ones((7, 7), np.uint8)

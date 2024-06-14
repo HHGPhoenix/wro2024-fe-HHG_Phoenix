@@ -117,9 +117,9 @@ def HoldLane(Utils, CornerWaiTTime=1):
             for response in responses:
                 print(response)
                 
-                if "DDCC" in responses:
+                if "DDCC" in response:
                     direction = 1
-                if "DDC" in responses:
+                elif "DDC" in response:
                     direction = 0
                     
         if rounds == 3 and timelastcorner + 0.5 < time.time():
